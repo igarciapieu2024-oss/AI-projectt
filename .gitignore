@@ -1,1 +1,8 @@
 # Files GitHub must ignore (Person 5)
+chroma_db/
+data/processed/
+data/feedback.csv
+eval/results.csv
+.venv/
+__pycache__/
+.DS_Store
