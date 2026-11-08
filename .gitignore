@@ -1,8 +1,15 @@
-# Files GitHub must ignore (Person 5)
-chroma_db/
+# Generated on each laptop - never uploaded (Francesca)
+chroma_db/*
+!chroma_db/.gitkeep
+data/interim/
 data/processed/
-data/feedback.csv
-eval/results.csv
+models/image_clf/
+eval/runs/
 .venv/
+venv/
 __pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
 .DS_Store
+.env
