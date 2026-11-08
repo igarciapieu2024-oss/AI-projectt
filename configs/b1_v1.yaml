@@ -1,0 +1,19 @@
+# Baseline B1: v1 = meaning search on the syllabi, prompt v1 (owner: Sergio)
+extends: base.yaml
+kb:
+  sources: [syllabi]
+  use_ocr: false
+  use_captions: false
+  chunk_strategy: section
+  dedup: false
+retrieval:
+  mode: dense
+  rerank: false
+  filters: false
+  small_to_big: false
+routing:
+  router: none
+generation:
+  prompt_version: v1
+  rewrite: false
+  selfcheck: false

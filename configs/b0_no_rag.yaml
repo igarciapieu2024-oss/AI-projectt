@@ -1,0 +1,8 @@
+# Baseline B0: the bare LLM, no retrieval (owner: Sergio)
+extends: base.yaml
+generation:
+  rag: false
+  rewrite: false
+  selfcheck: false
+routing:
+  router: none

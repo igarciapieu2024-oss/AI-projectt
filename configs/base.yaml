@@ -1,0 +1,41 @@
+# Shared defaults (tell the group before changing this file).
+# Every other config starts with `extends: base.yaml` and changes only what differs.
+
+kb:
+  sources: [syllabi, slides]
+  use_ocr: true
+  use_captions: true
+  chunk_strategy: slide        # section | slide
+  chunk_size: 800
+  chunk_overlap: 120
+  embed_model: sentence-transformers/all-MiniLM-L6-v2
+  dedup: true
+
+retrieval:
+  mode: hybrid                 # dense | hybrid
+  k_dense: 20
+  k_bm25: 20
+  rrf_k: 60
+  rerank: true
+  reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_k: 5
+  filters: true
+  small_to_big: true
+
+routing:
+  router: classifier           # none | classifier | llm
+  min_prob: 0.6
+
+generation:
+  rag: true
+  llm_model: llama3.1:8b       # set after D2 (demo laptop)
+  vision_model: moondream      # set after D2 (demo laptop)
+  prompt_version: v2
+  temperature: 0.1
+  rewrite: true
+  selfcheck: true
+  selfcheck_threshold: 0.2     # tuned on dev by Elena (Sat 14)
+
+eval:
+  judge_model: qwen2.5:7b
+  split: dev
