@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """Settings and paths (owner: Francesca; base.yaml is shared - tell the group before changing it).
 
 Every system variant is one YAML file in configs/ that starts with `extends: base.yaml`
@@ -116,3 +117,102 @@ def load_config(path: str | Path = "configs/base.yaml") -> Config:
     if unknown:
         raise ValueError(f"{path.name}: unknown config groups {sorted(unknown)}")
     return Config(name=path.stem, path=path, **{g: data.get(g, {}) for g in GROUPS})
+=======
+from pathlib import Path
+# ============================================================
+# PROJECT DIRECTORIES
+# ============================================================
+
+# Automatically identify the project's root directory.
+ROOT_DIR = Path(__file__).resolve().parents[1]
+
+# Original course materials.
+DATA_RAW_DIR = ROOT_DIR / "data" / "raw"
+
+# Processed data and extracted images.
+DATA_PROCESSED_DIR = ROOT_DIR / "data" / "processed"
+IMAGE_OUTPUT_DIR = DATA_PROCESSED_DIR / "images"
+
+# Local ChromaDB storage.
+CHROMA_DB_DIR = ROOT_DIR / "chroma_db"
+
+
+# ============================================================
+# DOCUMENT PROCESSING
+# ============================================================
+
+# Supported document formats.
+SUPPORTED_EXTENSIONS = {
+    ".pdf",
+    ".pptx",
+    ".docx",
+}
+
+# Default OCR languages (English and Spanish).
+OCR_LANGUAGE = "eng+spa"
+
+
+# ============================================================
+# TEXT CHUNKING
+# ============================================================
+
+CHUNK_SIZE = 350
+CHUNK_OVERLAP = 50
+
+
+# ============================================================
+# RETRIEVAL
+# ============================================================
+
+# Number of relevant chunks retrieved per question.
+TOP_K = 5
+
+
+# ============================================================
+# VECTOR DATABASE
+# ============================================================
+
+CHROMA_COLLECTION_NAME = "university_courses"
+
+
+# ============================================================
+# MODEL CONFIGURATION
+# ============================================================
+
+# These will be configured when the team selects its
+# local embedding model and LLM.
+
+EMBEDDING_MODEL_NAME = None
+LLM_MODEL_NAME = None
+
+
+# ============================================================
+# COURSE DISCOVERY
+# ============================================================
+
+def get_course_dirs() -> list[Path]:
+    """
+    Automatically discover course folders inside data/raw.
+
+    This allows new courses to be added without changing
+    the ingestion code.
+    """
+
+    if not DATA_RAW_DIR.exists():
+        return []
+
+    return sorted(
+        folder
+        for folder in DATA_RAW_DIR.iterdir()
+        if folder.is_dir()
+    )
+
+
+def get_course_names() -> list[str]:
+    """Return the names of all discovered courses."""
+
+    return [
+        folder.name
+        for folder in get_course_dirs()
+    ]
+>>>>>>> 0eadc24 (Implement document extraction, OCR, cleaning and chunking)
