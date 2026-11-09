@@ -1,5 +1,5 @@
 
-"""Find syllabus section and slide IDs matching a search query.
+"""Find syllabus, slide and image source IDs matching search words.
 
 Usage:
     python -m eval.find_ids "final exam"
@@ -12,24 +12,32 @@ import argparse
 import json
 from pathlib import Path
 
+from src.config import PATHS
 
-DATA_DIR = Path("data/interim")
 
-
-def find_ids(query: str, data_dir: Path = DATA_DIR) -> list[dict]:
-    """Return sections and slides containing all query words."""
+def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
+    """Search syllabus sections, slides and image text for query words."""
     words = query.casefold().split()
     if not words:
         return []
 
+    if data_dir is None:
+        files = [
+            (PATHS["syllabus_sections"], "section"),
+            (PATHS["slides"], "slide"),
+            (PATHS["image_texts"], "image"),
+        ]
+    else:
+        data_dir = Path(data_dir)
+        files = [
+            (data_dir / "syllabus_sections.jsonl", "section"),
+            (data_dir / "slides.jsonl", "slide"),
+            (data_dir / "image_texts.jsonl", "image"),
+        ]
+
     matches = []
 
-    for filename, id_field, title_field in [
-        ("syllabus_sections.jsonl", "section_id", "section_name"),
-        ("slides.jsonl", "slide_id", "title"),
-    ]:
-        path = data_dir / filename
-
+    for path, record_type in files:
         if not path.exists():
             print(f"File not found: {path}")
             continue
@@ -40,17 +48,36 @@ def find_ids(query: str, data_dir: Path = DATA_DIR) -> list[dict]:
                     continue
 
                 record = json.loads(line)
-                text = record.get("text", "")
-                title = record.get(title_field, "")
+
+                if record_type == "section":
+                    source_id = record.get("section_id", "")
+                    course = record.get("course_code", "")
+                    title = record.get("section_name", "")
+                    text = record.get("text", "")
+                elif record_type == "slide":
+                    source_id = record.get("slide_id", "")
+                    course = record.get("course_code", "")
+                    title = record.get("title", "")
+                    text = record.get("text", "")
+                else:
+                    source_id = record.get("slide_id", "")
+                    course = record.get("course_code", "")
+                    title = record.get("image_class", "Image")
+                    text = (
+                        record.get("ocr_text", "")
+                        + " "
+                        + record.get("description", "")
+                    )
 
                 searchable = f"{title} {text}".casefold()
 
                 if all(word in searchable for word in words):
                     matches.append({
-                        "id": record.get(id_field, ""),
-                        "course": record.get("course_code", ""),
+                        "id": source_id,
+                        "course": course,
                         "title": title,
                         "snippet": " ".join(text.split())[:160],
+                        "type": record_type,
                     })
 
     return matches
@@ -58,7 +85,7 @@ def find_ids(query: str, data_dir: Path = DATA_DIR) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Find IDs of syllabus sections and slides."
+        description="Find syllabus section and slide IDs."
     )
     parser.add_argument("query", help="Words to search for")
     args = parser.parse_args()
@@ -66,11 +93,12 @@ def main() -> None:
     results = find_ids(args.query)
 
     if not results:
-        print("No matching sections or slides found.")
+        print("No matching sections, slides or images found.")
         return
 
     for result in results:
-        print(f"\nID: {result['id']}")
+        print(f"\nType: {result['type']}")
+        print(f"ID: {result['id']}")
         print(f"Course: {result['course']}")
         print(f"Title/Section: {result['title']}")
         print(f"Text: {result['snippet']}")
