@@ -1,0 +1,5 @@
+extends: base.yaml
+kb:
+  use_ocr: true
+  use_captions: false
+  
