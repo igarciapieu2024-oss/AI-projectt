@@ -1,0 +1,7 @@
+question_id,split,type,turn1,question,course_code,gold_ids,reference_answer,key_facts,answerable,author
+EX01,dev,admin,,What percentage is the final exam worth?,c01,c01_syl_sec04,The final exam is worth 40%.,40%,1,example
+EX02,dev,cross,,Which courses have a final exam?,,c01_syl_sec04;c02_syl_sec03,Course 1 and Course 2 have final exams.,Course 1;Course 2,1,example
+EX03,dev,content,,What determines the equilibrium price?,c01,c01_s04_p017,Supply and demand determine the equilibrium price.,supply;demand,1,example
+EX04,dev,image,,What does the diagram show?,c01,c01_s04_p017,The diagram shows supply and demand intersecting.,supply;demand;intersection,1,example
+EX05,dev,followup,What is inflation?,How is it measured?,c01,c01_s05_p008,Inflation is measured using changes in the general price level.,price level;change,1,example
+EX06,dev,unanswerable,,What is the professor's favourite movie?,c01,,Not covered in the course material.,,0,example
