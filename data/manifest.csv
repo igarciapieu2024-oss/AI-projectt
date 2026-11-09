@@ -1,1 +1,87 @@
 source_id,course_code,course_name,doc_type,sessions,file,language
+ai_ml_s01,ai_ml,AI Machine Learning Foundations,slides,[1],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 1 - Course Introduction.pdf,en
+ai_ml_s10,ai_ml,AI Machine Learning Foundations,slides,[10],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 10 - Unsupervised Learning.pdf,en
+ai_ml_s11,ai_ml,AI Machine Learning Foundations,slides,[11],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 11 - MLP.pdf,en
+ai_ml_s19-20,ai_ml,AI Machine Learning Foundations,slides,"[19,20]",AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 19 and 20 - CNNs.pdf,en
+ai_ml_s02,ai_ml,AI Machine Learning Foundations,slides,[2],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 2 - Introduction to Machine Learning (1).pdf,en
+ai_ml_s21,ai_ml,AI Machine Learning Foundations,slides,[21],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 21 - Practical session - YOLO (1).pdf,en
+ai_ml_s03,ai_ml,AI Machine Learning Foundations,slides,[3],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 3 - Practical session - Types of Learning (1).pdf,en
+ai_ml_s04,ai_ml,AI Machine Learning Foundations,slides,[4],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 4 - Regression (1).pdf,en
+ai_ml_s05,ai_ml,AI Machine Learning Foundations,slides,[5],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 5 - Classification (1).pdf,en
+ai_ml_s06,ai_ml,AI Machine Learning Foundations,slides,[6],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 6 - Overfitting and Regularization (1).pdf,en
+ai_ml_s07,ai_ml,AI Machine Learning Foundations,slides,[7],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 7 - Practical session - Classification (1).pdf,en
+ai_ml_s08,ai_ml,AI Machine Learning Foundations,slides,[8],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 8 - Tree-based Methods.pdf,en
+ai_ml_s09,ai_ml,AI Machine Learning Foundations,slides,[9],AI-MACHINE_LEARNING_FOUNDATIONS/presentations/Session 9 - Support Vector Machines.pdf,en
+ai_ml_syl,ai_ml,AI Machine Learning Foundations,syllabus,,AI-MACHINE_LEARNING_FOUNDATIONS/syllabus/AI-MACHINE LEARNING SYLLABUS.pdf,en
+macro_s20-21-22,macro,Macroeconomics,slides,"[20,21,22]",Macroeconomics/Presentations/1.AD_AS_Model_2021class.pdf,en
+macro_s02-03-04,macro,Macroeconomics,slides,"[2,3,4]",Macroeconomics/Presentations/1.KeyMacroVariables (1).pdf,en
+macro_s17-18-19,macro,Macroeconomics,slides,"[17,18,19]",Macroeconomics/Presentations/1.LaborMarket_2026class(1).pdf,en
+macro_s01,macro,Macroeconomics,slides,[1],Macroeconomics/Presentations/1.Session1_Macro_BBA_sep2026(1).pdf,en
+macro_s05-06-07,macro,Macroeconomics,slides,"[5,6,7]",Macroeconomics/Presentations/Goods market in a closed economy.pdf,en
+macro_s08,macro,Macroeconomics,slides,[8],Macroeconomics/Presentations/Goods market in an open economy.pdf,en
+macro_s11-12-13-14,macro,Macroeconomics,slides,"[11,12,13,14]",Macroeconomics/Presentations/IS-LM MODEL.pdf,en
+macro_s09-10,macro,Macroeconomics,slides,"[9,10]",Macroeconomics/Presentations/The financial market.pdf,en
+macro_syl,macro,Macroeconomics,syllabus,,Macroeconomics/Syllabus/Macroeconomics syllabus.pdf,en
+mgmt_control_s01,mgmt_control,Management Control,slides,[1],Management_Control/Presentations/BB 01 Management Control - Introduction AdP.pdf,en
+mgmt_control_s02,mgmt_control,Management Control,slides,[2],Management_Control/Presentations/BB 01 Management Control - Topic 1 AdP (1).pdf,en
+mgmt_control_s03,mgmt_control,Management Control,slides,[3],Management_Control/Presentations/BB 02 Management Control -Topic 2 AdP(1) (1).pdf,en
+mgmt_control_s04-05,mgmt_control,Management Control,slides,"[4,5]",Management_Control/Presentations/BB 03 Management Control - Topic 3 AdP (1).pdf,en
+mgmt_control_s06-07-08,mgmt_control,Management Control,slides,"[6,7,8]",Management_Control/Presentations/BB 04 Management Control - Topic 4 AdP (1).pdf,en
+mgmt_control_s09-10-11-12-13,mgmt_control,Management Control,slides,"[9,10,11,12,13]",Management_Control/Presentations/BB 05 Management Control - Topic 5 (sessions 9-10-11) AdP (1).pdf,en
+mgmt_control_s15-16-17,mgmt_control,Management Control,slides,"[15,16,17]",Management_Control/Presentations/BB 06 MC Topic 6 AdP.pdf,en
+mgmt_control_s18-19-20,mgmt_control,Management Control,slides,"[18,19,20]",Management_Control/Presentations/BB 07 Management Control - Topic 7 AdP.pdf,en
+mgmt_control_syl,mgmt_control,Management Control,syllabus,,Management_Control/Syllabus/Management Control Syllabus.pdf,en
+os_s10,os,Operating Systems,slides,[10],Operating_Systems/Presentations/lecture_10_v2 (1).pdf,en
+os_s11,os,Operating Systems,slides,[11],Operating_Systems/Presentations/lecture_11-1.pdf,en
+os_s12,os,Operating Systems,slides,[12],Operating_Systems/Presentations/lecture_12.pdf,en
+os_s13,os,Operating Systems,slides,[13],Operating_Systems/Presentations/lecture_13.pdf,en
+os_s14,os,Operating Systems,slides,[14],Operating_Systems/Presentations/lecture_14.pdf,en
+os_s15,os,Operating Systems,slides,[15],Operating_Systems/Presentations/lecture_15.pdf,en
+os_s01,os,Operating Systems,slides,[1],Operating_Systems/Presentations/lecture_1_01092026-3 (1).pdf,en
+os_s02,os,Operating Systems,slides,[2],Operating_Systems/Presentations/lecture_2_07092026-1 (1).pdf,en
+os_s03,os,Operating Systems,slides,[3],Operating_Systems/Presentations/lecture_3_08092026 (1).pdf,en
+os_s04,os,Operating Systems,slides,[4],Operating_Systems/Presentations/lecture_4_14092026 (1).pdf,en
+os_s05,os,Operating Systems,slides,[5],Operating_Systems/Presentations/lecture_5_15092026-3 (1).pdf,en
+os_s06,os,Operating Systems,slides,[6],Operating_Systems/Presentations/lecture_6_16092026-2 (1).pdf,en
+os_s07,os,Operating Systems,slides,[7],Operating_Systems/Presentations/lecture_7_21092026-1 (1).pdf,en
+os_s08,os,Operating Systems,slides,[8],Operating_Systems/Presentations/lecture_8 (1).pdf,en
+os_s09,os,Operating Systems,slides,[9],Operating_Systems/Presentations/lecture_9_v2.pdf,en
+os_syl,os,Operating Systems,syllabus,,Operating_Systems/Syllabus/Operating Systems Syllabus.pdf,en
+ob_s01,ob,Organizational Behaivour,slides,[1],Organizational_Behaivour/Presentations/Session 1_Intro to OB_BBAnDBA Sept11_2026_3MB_OB_Professor Morales.pdf,en
+ob_s02,ob,Organizational Behaivour,slides,[2],Organizational_Behaivour/Presentations/Session 2_Personality&Values_BBAnDBA 3MB_OB_Sept14_2026_Professor Morales.pdf,en
+ob_s03,ob,Organizational Behaivour,slides,[3],Organizational_Behaivour/Presentations/Session 3_Attitudes&Job Satisfaction_OB_BBAnDBA Sept28_2026_3MB_Professor Morales.pdf,en
+ob_s05,ob,Organizational Behaivour,slides,[5],Organizational_Behaivour/Presentations/Session 5_MotivationConcepts_OB_BBAnDBA Oct5_2026_3MB_Professor Morales.pdf,en
+ob_s10-11,ob,Organizational Behaivour,slides,"[10,11]",Organizational_Behaivour/Presentations/Sessions 10-11_Foundations of Group Behavior&WorkTeams_OB_BBAnDBA Oct26-2026_3MB_Professor Morales.pdf,en
+ob_syl,ob,Organizational Behaivour,syllabus,,Organizational_Behaivour/Syllabus/Organizational Behaivour Syllabus.pdf,en
+strategies_s01,strategies,Strategies,slides,[1],Strategies/Presentations/S1 ieRL27 Concept of strategy (2).pdf,en
+strategies_s11,strategies,Strategies,slides,[11],Strategies/Presentations/S11 ieRL27 SOLUTION CASE Arrognat Brewery.pdf,en
+strategies_s12,strategies,Strategies,slides,[12],Strategies/Presentations/S12 ieRL27 Game Theory Fundamentals.pdf,en
+strategies_s13,strategies,Strategies,slides,[13],Strategies/Presentations/S13 ieRL27 Game Theory Applied to competition.pdf,en
+strategies_s14,strategies,Strategies,slides,[14],Strategies/Presentations/S14 ieRL27 Lobster Simulation Game.pdf,en
+strategies_s16,strategies,Strategies,slides,[16],Strategies/Presentations/S16 ieRL27 Game Theory Applied.pdf,en
+strategies_s17,strategies,Strategies,slides,[17],Strategies/Presentations/S17 ieRL27 Entry Dynamics.pdf,en
+strategies_s18,strategies,Strategies,slides,[18],Strategies/Presentations/S18 27v1 Industry Life Cicle.pdf,en
+strategies_s02,strategies,Strategies,slides,[2],Strategies/Presentations/S2 ieRL27 RLP Value Creation (1).pdf,en
+strategies_s20,strategies,Strategies,slides,[20],Strategies/Presentations/S20 RLv27 Vertical Integration.pdf,en
+strategies_s22,strategies,Strategies,slides,[22],Strategies/Presentations/S22 RLv26 Diversification.pdf,en
+strategies_s24,strategies,Strategies,slides,[24],Strategies/Presentations/S24 ieRL26 Corporate Culture & ECOALF.pdf,en
+strategies_s25,strategies,Strategies,slides,[25],Strategies/Presentations/S25 ieRL26v8 Strategy in turbulent environments.pdf,en
+strategies_s26,strategies,Strategies,slides,[26],Strategies/Presentations/S26 RLie27 Business Model Innovation.pdf,en
+strategies_s27-28,strategies,Strategies,slides,"[27,28]",Strategies/Presentations/S27_28 RLv26 Case competition Instructions.pdf,en
+strategies_s29,strategies,Strategies,slides,[29],Strategies/Presentations/S29 ieRL27 Corporate Strategy (except Game Theory).pdf,en
+strategies_s04,strategies,Strategies,slides,[4],Strategies/Presentations/S4 ieRL27 Industry analysis (1).pdf,en
+strategies_s05,strategies,Strategies,slides,[5],Strategies/Presentations/S5 ieRL27 US CASE US AIRLINES.pdf,en
+strategies_s06,strategies,Strategies,slides,[6],Strategies/Presentations/S6 ieRL27 Segmentation & Blue Ocean.pdf,en
+strategies_s07,strategies,Strategies,slides,[7],Strategies/Presentations/S7 ieRL27 Resources & Capabilities.pdf,en
+strategies_s08,strategies,Strategies,slides,[8],Strategies/Presentations/S8 ieRL27 CASE Harley Davidson (1).pdf,en
+strategies_s09,strategies,Strategies,slides,[9],Strategies/Presentations/S9 ieRL27 Competitive Advantage & Cost Leader.pdf,en
+strategies_syl,strategies,Strategies,syllabus,,Strategies/Syllabus/Strategies Syllabus.pdf,en
+time_series_s01,time_series,Time Series,slides,[1],Time_Series/Presentations/Time Series Analysis - Session 1(1) (1).pdf,en
+time_series_s02,time_series,Time Series,slides,[2],Time_Series/Presentations/Time Series Analysis - Session 2 (1).pdf,en
+time_series_s03,time_series,Time Series,slides,[3],Time_Series/Presentations/Time Series Analysis - Session 3 (1).pdf,en
+time_series_s04,time_series,Time Series,slides,[4],Time_Series/Presentations/Time Series Analysis - Session 4(1) (1).pdf,en
+time_series_s05,time_series,Time Series,slides,[5],Time_Series/Presentations/Time Series Analysis - Session 5(1) (1).pdf,en
+time_series_s06,time_series,Time Series,slides,[6],Time_Series/Presentations/Time Series Analysis - Session 6(1) (1).pdf,en
+time_series_s07,time_series,Time Series,slides,[7],Time_Series/Presentations/Time Series Analysis - Session 7(1) (1).pdf,en
+time_series_s08,time_series,Time Series,slides,[8],Time_Series/Presentations/Time Series Analysis - Session 8.pdf,en
+time_series_syl,time_series,Time Series,syllabus,,Time_Series/Syllabus/Time Series Syllabus.pdf,en
