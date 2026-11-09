@@ -52,7 +52,7 @@ python -m src.check_env
 | `src/vision/` | extract + OCR (Santiago) · classify + describe (Irene) | Santiago, Irene |
 | `src/retrieval/`, `src/generation/` | search, reranker, router wrapper, prompts, LLM, `answer()` | Sergio |
 | `src/train/` | image classifier · router | Irene · Francesca |
-| `app.py`, `app_components/`, `.streamlit/`, `assets/` | the Streamlit app | Irene |
+| `app.py`, `app_pages/`, `app_components/`, `app_content.py`, `.streamlit/`, `assets/`, `static/` | the Streamlit app (texts in `app_content.py`, look in `assets/style.css`, fonts in `static/fonts/`) | Irene |
 | `eval/` | questions, harness, judge, metrics, statistics, figures | Elena |
 | `reports/` | small result files used in the documents and slides | each owner |
 | `docs/` | `parts/<name>.md`, technical and end-to-end documents | Francesca (parts from everyone) |

@@ -1,0 +1,314 @@
+/* The look of the whole app (owner: Irene).
+   Loaded on every page by app_components/theme.py. The colours are the same 6 as in .streamlit/config.toml. */
+
+/*1 the brand colours and sizes, named once and reused below (taken from the SyllabusAI logo) */
+:root {
+  --ink: #1B1747;        /* text: the dark navy of the logo */
+  --navy: #241C63;       /* dark panels: the graduation cap */
+  --blue: #2B6FD6;       /* buttons and links: the blue of "AI" and of the book */
+  --violet: #6E56CF;     /* second accent, used next to the blue */
+  --paper: #F6F7FD;      /* page background, a very light lavender */
+  --marker: #FFE45C;     /* the highlighter: citations and the parts of an answer that come from a source */
+  --moss: #1E9E6A;       /* "cited", "checked" */
+  --coral: #D64545;      /* "no sources", warnings */
+  --slate: #5B6080;      /* secondary text */
+  --line: #E1E4F2;       /* thin borders */
+  --tint: #EEF1FB;       /* light panels */
+  --display: "Instrument Sans", sans-serif;  /* titles: the same family as the text, in bold */
+  --shadow: 0 1px 2px rgba(27, 23, 71, 0.05), 0 10px 30px -10px rgba(27, 23, 71, 0.16);  /* cards resting on the page */
+  --shadow-lg: 0 40px 80px -30px rgba(27, 23, 71, 0.45);                                 /* the laptop in the hero */
+}
+
+/*2 page frame: a white top bar with the logo and the menu, like a normal web app */
+[data-testid="stHeader"] {
+  background: rgba(255, 255, 255, 0.86); backdrop-filter: blur(10px);       /* white, slightly see-through when scrolling */
+  border-bottom: 1px solid var(--line); height: 4rem;
+}
+[data-testid="stHeader"] a, [data-testid="stHeader"] button p { font-weight: 600; }  /* the menu items a bit bolder */
+[data-testid="stMainBlockContainer"] { max-width: 1180px; padding-top: 6rem; }  /* starts below the top bar; not too wide on the projector */
+[data-testid="stSidebar"] { border-right: 1px solid var(--line); }       /* a thin line instead of a shadow */
+h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; color: var(--ink); }
+
+/* our titles must win over Streamlit's own heading and paragraph styles, so they are more specific */
+[data-testid="stMarkdownContainer"] .section-title { margin: 4.5rem 0 1.6rem; padding: 0; }
+[data-testid="stMarkdownContainer"] .hero-title { padding: 0; }
+[data-testid="stMarkdownContainer"] .page-title { padding: 0; }
+
+/*3 buttons: blue primary, outlined secondary */
+.stButton button[kind="primary"] {
+  background: var(--blue); border: 0; font-weight: 600; padding: 0.7rem 1.4rem;
+  box-shadow: 0 6px 18px -6px rgba(43, 111, 214, 0.5);     /* a blue glow under the main button */
+}
+.stButton button[kind="primary"]:hover { background: #1F5BB8; }
+.stButton button:focus-visible { outline: 3px solid var(--marker); outline-offset: 2px; }  /* visible keyboard focus */
+
+/*4 HOME: the hero, a light blue panel with the pitch on the left and the app on a laptop on the right */
+.st-key-hero {
+  background: linear-gradient(120deg, #FFFFFF 0%, #EEF2FF 50%, #DCE5FF 100%);  /* white to light blue, like the logo's book */
+  border-radius: 28px; padding: 3rem 3rem 3.4rem; border: 1px solid var(--line);
+}
+.hero-pill {                                  /* the small label above the headline */
+  display: inline-flex; align-items: center; gap: 0.5rem; background: #fff; border: 1px solid var(--line);
+  border-radius: 999px; padding: 0.35rem 0.9rem; font-size: 0.85rem; font-weight: 600; color: var(--ink); margin-bottom: 1.4rem;
+}
+.hero-title {
+  font-family: var(--display); font-weight: 700; color: var(--ink);
+  font-size: clamp(2.4rem, 4.4vw, 3.9rem); line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 1.4rem; padding: 0 !important; text-wrap: balance;
+}
+.hero-title em { font-style: normal; color: var(--blue); }  /* the words in blue, as in the logo's "AI" */
+.hero-pitch { font-size: 1.12rem !important; color: var(--slate); line-height: 1.6; max-width: 34rem; margin: 0 0 1.6rem; }
+.st-key-hero .stButton button[kind="primary"] { padding: 0.85rem 1.7rem; border-radius: 12px; }
+.st-key-hero .stButton button[kind="primary"] p { font-size: 1.05rem; font-weight: 650; }
+
+/*5 the laptop: the real chat screen of the app, with three documents floating next to it */
+.device { position: relative; padding: 1.5rem 0 1rem 6.4rem; }  /* room on the left for the floating documents */
+.laptop-screen {                              /* the black frame of the screen */
+  background: #14122E; border-radius: 16px 16px 6px 6px; padding: 10px; box-shadow: var(--shadow-lg); position: relative; z-index: 1;
+}
+.laptop-base {                                /* the keyboard part, wider than the screen */
+  height: 16px; margin: 0 -7%; border-radius: 0 0 14px 14px; position: relative; z-index: 1;
+  background: linear-gradient(#D9DCE8, #B7BBCB); box-shadow: 0 18px 30px -18px rgba(27, 23, 71, 0.6);
+}
+.laptop-base::after {                         /* the notch to open the laptop */
+  content: ""; position: absolute; left: 50%; top: 0; width: 18%; height: 6px; transform: translateX(-50%);
+  background: #A9AEC0; border-radius: 0 0 8px 8px;
+}
+.mini-app { display: grid; grid-template-columns: 30% 1fr; background: #fff; border-radius: 8px; overflow: hidden; min-height: 290px; }
+.mini-side { background: var(--navy); padding: 0.8rem 0.6rem; color: #C9C6EE; font-size: 0.72rem; }
+.mini-side img { width: 100%; max-width: 120px; filter: brightness(0) invert(1); margin: 0.2rem 0 0.9rem; }  /* the logo in white */
+.mini-side div { padding: 0.4rem 0.5rem; border-radius: 6px; margin-bottom: 0.2rem; }
+.mini-side div.on { background: var(--blue); color: #fff; font-weight: 600; }
+.mini-main { padding: 0.9rem 1rem; color: var(--ink); }
+.mini-q {
+  background: var(--blue); color: #fff; border-radius: 12px 12px 3px 12px; padding: 0.45rem 0.7rem;
+  margin: 0 0 0.7rem auto; width: fit-content; max-width: 88%; font-size: 0.78rem;
+}
+.mini-a { font-size: 0.78rem; line-height: 1.65; margin: 0 0 0.7rem; }
+.slips { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
+.slip { border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.55rem; background: var(--paper); font-size: 0.68rem; color: var(--slate); }
+.slip b { color: var(--ink); font-weight: 600; display: block; }
+.hl {                                       /* the highlighter stroke, drawn from left to right on the cited parts */
+  background-image: linear-gradient(transparent 12%, var(--marker) 12%, var(--marker) 88%, transparent 88%);
+  background-repeat: no-repeat; background-size: 0% 100%;
+  animation: sweep 0.7s ease-out forwards; animation-delay: var(--d, 0.4s);
+  padding: 0 0.1em; border-radius: 3px;
+}
+@keyframes sweep { to { background-size: 100% 100%; } }
+@media (prefers-reduced-motion: reduce) { .hl { animation: none; background-size: 100% 100%; } }  /* no motion if the laptop asks for it */
+.doc {                                        /* the floating documents: syllabus, slides, diagram */
+  position: absolute; left: 0; width: 120px; background: #fff; border-radius: 12px; box-shadow: var(--shadow);
+  padding: 0.65rem 0.75rem; z-index: 2; font-size: 0.78rem; font-weight: 650; color: var(--ink);
+}
+.doc .doc-icon { width: 26px; height: 26px; border-radius: 7px; background: #E4EAFF; color: var(--blue); display: grid; place-items: center; margin-bottom: 0.45rem; }
+.doc i { display: block; height: 5px; border-radius: 3px; background: var(--line); margin-top: 0.35rem; }
+.doc i + i { width: 70%; }
+.doc.d1 { top: 0.4rem; transform: rotate(-6deg); }
+.doc.d2 { top: 8.6rem; left: -0.6rem; transform: rotate(4deg); }
+.doc.d3 { top: 16.4rem; transform: rotate(-3deg); }
+.doc.d3 .doc-icon { background: #EDE8FF; color: var(--violet); }
+.float-badge {                                /* the small card under the laptop: "checked against 2 sources" */
+  position: absolute; right: -0.6rem; bottom: -0.4rem; background: #fff; border-radius: 12px; box-shadow: var(--shadow);
+  padding: 0.6rem 0.9rem; display: flex; gap: 0.6rem; align-items: center; font-size: 0.82rem; color: var(--ink); z-index: 2;
+}
+.float-badge b { display: block; font-size: 0.86rem; }
+.float-badge span { color: var(--slate); }
+.check { width: 28px; height: 28px; border-radius: 50%; background: #DDF3E9; color: var(--moss); display: grid; place-items: center; flex: none; }
+
+/*6 the citation chip [S1] used everywhere an answer cites a source */
+.cite {
+  display: inline-block; background: var(--marker); color: var(--ink); font-weight: 700; font-size: 0.72em;
+  border-radius: 5px; padding: 0.05em 0.4em; margin: 0 0.15em; vertical-align: 0.15em; line-height: 1.4;
+}
+
+/*7 HOME: the sections under the hero */
+[data-testid="stMarkdownContainer"] .section-title { margin: 4.5rem 0 1.8rem; padding: 0; }
+.section-title { font-family: var(--display); font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+.section-title.center { display: flex; align-items: center; gap: 1.5rem; justify-content: center; text-align: center; }
+.section-title.center::before, .section-title.center::after { content: ""; flex: 1; max-width: 160px; height: 1px; background: var(--line); }  /* the lines on both sides */
+
+.features { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem; }
+.feature {
+  background: #fff; border-radius: 18px; padding: 1.5rem 1.4rem 1.6rem; box-shadow: var(--shadow);
+  border-bottom: 3px solid var(--blue);                                    /* a coloured line at the bottom of each card */
+}
+.feature:nth-child(even) { border-bottom-color: var(--violet); }           /* blue and violet, one after the other */
+.feature-icon { width: 52px; height: 52px; border-radius: 14px; background: #E4EAFF; color: var(--blue); display: grid; place-items: center; margin-bottom: 1.1rem; }
+.feature:nth-child(even) .feature-icon { background: #EDE8FF; color: var(--violet); }
+.feature b { display: block; font-family: var(--display); font-size: 1.15rem; margin-bottom: 0.45rem; color: var(--ink); }
+.feature span { color: var(--slate); line-height: 1.55; font-size: 0.95rem; }
+
+.trust {                                      /* the strip with the 3 guarantees */
+  display: grid; grid-template-columns: repeat(3, 1fr); background: linear-gradient(90deg, #EEF2FF, #F4F0FF);
+  border: 1px solid var(--line); border-radius: 18px; padding: 1.3rem 0.5rem; margin-top: 1.6rem;
+}
+.trust > div { display: flex; gap: 0.9rem; align-items: center; padding: 0 1.6rem; border-left: 1px solid #D5D9EE; }
+.trust > div:first-child { border-left: 0; }
+.trust svg { flex: none; color: var(--navy); }
+.trust b { display: block; color: var(--ink); }
+.trust span { color: var(--slate); font-size: 0.9rem; }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+.stat { background: #fff; border-radius: 18px; padding: 1.6rem 1.6rem 1.5rem; box-shadow: var(--shadow); }
+.stat-n { font-family: var(--display); font-size: 3.2rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1; color: var(--blue); }
+.stat-l { color: var(--slate); margin-top: 0.6rem; line-height: 1.45; max-width: 18rem; }
+
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem; }
+.step { position: relative; }
+.step:not(:last-child)::after {              /* the line from each step's circle to the next one */
+  content: ""; position: absolute; top: 19px; left: 48px; width: calc(100% + 1.2rem - 56px); height: 2px; background: var(--line);
+}
+.step-n {
+  width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 2px solid var(--blue); color: var(--blue);
+  display: grid; place-items: center; font-weight: 700; margin-bottom: 0.9rem;
+}
+.step:last-child .step-n { background: var(--blue); color: #fff; }  /* the last step: the cited answer */
+.step b { display: block; font-size: 1.05rem; margin-bottom: 0.3rem; }
+.step span { color: var(--slate); line-height: 1.5; font-size: 0.95rem; }
+
+.st-key-closing { background: linear-gradient(110deg, var(--navy), #3A3196 60%, var(--blue)); border-radius: 22px; padding: 2.2rem 2.4rem; margin-top: 4.5rem; }
+.st-key-closing .stButton button[kind="primary"] { background: #fff; color: var(--navy); box-shadow: none; }
+.closing-title { font-size: 1.9rem !important; font-family: var(--display); font-weight: 700; letter-spacing: -0.02em; margin: 0; color: #fff; }
+.footer { color: var(--slate); font-size: 0.85rem; margin: 2.5rem 0 1rem; }
+
+/*8 page headers on the other pages */
+.page-title { font-family: var(--display); font-size: 2.4rem; font-weight: 750; letter-spacing: -0.03em; margin: 0; color: var(--ink); }
+.page-sub { color: var(--slate); font-size: 1.05rem; margin: 0.3rem 0 1.5rem; }
+
+/*9 ASSISTANT: chat bubbles; the user on the right in blue, the assistant on white paper */
+[data-testid="stChatMessage"] { background: transparent; padding: 0.4rem 0; gap: 0.8rem; }
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) { flex-direction: row-reverse; }
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) [data-testid="stChatMessageContent"] {
+  background: var(--blue); color: #fff; border-radius: 18px 18px 4px 18px; padding: 0.7rem 1rem 0.1rem;
+  flex: 0 1 auto; max-width: 75%; margin: 0 0 0 auto !important;  /* pushed to the right, next to the avatar */
+}
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) [data-testid="stChatMessageContent"] p { color: #fff; }
+[data-testid="stChatMessageAvatarUser"] { background: var(--tint); color: var(--ink); }  /* a quiet grey avatar for the student */
+[data-testid="stChatMessage"]:not(:has([data-testid="stChatMessageAvatarUser"])) [data-testid="stChatMessageContent"] {
+  background: #fff; border: 1px solid var(--line); border-radius: 4px 18px 18px 18px; padding: 1rem 1.2rem 0.6rem;
+}
+.answer { font-size: 1.05rem; line-height: 1.7; }
+
+[data-testid="stChatMessage"]:not(:has([data-testid="stChatMessageAvatarUser"])) [data-testid="stChatMessageContent"] { box-shadow: var(--shadow); border-color: transparent; }
+
+/* the box where the student types: a rounded bar floating at the bottom */
+[data-testid="stChatInput"] { border-radius: 26px; box-shadow: var(--shadow); background: #fff; border: 1px solid var(--line); }
+[data-testid="stChatInput"] textarea { font-size: 1rem; }
+[data-testid="stBottom"] > div { background: linear-gradient(transparent, var(--paper) 30%); }  /* the answers fade out behind it */
+
+/* the toolbar above the chat: course filter, behind-the-scenes switch, new chat */
+.st-key-toolbar { background: #fff; border-radius: 14px; padding: 0.5rem 0.8rem; box-shadow: var(--shadow); margin-bottom: 1rem; }
+
+/* the empty chat: a welcome in the middle of the page */
+.welcome { text-align: center; margin: 3rem 0 2rem; }
+.welcome img { width: 64px; height: 64px; margin-bottom: 1.2rem; }
+.welcome-title { font-family: var(--display); font-size: 2.2rem; font-weight: 750; letter-spacing: -0.03em; color: var(--ink); }
+.welcome-sub { color: var(--slate); font-size: 1.05rem; margin-top: 0.4rem; }
+
+/*10 empty chat: the example questions as large buttons */
+.st-key-starters [data-testid="stElementContainer"], .st-key-starters .stButton { width: 100% !important; }  /* the buttons fill their column */
+.st-key-starters .stButton button {
+  width: 100%; min-height: 4.6rem; justify-content: flex-start; text-align: left; background: #fff;
+  border: 1px solid transparent; border-radius: 16px; padding: 0.9rem 1.2rem; box-shadow: var(--shadow);
+}
+.st-key-starters .stButton button > div { justify-content: flex-start; }      /* text on the left, like a card */
+.st-key-starters .stButton button span[data-testid="stIconMaterial"] { color: var(--blue); }
+.st-key-starters .stButton button:hover { border-color: var(--blue); color: var(--blue); }
+
+/*11 source cards under an answer */
+.src-head { font-size: 0.8rem; color: var(--slate); margin: 0.6rem 0 0.5rem; font-weight: 600; }
+.sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.7rem; margin-bottom: 0.8rem; }
+.src { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--paper); display: flex; flex-direction: column; }
+.also { font-size: 0.8rem; color: var(--slate); margin: -0.2rem 0 0.9rem; line-height: 1.6; }  /* retrieved but not cited: one quiet line */
+.also .tag { margin-right: 0.25rem; }
+.src-thumb { aspect-ratio: 16 / 9; background: var(--tint); display: grid; place-items: center; color: var(--slate); }
+.src-thumb:not(:has(img)) { aspect-ratio: auto; height: 56px; }  /* without a picture, only a thin strip with the icon */
+.src-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.src-body { padding: 0.6rem 0.75rem 0.75rem; font-size: 0.82rem; line-height: 1.45; }
+.src-tags { display: flex; gap: 0.35rem; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap; }
+.tag { border-radius: 5px; padding: 0.05em 0.45em; font-size: 0.72rem; font-weight: 600; background: var(--tint); color: var(--slate); }
+.tag.label { background: var(--line); color: var(--ink); }
+.tag.label.on { background: var(--marker); }
+.tag.img { background: #E4EAFF; color: #2442B8; }
+.src-path { font-weight: 600; color: var(--ink); margin-bottom: 0.25rem; }
+.src-text { color: var(--slate); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.src-image { margin-top: 0.5rem; border-left: 3px solid var(--blue); background: #fff; padding: 0.35rem 0.5rem; border-radius: 0 6px 6px 0; color: var(--ink); }
+
+/*12 notices: refusal and "no sources" */
+.notice { display: flex; gap: 0.7rem; align-items: flex-start; border-radius: 12px; padding: 0.8rem 1rem; margin: 0.3rem 0 0.8rem; font-size: 0.92rem; line-height: 1.45; }
+.notice b { display: block; }
+.notice.refuse { background: #FFF8D6; border: 1px solid #F2DB6B; }
+.notice.warn { background: #FCEBEB; border: 1px solid #F0BDBD; color: #8A2323; }
+
+/*13 behind the scenes: the route and the time bar */
+.route { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.9rem; }
+.route b { font-family: var(--display); font-size: 1.15rem; }
+.pill { background: var(--tint); border-radius: 999px; padding: 0.15em 0.65em; font-size: 0.8rem; color: var(--slate); }
+.timebar { display: flex; height: 30px; border-radius: 8px; overflow: hidden; margin: 0.4rem 0 0.4rem; }
+.timebar div { display: grid; place-items: center; font-size: 0.72rem; font-weight: 600; color: #fff; min-width: 4px; white-space: nowrap; overflow: hidden; }
+.timelegend { display: flex; flex-wrap: wrap; gap: 0.9rem; font-size: 0.8rem; color: var(--slate); margin-bottom: 1rem; }
+.timelegend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 0.3rem; vertical-align: -1px; }
+
+/* the suggested next questions under the last answer */
+.st-key-suggest [data-testid="stWidgetLabel"] p { font-size: 0.8rem; color: var(--slate); }
+.st-key-suggest button { background: #fff; border-color: var(--line); }
+
+/*14 COMPARE: two panels, red top line for the LLM alone, green for our system */
+.st-key-panel_bare, .st-key-panel_rag { background: #fff; border-radius: 18px; padding: 1.3rem 1.4rem; box-shadow: var(--shadow); }
+.st-key-askbar { background: #fff; border-radius: 18px; padding: 1rem 1.2rem; box-shadow: var(--shadow); margin-bottom: 1.4rem; }
+.st-key-panel_bare { border-top: 5px solid var(--coral); }
+.st-key-panel_rag { border-top: 5px solid var(--moss); }
+.panel-title { font-family: var(--display); font-size: 1.4rem; font-weight: 700; margin: 0; }
+.panel-sub { color: var(--slate); font-size: 0.88rem; margin: 0.1rem 0 0.9rem; }
+
+/*15 HOW IT WORKS: the two lanes of the pipeline and the results table */
+.lane { background: #fff; box-shadow: var(--shadow); border-radius: 18px; padding: 1.3rem 1.4rem; margin-bottom: 1rem; }
+.lane-title { font-family: var(--display); font-size: 1.25rem; font-weight: 700; margin: 0 0 0.2rem; }
+.lane-when { color: var(--slate); font-size: 0.88rem; margin-bottom: 1rem; }
+.flow { display: flex; align-items: stretch; gap: 0.4rem; flex-wrap: wrap; }
+.node { background: var(--tint); border-radius: 10px; padding: 0.55rem 0.75rem; font-size: 0.86rem; flex: 1 1 120px; }
+.node b { display: block; font-size: 0.92rem; }
+.node span { color: var(--slate); font-size: 0.78rem; }
+.node.end { background: var(--marker); }
+.arrow { align-self: center; color: var(--slate); }
+.results { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 1rem; background: #fff; border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+.results th { text-align: left; font-weight: 600; color: var(--slate); font-size: 0.85rem; padding: 0.6rem 0.8rem; border-bottom: 2px solid var(--ink); }
+.results td { padding: 0.8rem; border-bottom: 1px solid var(--line); }
+.results td.num { font-family: var(--display); font-size: 1.3rem; font-weight: 700; }
+.results .ours { background: #FFFBE0; }                       /* our column lightly highlighted */
+
+/*16 phones and small windows: stack the grids */
+@media (max-width: 760px) {
+  .st-key-hero { padding: 2rem 1.3rem; }
+  .stats, .steps, .features, .trust { grid-template-columns: 1fr; gap: 1.2rem; }
+  .trust > div { border-left: 0; }
+  .device { padding-left: 0; }
+  .doc { display: none; }
+  .step::after { display: none; }
+  .float-badge { right: 0.4rem; }
+}
+
+/*17 small fixes for the app look */
+.st-key-starters .stButton button p { white-space: normal; text-align: left; }  /* long example questions wrap instead of being cut */
+[data-testid="stChatInput"] > div, [data-testid="stChatInput"] textarea { background: #fff; }  /* the typing box white, not grey */
+
+/*18 the "searching" indicator: 3 dots that pulse one after the other until the first word arrives */
+.thinking { display: flex; align-items: center; gap: 0.35rem; color: var(--slate); font-size: 0.95rem; padding: 0.3rem 0; }
+.thinking span { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); animation: pulse 1.2s infinite ease-in-out; }
+.thinking span:nth-child(2) { animation-delay: 0.15s; }
+.thinking span:nth-child(3) { animation-delay: 0.3s; margin-right: 0.4rem; }
+@keyframes pulse { 0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .thinking span { animation: none; opacity: 0.6; } }
+
+/*19 "what it knows": the size of the knowledge base, on How it works */
+.kb { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.4rem; }
+.kb div { background: #fff; border-radius: 16px; padding: 1.1rem 1.2rem; box-shadow: var(--shadow); }
+.kb b { display: block; font-family: var(--display); font-size: 2.2rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1.1; }
+.kb span { color: var(--slate); font-size: 0.9rem; }
+.course-list { color: var(--slate); font-size: 0.92rem; margin: -0.4rem 0 2rem; line-height: 1.6; }
+@media (max-width: 760px) { .kb { grid-template-columns: 1fr 1fr; } }
+
+/*20 behind the scenes: the table with the score of each source */
+.scores { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 0.6rem; }
+.scores th { text-align: left; color: var(--slate); font-weight: 600; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); }
+.scores td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); }
+.scores td.n, .scores th:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }  /* numbers aligned on the right */
