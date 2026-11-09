@@ -1,55 +1,28 @@
-"""Streamlit chat (owner: Irene).
+"""The Streamlit app: entry point with the 4 pages (owner: Irene).
 
 Run with the fake engine (works today):   USE_FAKE=1 streamlit run app.py
-Run with the real engine (from Wed 11):   streamlit run app.py
-Windows PowerShell:  $env:USE_FAKE=1; streamlit run app.py
+Windows PowerShell:                         $env:USE_FAKE=1; streamlit run app.py
+Run with the real engine (from Wed 11):    streamlit run app.py
 """
-from __future__ import annotations
+import streamlit as st  # the library that builds the web app
 
-import os
+import app_content as content  # the company name and the logo files
+from app_components.theme import apply_theme  # our CSS (colours, fonts, cards)
 
-import streamlit as st
+#1 browser tab and page width
+# the tab shows the logo and the name; "wide" uses the whole screen width, better for the projector
+st.set_page_config(page_title=f"{content.COMPANY_NAME}, {content.SUBTITLE.lower()}", page_icon=content.LOGO_MARK, layout="wide")
 
-from src.schemas import AnswerResult
+#2 the brand
+apply_theme()  # loads assets/style.css before any page is drawn
+st.logo(content.LOGO_PATH, size="large")  # logo with the name, at the left of the top bar
 
-if os.environ.get("USE_FAKE") == "1":
-    from src.generation.fake import answer_stream
-else:
-    from src.generation.answer import answer_stream
-
-st.set_page_config(page_title="Course assistant", page_icon="📚")
-st.title("Course assistant")
-st.caption("Answers only from the official syllabi and slides, offline.")
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-question = st.chat_input("Ask about your courses")
-if question:
-    st.session_state.messages.append({"role": "user", "content": question})
-    with st.chat_message("user"):
-        st.markdown(question)
-
-    with st.chat_message("assistant"):
-        history = st.session_state.messages[:-1]
-        result: AnswerResult | None = None
-
-        def text_only():
-            global result
-            for piece in answer_stream(question, history=history):
-                if isinstance(piece, AnswerResult):
-                    result = piece
-                else:
-                    yield piece
-
-        st.write_stream(text_only())
-        if result is not None:
-            with st.expander("Sources"):
-                for hit in result.context_hits:
-                    st.markdown(f"**[{hit.label}]** {hit.chunk.outline_path}")
-                    st.caption(hit.chunk.text)
-            st.session_state.messages.append({"role": "assistant", "content": result.answer_text})
+#3 the 4 pages; each one is a file in app_pages/, and the menu at the top is built from this list
+# the icons are Google's Material icons, which come inside Streamlit, so they work offline
+pages = [
+    st.Page("app_pages/home.py", title="Home", icon=":material/home:", default=True),  # the landing page opens first
+    st.Page("app_pages/assistant.py", title="Assistant", icon=":material/forum:"),  # the chat, the technical core
+    st.Page("app_pages/compare.py", title="Compare", icon=":material/compare:"),  # our system vs the LLM alone
+    st.Page("app_pages/how_it_works.py", title="How it works", icon=":material/account_tree:"),  # architecture and results
+]
+st.navigation(pages, position="top").run()  # menu in a bar at the top, like a normal web app; runs the chosen page
