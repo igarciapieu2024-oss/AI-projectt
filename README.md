@@ -35,9 +35,12 @@ python -m src.check_env
 | Build the knowledge base | `python -m src.pipeline build --config configs/final.yaml` | Santiago |
 | Train the router | `python -m src.train.train_router` | Francesca |
 | Evaluate one config | `python -m eval.run_eval --config configs/final.yaml --split dev` | Elena |
+| Compare local LLM speed | `python -m eval.benchmark_llm --runs 3` | Sergio |
 | Start the app (fake engine) | `USE_FAKE=1 streamlit run app.py` (PowerShell: `$env:USE_FAKE=1; streamlit run app.py`) | Irene |
 | Start the app (real engine) | `streamlit run app.py` | Irene |
 | Fast tests | `pytest -m "not slow"` | everyone |
+
+The LLM benchmark tests `llama3.1:8b`, `qwen2.5:7b` and `llama3.2:3b` with the same cited-answer prompt. Pull the models first with `ollama pull <model>`. It prints each response and elapsed time; judge answer quality and citation behavior as well as whether every run meets the 10-second target. The first run may include model loading time.
 
 ## Where things go
 
