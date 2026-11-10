@@ -1,78 +1,99 @@
-"""Describe the useful slide images with a local vision model in Ollama, once (owner: Irene).
+"""Classify and describe every slide image with a local vision model in Ollama, in one step (owner: Irene).
+
+The vision model decides the type of each image AND writes its description in the same call,
+so we don't need a separate image classifier: one model, one decision, less noise in the knowledge base.
 
 Run from the repo root (Ollama must be open):
-    python -m src.vision.describe --limit 5         # try it on 5 images first
-    python -m src.vision.describe                  # all the useful images
-    python -m src.vision.describe --review 50      # 50 random descriptions to check by hand
-    python -m src.vision.describe --apply-review   # saves your corrections
+    python -m src.vision.describe --limit 5                       # try it on 5 images first
+    python -m src.vision.describe --limit 5 --model qwen2.5vl:3b   # try another vision model without touching the config
+    python -m src.vision.describe                                 # all the images
+    python -m src.vision.describe --review 50                     # 50 random descriptions to check by hand
+    python -m src.vision.describe --apply-review                  # saves your corrections
 """
 from __future__ import annotations  # lets us write types like "int | None" in any Python version
 
 import argparse  # reads the options we write after the command (--limit, --review...)
-import csv  # reads the classes file and the review spreadsheet
-import json  # writes the review counts as a readable file
+import csv  # reads and writes the review spreadsheet
+import json  # reads the model's answer (it comes as JSON) and writes the review counts
 import random  # picks the random sample for the check by hand
 import sys  # returns the exit code when the script finishes
-import time  # measures how long each description takes
+import time  # measures how long each image takes
 from pathlib import Path  # handles file paths the same way on Windows and Mac
 
 from src.config import PATHS, load_config  # the shared folder paths and settings of the project
 from src.schemas import ImageText  # the agreed format of one image row
 from src.utils.io import read_jsonl, write_jsonl  # read and write .jsonl files (one row per line)
 
-# only these 4 types carry information; photos and decorations are skipped because describing
-# each image takes several seconds and they would add nothing a student could search for
+# the 6 types the vision model can choose from (the same 6 names as in src/schemas.py)
+CLASSES = ["diagram", "chart", "formula", "table", "photo", "decoration"]
+# only these 4 types carry course content; photos and decorations (logos, icons, backgrounds)
+# get a class but no description, so they never reach the knowledge base
 USEFUL_CLASSES = {"diagram", "chart", "formula", "table"}
 MAX_WORDS = 120  # short enough to fit inside the slide's chunk without pushing out the slide text
 REVIEW_FILE = PATHS["labels"] / "description_review.csv"  # the spreadsheet for the check by hand
 # the columns of that spreadsheet: the first 5 are filled by the script, the last 3 by us
 REVIEW_FIELDS = ["image_id", "image_class", "image_path", "ocr_text", "description", "correct", "fixed_description", "error_type"]
 
-# the instruction we give the vision model. Each line has a reason:
+# the instruction we give the vision model. Each part has a reason:
+# - the list of classes with examples: logos and university branding are the main noise, so we name them
+# - "description empty" for photo/decoration: the model itself filters what is not worth storing
 # - "only what is visible": small vision models tend to add general knowledge that is not in the image
-# - the class: tells it what to look for (axes in a chart, boxes and arrows in a diagram)
 # - labels in order: those words are what students will type when they search
 # - the OCR text: the vision model often misreads small words, the OCR text helps it spell them right
-PROMPT = """You are describing one image from a university course slide, so that students can find it by searching.
-Describe only what is visible in the image. Do not add knowledge that is not in the image.
-1. Say what kind of image it is ({image_class}).
-2. List the labels, arrows, axes, values and steps you can read, in their order.
-3. Say in one sentence what the image shows.
-Use at most {max_words} words.
-Text read from the image (it may have errors; use it to spell words correctly): "{ocr_text}"
+# - JSON only: so the script can read the class and the description without guessing
+PROMPT = """You are processing one image taken from a university course slide.
+
+Step 1. Classify the image into exactly one of these classes:
+- diagram: boxes, arrows, flows, networks, architectures, process steps
+- chart: plots, graphs, bar/line/pie charts, anything with axes or data
+- formula: mathematical equations or notation
+- table: rows and columns of values or text
+- photo: a picture of people, places or objects that teaches nothing about the course content
+- decoration: logos, icons, university branding, backgrounds, clip art, stock images
+
+Step 2. If the class is diagram, chart, formula or table, describe it so that students can find it by searching:
+- describe only what is visible; do not add knowledge that is not in the image
+- list the labels, arrows, axes, values and steps you can read, in their order
+- end with one sentence saying what the image shows
+- use at most {max_words} words
+If the class is photo or decoration, the description must be an empty string.
+
+Text read from the image by OCR (it may have errors; use it to spell words correctly): "{ocr_text}"
+
+Answer with JSON only, in this exact format:
+{{"image_class": "<one of the 6 classes>", "description": "<text or empty>"}}
 """
 
 
-#1 describe one image
+#1 classify and describe one image
 
-def describe_image(path: str, ocr_text: str, cfg, image_class: str = "diagram") -> str:
-    """Send one image + the prompt to the vision model and return its description."""
+def classify_and_describe(path: str, ocr_text: str, model: str) -> tuple[str, str]:
+    """Send one image + the prompt to the vision model and return (class, description)."""
     import ollama  # imported here so the rest of the project works even if Ollama is not installed
 
     # fills the prompt; the OCR text is cut at 1,500 characters so a very long one doesn't flood the model
-    prompt = PROMPT.format(image_class=image_class, max_words=MAX_WORDS, ocr_text=(ocr_text or "")[:1500])
+    prompt = PROMPT.format(max_words=MAX_WORDS, ocr_text=(ocr_text or "")[:1500])
     reply = ollama.chat(  # sends the request to Ollama, which runs on this laptop
-        model=cfg.generation["vision_model"],  # moondream by default, set in configs/base.yaml (not written here)
+        model=model,  # the vision model (from configs/base.yaml, or --model to try another one)
         messages=[{"role": "user", "content": prompt, "images": [str(path)]}],  # the image goes with the message
-        options={"temperature": 0},  # 0 = no randomness, the same image always gets the same description
+        format="json",  # forces the model to answer with valid JSON, so we can always read it
+        options={"temperature": 0},  # 0 = no randomness, the same image always gets the same answer
     )
     # newer versions of the ollama library return an object, older ones a dictionary; this works with both
     text = reply["message"]["content"] if isinstance(reply, dict) else reply.message.content
-    words = " ".join(text.split()).split(" ")  # removes line breaks and double spaces, then splits into words
-    return " ".join(words[:MAX_WORDS])  # cuts it at 120 words in case the model wrote more
+    data = json.loads(text)  # turns the JSON text into a Python dictionary
+
+    image_class = str(data.get("image_class", "")).strip().lower()  # the class, in lower case to compare it
+    if image_class not in CLASSES:  # the model wrote something that is not one of the 6 classes
+        raise ValueError(f"unknown class from the model: {image_class!r}")  # the image is retried in the next run
+    if image_class not in USEFUL_CLASSES:  # photo or decoration
+        return image_class, ""  # no description: this is what keeps logos and pictures out of the knowledge base
+
+    words = " ".join(str(data.get("description", "")).split()).split(" ")  # removes line breaks and double spaces, then splits into words
+    return image_class, " ".join(words[:MAX_WORDS]).strip()  # cuts it at 120 words in case the model wrote more
 
 
-#2 read what we need: the image rows from the extraction step and the CNN classes
-
-def load_classes() -> dict[str, tuple[str, float]]:
-    """image_id -> (class, probability), written by the CNN (train_image_classifier.py)."""
-    path = PATHS["image_classes"]  # data/interim/image_classes.csv
-    if not path.exists():  # the CNN hasn't classified the images yet
-        raise SystemExit(f"No image classes yet: {path}. Run: python -m src.train.train_image_classifier")
-    with path.open(encoding="utf-8", newline="") as f:  # opens the file
-        # one entry per image: its class and how sure the CNN was
-        return {r["image_id"]: (r["image_class"], float(r["class_prob"])) for r in csv.DictReader(f)}
-
+#2 read the image rows written by the extraction + OCR step
 
 def load_rows() -> list[ImageText]:
     """One row per image from data/image_texts.jsonl: its ID, its slide, its file and its OCR text."""
@@ -83,25 +104,29 @@ def load_rows() -> list[ImageText]:
     return read_jsonl(path, ImageText)  # type: ignore[return-value]
 
 
-#3 describe all the useful images, saving as we go
+def needs_work(row: ImageText, force: bool) -> bool:
+    """True if this image still has to go through the vision model."""
+    if row.human_checked:  # we never overwrite an image we corrected by hand
+        return False
+    if force:  # --force: redo everything that was not corrected by hand
+        return True
+    if not row.image_class:  # never classified
+        return True
+    # classified as useful but the description is missing (for example Ollama failed half way)
+    return row.image_class in USEFUL_CLASSES and not row.description
 
-def describe_all(cfg, limit: int | None = None, force: bool = False) -> int:
-    """Add the class to every row and a description to the useful ones. Returns how many were described."""
+
+#3 classify and describe all the images, saving as we go
+
+def describe_all(cfg, limit: int | None = None, force: bool = False, model: str | None = None) -> int:
+    """Add a class to every image and a description to the useful ones. Returns how many were processed."""
     rows = load_rows()  # all the image rows
-    classes = load_classes()  # the CNN class of each image
-    model = cfg.generation["vision_model"]  # the vision model name, from the settings
+    model = model or cfg.generation["vision_model"]  # --model if given, otherwise the one in the settings
 
-    for row in rows:  # copies the CNN class into each row, so the chunks know what each image is
-        if row.image_id in classes:  # only images the CNN classified
-            row.image_class, row.class_prob = classes[row.image_id]
-
-    # what still needs a description: useful class, no description yet (unless --force), and not corrected by hand
-    # (we never overwrite a description we fixed by hand)
-    todo = [r for r in rows if r.image_class in USEFUL_CLASSES and (force or not r.description) and not r.human_checked]
+    todo = [r for r in rows if needs_work(r, force)]  # what is still pending
     if limit:  # --limit 5 to try it quickly before running everything
         todo = todo[:limit]
-    # prints how many images there are in total, how many are useful and how many are left to describe
-    print(f"{len(rows)} images · {sum(r.image_class in USEFUL_CLASSES for r in rows)} useful · {len(todo)} to describe with {model}")
+    print(f"{len(rows)} images · {len(todo)} to classify and describe with {model}")
 
     done, start = 0, time.perf_counter()  # a counter and the start time, to measure the speed
     for row in todo:  # one image at a time
@@ -112,21 +137,27 @@ def describe_all(cfg, limit: int | None = None, force: bool = False) -> int:
             print(f"  missing image file: {row.image_path}")
             continue  # skip it and go to the next one
         try:  # we catch errors so one bad image doesn't stop the whole run
-            row.description = describe_image(str(path), row.ocr_text, cfg, row.image_class)  # step 1
-            row.vision_model = model  # we save which model wrote it, for the documentation
+            row.image_class, row.description = classify_and_describe(str(path), row.ocr_text, model)  # step 1
+            row.class_prob = 1.0  # the vision model gives no probability; 1.0 marks "decided by the vision model"
+            row.vision_model = model  # we save which model decided, for the documentation
         except Exception as exc:  # noqa: BLE001
-            # if Ollama fails on one image we don't stop everything: that row stays empty and is retried next run
+            # bad JSON, unknown class or Ollama error: that row stays empty and is retried next run
             print(f"  {row.image_id}: {type(exc).__name__}: {exc}")
             continue
-        done += 1  # one more described
+        done += 1  # one more processed
         elapsed = time.perf_counter() - start  # seconds since we started
-        print(f"  {done}/{len(todo)} {row.image_id} ({elapsed / done:.1f} s/image)")  # shows the speed, to estimate the total time
+        # shows the class it chose and the speed, to estimate the total time
+        print(f"  {done}/{len(todo)} {row.image_id} -> {row.image_class} ({elapsed / done:.1f} s/image)")
         if done % 10 == 0:  # every 10 images
             # saves the file: if the laptop sleeps or Ollama closes, we lose at most 10 and the next run continues here
             write_jsonl(PATHS["image_texts"], rows)
     write_jsonl(PATHS["image_texts"], rows)  # final save
-    print(f"Described {done} images -> {PATHS['image_texts'].relative_to(PATHS['root'])}")
-    return done  # how many were described in this run
+
+    # summary for the documentation: how many images ended up in each class
+    counts = {c: sum(r.image_class == c for r in rows) for c in CLASSES}
+    print(f"Processed {done} images -> {PATHS['image_texts'].relative_to(PATHS['root'])}")
+    print("Images per class:", counts)
+    return done  # how many were processed in this run
 
 
 #4 the check by hand: 50 random descriptions, corrected and counted
@@ -186,8 +217,9 @@ def main(argv: list[str] | None = None) -> int:
     # reads the options written after the command
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", default="configs/base.yaml")  # which settings to use (the vision model is there)
-    parser.add_argument("--limit", type=int, help="describe at most this many images (to try it first)")
-    parser.add_argument("--force", action="store_true", help="describe again images that already have a description")
+    parser.add_argument("--limit", type=int, help="process at most this many images (to try it first)")
+    parser.add_argument("--model", help="vision model to use instead of the one in the config (to compare models)")
+    parser.add_argument("--force", action="store_true", help="process again images that were already done (except the ones corrected by hand)")
     parser.add_argument("--review", type=int, metavar="N", help="write N random descriptions to check by hand")
     parser.add_argument("--apply-review", action="store_true", help="apply the corrections from the review file")
     args = parser.parse_args(argv)
@@ -195,8 +227,8 @@ def main(argv: list[str] | None = None) -> int:
         write_review(args.review)  # step 4, first half
     elif args.apply_review:  # --apply-review
         apply_review()  # step 4, second half
-    else:  # no option: describe the images
-        describe_all(load_config(args.config), limit=args.limit, force=args.force)  # steps 1 to 3
+    else:  # no option: classify and describe the images
+        describe_all(load_config(args.config), limit=args.limit, force=args.force, model=args.model)  # steps 1 to 3
     return 0  # 0 = finished without errors
 
 
