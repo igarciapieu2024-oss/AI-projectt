@@ -143,3 +143,72 @@ def test_evaluation_exports(sample_questions, tmp_path, monkeypatch):
     assert rows[0]["config"] == "b1_v1"
     assert rows[0]["fake_mode"] == "True"
     assert float(rows[0]["recall_at_5"]) == 1.0
+
+def test_judge_integration(sample_questions, tmp_path, monkeypatch):
+    """Verify that judge results are included in evaluation reports."""
+    from eval import run_eval
+
+    monkeypatch.setitem(run_eval.PATHS, "root", tmp_path)
+
+    # Simulate the real answer engine using the existing fake.
+    from src.generation import fake
+
+    import sys
+    import types
+
+    fake_answer_module = types.ModuleType("src.generation.answer")
+    fake_answer_module.answer = fake.answer
+
+    monkeypatch.setitem(
+        sys.modules,
+        "src.generation.answer",
+        fake_answer_module,
+    )
+
+    def simulated_judge(
+        answer_text, reference_answer, sources, cfg
+    ):
+        return {
+            "correctness": 4,
+            "claims": [
+                {"text": "Example claim", "supported": True},
+                {"text": "Unsupported claim", "supported": False},
+            ],
+            "n_claims": 2,
+            "unsupported_claims": ["Unsupported claim"],
+            "n_unsupported_claims": 1,
+            "hallucination_rate": 0.5,
+        }
+
+    output = run_eval.evaluate(
+        config_path="configs/b1_v1.yaml",
+        split="dev",
+        use_fake=False,
+        questions_path=sample_questions,
+        use_judge=True,
+        judge_fn=simulated_judge,
+    )
+
+    results = json.loads(output.read_text(encoding="utf-8"))
+
+    assert len(results) == 2
+    assert results[0]["judge"]["correctness"] == 4
+
+    summary = json.loads(
+        (output.parent / "summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert summary["n_judged"] == 2
+    assert summary["mean_correctness"] == 4
+    assert summary["hallucination_rate"] == 0.5
+
+    report_path = tmp_path / "reports" / "ablation_dev.csv"
+
+    with report_path.open(newline="", encoding="utf-8") as file:
+        rows = list(csv.DictReader(file))
+
+    assert len(rows) == 1
+    assert float(rows[0]["mean_correctness"]) == 4.0
+    assert float(rows[0]["hallucination_rate"]) == 0.5

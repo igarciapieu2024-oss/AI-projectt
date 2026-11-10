@@ -54,30 +54,36 @@ def reciprocal_rank(
     return 0.0
 
 
+
 def ndcg_at_k(
     retrieved_ids: list[str] | list[list[str]],
     gold_ids: list[str],
     k: int = 10,
 ) -> float:
-    """Binary nDCG using unique gold ID coverage."""
+    """Binary nDCG@k based on relevant retrieved sources."""
+    if k <= 0:
+        return 0.0
+
     gold = set(gold_ids)
 
     if not gold:
         return 0.0
 
-    found = set()
-    dcg = 0.0
+    groups = _as_groups(retrieved_ids)
 
-    for rank, group in enumerate(
-        _as_groups(retrieved_ids)[:k], start=1
-    ):
-        new_matches = (group & gold) - found
+    # Each source counts as relevant (1) or irrelevant (0).
+    relevance = [
+        int(bool(group & gold))
+        for group in groups
+    ]
 
-        if new_matches:
-            dcg += 1.0 / math.log2(rank + 1)
-            found.update(new_matches)
+    dcg = sum(
+        rel / math.log2(rank + 1)
+        for rank, rel in enumerate(relevance[:k], start=1)
+    )
 
-    ideal_hits = min(len(gold), k)
+    # Number of relevant sources, capped at k.
+    ideal_hits = min(sum(relevance), k)
 
     idcg = sum(
         1.0 / math.log2(rank + 1)
@@ -85,6 +91,8 @@ def ndcg_at_k(
     )
 
     return dcg / idcg if idcg else 0.0
+
+
 
 
 def refusal_metrics(

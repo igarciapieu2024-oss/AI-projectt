@@ -4,6 +4,8 @@
 Usage:
     python -m eval.run_eval --config configs/b1_v1.yaml --split dev --fake
 
+    python -m eval.run_eval --config configs/b1_v1.yaml --split dev --judge
+
 Owner: Elena.
 """
 from __future__ import annotations
@@ -31,24 +33,32 @@ def evaluate(
     split: str,
     use_fake: bool = False,
     questions_path: Path | None = None,
+    use_judge: bool = False,
+    judge_fn=None,
 ) -> Path:
     """Evaluate questions and save detailed and aggregate results."""
 
-    # Protect the final test set.
+    # Keep the final test set locked.
     if split != "dev":
         raise ValueError(
             "The test set is locked. Only dev is allowed for now."
         )
 
+    # Fake RAG answers must not be judged as real results.
+    if use_fake and use_judge:
+        raise ValueError(
+            "The LLM judge must not score simulated RAG answers."
+        )
+
     cfg = load_config(config_path)
 
-    # Select the answer function.
+    # Select the answer engine.
     if use_fake:
         from src.generation.fake import answer
     else:
         from src.generation.answer import answer
 
-    # Allow an isolated question dataset for unit tests.
+    # Use a temporary CSV for tests or the official dataset.
     questions_path = (
         Path(questions_path)
         if questions_path is not None
@@ -59,7 +69,8 @@ def evaluate(
         newline="", encoding="utf-8"
     ) as file:
         questions = [
-            row for row in csv.DictReader(file)
+            row
+            for row in csv.DictReader(file)
             if row["split"].strip() == split
         ]
 
@@ -71,6 +82,7 @@ def evaluate(
     results = []
 
     for row in questions:
+        # Follow-up questions can include previous conversation context.
         history = (
             [{"role": "user", "content": row["turn1"]}]
             if row["turn1"].strip()
@@ -81,6 +93,7 @@ def evaluate(
             course_code=row["course_code"].strip() or None
         )
 
+        # Generate the answer.
         result = answer(
             question=row["question"],
             history=history,
@@ -106,8 +119,7 @@ def evaluate(
             for source_id in group
         ]
 
-        # Retrieval metrics are defined for questions with
-        # gold evidence, not unanswerable questions.
+        # Retrieval metrics only apply when gold evidence exists.
         has_gold = bool(gold_ids)
 
         recall5 = (
@@ -127,6 +139,35 @@ def evaluate(
 
         expected_refusal = row["answerable"].strip() == "0"
 
+        # Optional LLM-based evaluation.
+        judge_result = None
+
+        if use_judge:
+            from eval.judge import judge_answer
+
+            sources = [
+                {
+                    "label": hit.label,
+                    "chunk_id": hit.chunk.chunk_id,
+                    "covers": hit.chunk.covers,
+                    "text": hit.chunk.text,
+                }
+                for hit in result.context_hits
+            ]
+
+            run_judge = (
+                judge_fn if judge_fn is not None
+                else judge_answer
+            )
+
+            judge_result = run_judge(
+                answer_text=result.answer_text,
+                reference_answer=row["reference_answer"],
+                sources=sources,
+                cfg=cfg,
+            )
+
+        # Save individual question metrics.
         results.append({
             "question_id": row["question_id"],
             "split": split,
@@ -160,9 +201,10 @@ def evaluate(
             ],
             "timings_ms": result.timings_ms,
             "time_ms": result.timings_ms.get("total", 0.0),
+            "judge": judge_result,
         })
 
-    # Calculate aggregate retrieval metrics.
+    # Aggregate retrieval metrics.
     retrieval_results = [
         item for item in results
         if item["recall_at_5"] is not None
@@ -171,11 +213,20 @@ def evaluate(
     expected = [
         item["expected_refusal"] for item in results
     ]
+
     predicted = [
         item["refused"] for item in results
     ]
 
     refusals = refusal_metrics(expected, predicted)
+
+    def metric_mean(items, key):
+        values = [
+            item[key]
+            for item in items
+            if item.get(key) is not None
+        ]
+        return mean(values) if values else None
 
     summary = {
         "config": cfg.name,
@@ -183,17 +234,14 @@ def evaluate(
         "fake_mode": use_fake,
         "n_questions": len(results),
         "n_retrieval_scored": len(retrieval_results),
-        "recall_at_5": (
-            mean(item["recall_at_5"] for item in retrieval_results)
-            if retrieval_results else None
+        "recall_at_5": metric_mean(
+            retrieval_results, "recall_at_5"
         ),
-        "mrr": (
-            mean(item["reciprocal_rank"] for item in retrieval_results)
-            if retrieval_results else None
+        "mrr": metric_mean(
+            retrieval_results, "reciprocal_rank"
         ),
-        "ndcg_at_10": (
-            mean(item["ndcg_at_10"] for item in retrieval_results)
-            if retrieval_results else None
+        "ndcg_at_10": metric_mean(
+            retrieval_results, "ndcg_at_10"
         ),
         **refusals,
         "average_latency_ms": average_latency([
@@ -201,7 +249,34 @@ def evaluate(
         ]),
     }
 
-    # Create a unique output directory for this run.
+    # Aggregate LLM judge metrics when available.
+    judge_results = [
+        item["judge"]
+        for item in results
+        if item["judge"] is not None
+    ]
+
+    summary["n_judged"] = len(judge_results)
+    summary["mean_correctness"] = metric_mean(
+        judge_results, "correctness"
+    )
+
+    total_claims = sum(
+        item["n_claims"]
+        for item in judge_results
+    )
+
+    total_unsupported = sum(
+        item["n_unsupported_claims"]
+        for item in judge_results
+    )
+
+    summary["hallucination_rate"] = (
+        total_unsupported / total_claims
+        if total_claims else None
+    )
+
+    # Save each run in a separate directory.
     run_id = datetime.now(timezone.utc).strftime(
         "%Y%m%d_%H%M%S_%f"
     )
@@ -212,6 +287,7 @@ def evaluate(
         / "runs"
         / f"{run_id}_{cfg.name}"
     )
+
     run_dir.mkdir(parents=True, exist_ok=False)
 
     results_file = run_dir / "results.json"
@@ -229,7 +305,7 @@ def evaluate(
         encoding="utf-8",
     )
 
-    # Append one row to the experiment comparison report.
+    # Append aggregate metrics to the experiment report.
     reports_dir = PATHS["root"] / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
 
@@ -249,7 +325,37 @@ def evaluate(
         "refusal_recall",
         "refusal_accuracy",
         "average_latency_ms",
+        "n_judged",
+        "mean_correctness",
+        "hallucination_rate",
     ]
+
+    # Preserve previous reports when adding new columns.
+    previous_rows = []
+
+    if report_file.exists() and report_file.stat().st_size:
+        with report_file.open(
+            newline="", encoding="utf-8"
+        ) as file:
+            reader = csv.DictReader(file)
+            previous_rows = list(reader)
+
+            existing_columns = reader.fieldnames or []
+
+        if existing_columns != fieldnames:
+            with report_file.open(
+                "w", newline="", encoding="utf-8"
+            ) as file:
+                writer = csv.DictWriter(
+                    file, fieldnames=fieldnames
+                )
+                writer.writeheader()
+
+                for previous in previous_rows:
+                    writer.writerow({
+                        key: previous.get(key, "")
+                        for key in fieldnames
+                    })
 
     write_header = (
         not report_file.exists()
@@ -267,7 +373,8 @@ def evaluate(
             writer.writeheader()
 
         writer.writerow({
-            key: summary[key] for key in fieldnames
+            key: summary[key]
+            for key in fieldnames
         })
 
     print(f"Evaluated {len(results)} questions")
@@ -284,6 +391,17 @@ def evaluate(
         f"Average latency: "
         f"{summary['average_latency_ms']:.1f} ms"
     )
+
+    if use_judge:
+        print(
+            f"Mean correctness: "
+            f"{summary['mean_correctness']}"
+        )
+        print(
+            f"Hallucination rate: "
+            f"{summary['hallucination_rate']}"
+        )
+
     print(f"Results saved to: {results_file}")
     print(f"Summary saved to: {summary_file}")
     print(f"Report updated: {report_file}")
@@ -307,7 +425,13 @@ def main() -> None:
     parser.add_argument(
         "--fake",
         action="store_true",
-        help="Use simulated answers instead of the real RAG.",
+        help="Use simulated answers instead of real RAG.",
+    )
+
+    parser.add_argument(
+        "--judge",
+        action="store_true",
+        help="Evaluate real answers with the configured LLM judge.",
     )
 
     args = parser.parse_args()
@@ -316,6 +440,7 @@ def main() -> None:
         config_path=args.config,
         split=args.split,
         use_fake=args.fake,
+        use_judge=args.judge,
     )
 
 
