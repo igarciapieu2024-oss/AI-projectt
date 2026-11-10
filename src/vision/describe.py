@@ -30,6 +30,9 @@ CLASSES = ["diagram", "chart", "formula", "table", "photo", "decoration"]
 # get a class but no description, so they never reach the knowledge base
 USEFUL_CLASSES = {"diagram", "chart", "formula", "table"}
 MAX_WORDS = 120  # short enough to fit inside the slide's chunk without pushing out the slide text
+# the vision model reads the image at its own resolution, so a big image becomes thousands of pieces to read
+# and takes minutes; 768 pixels on the longest side keeps labels readable and makes each image much faster
+MAX_SIDE = 768
 REVIEW_FILE = PATHS["labels"] / "description_review.csv"  # the spreadsheet for the check by hand
 # the columns of that spreadsheet: the first 5 are filled by the script, the last 3 by us
 REVIEW_FIELDS = ["image_id", "image_class", "image_path", "ocr_text", "description", "correct", "fixed_description", "error_type"]
@@ -67,6 +70,19 @@ Answer with JSON only, in this exact format:
 
 #1 classify and describe one image
 
+def shrink(path: str) -> bytes:
+    """Return a smaller copy of the image (longest side MAX_SIDE pixels) as PNG bytes; the file itself is not changed."""
+    from io import BytesIO  # lets us save the smaller copy in memory instead of on disk
+    from PIL import Image  # opens and resizes images (already in requirements.txt)
+
+    with Image.open(path) as im:  # opens the image file
+        im = im.convert("RGB")  # same colour format for every image (some are black and white or transparent)
+        im.thumbnail((MAX_SIDE, MAX_SIDE))  # shrinks it keeping its shape; images already smaller stay the same
+        buffer = BytesIO()  # an empty "file" in memory
+        im.save(buffer, format="PNG")  # saves the smaller copy there
+    return buffer.getvalue()  # the bytes Ollama receives instead of the original file
+
+
 def classify_and_describe(path: str, ocr_text: str, model: str) -> tuple[str, str]:
     """Send one image + the prompt to the vision model and return (class, description)."""
     import ollama  # imported here so the rest of the project works even if Ollama is not installed
@@ -75,9 +91,10 @@ def classify_and_describe(path: str, ocr_text: str, model: str) -> tuple[str, st
     prompt = PROMPT.format(max_words=MAX_WORDS, ocr_text=(ocr_text or "")[:1500])
     reply = ollama.chat(  # sends the request to Ollama, which runs on this laptop
         model=model,  # the vision model (from configs/base.yaml, or --model to try another one)
-        messages=[{"role": "user", "content": prompt, "images": [str(path)]}],  # the image goes with the message
+        messages=[{"role": "user", "content": prompt, "images": [shrink(path)]}],  # the smaller copy goes with the message
         format="json",  # forces the model to answer with valid JSON, so we can always read it
         options={"temperature": 0},  # 0 = no randomness, the same image always gets the same answer
+        keep_alive="30m",  # keeps the model loaded between images, so it is not reloaded each time
     )
     # newer versions of the ollama library return an object, older ones a dictionary; this works with both
     text = reply["message"]["content"] if isinstance(reply, dict) else reply.message.content
