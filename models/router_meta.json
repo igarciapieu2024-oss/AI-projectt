@@ -1,0 +1,104 @@
+{
+  "trained_at": "2026-11-09T23:20:57+00:00",
+  "n_questions": 300,
+  "label_counts": {
+    "course_content": 75,
+    "out_of_scope": 75,
+    "course_admin": 75,
+    "cross_course": 75
+  },
+  "features": "sentence-transformers/all-MiniLM-L6-v2",
+  "best_model": "svm",
+  "best_params": {
+    "C": 10,
+    "kernel": "rbf"
+  },
+  "cv": "nested: GridSearchCV inner StratifiedKFold(3), outer StratifiedKFold(5), seed 42",
+  "comparison": [
+    {
+      "model": "svm",
+      "macro_f1_mean": 0.8413028135657445,
+      "macro_f1_std": 0.029180089015965742,
+      "accuracy_mean": 0.8433333333333334,
+      "train_seconds": 0.9822195000015199
+    },
+    {
+      "model": "logistic_regression",
+      "macro_f1_mean": 0.8311348580746442,
+      "macro_f1_std": 0.03487982848554502,
+      "accuracy_mean": 0.8333333333333334,
+      "train_seconds": 0.6259245420224033
+    },
+    {
+      "model": "mlp",
+      "macro_f1_mean": 0.8256331598607437,
+      "macro_f1_std": 0.03204184803061107,
+      "accuracy_mean": 0.8300000000000001,
+      "train_seconds": 11.087139999959618
+    },
+    {
+      "model": "random_forest",
+      "macro_f1_mean": 0.7514332898583782,
+      "macro_f1_std": 0.030932376768655956,
+      "accuracy_mean": 0.7633333333333333,
+      "train_seconds": 30.141978542029392
+    },
+    {
+      "model": "knn",
+      "macro_f1_mean": 0.6764903946404887,
+      "macro_f1_std": 0.03959981548820373,
+      "accuracy_mean": 0.6900000000000001,
+      "train_seconds": 0.4531847499893047
+    }
+  ],
+  "best_per_class_f1": {
+    "course_admin": 0.8774193548387097,
+    "course_content": 0.8129032258064516,
+    "cross_course": 0.9530201342281879,
+    "out_of_scope": 0.723404255319149
+  },
+  "confusion_matrix": {
+    "labels": [
+      "course_admin",
+      "course_content",
+      "cross_course",
+      "out_of_scope"
+    ],
+    "matrix": [
+      [
+        68,
+        2,
+        1,
+        4
+      ],
+      [
+        1,
+        63,
+        0,
+        11
+      ],
+      [
+        4,
+        0,
+        71,
+        0
+      ],
+      [
+        7,
+        15,
+        2,
+        51
+      ]
+    ]
+  },
+  "classifier_seconds_per_question": 0.011147446680115535,
+  "llm_baseline": {
+    "model": "llm:llama3.1:8b",
+    "macro_f1": 0.8912623403476357,
+    "accuracy": 0.8933333333333333,
+    "invalid_answers": 0,
+    "seconds_per_question": 0.8500281044689473,
+    "n_questions": 300
+  },
+  "min_prob": 0.6
+}
