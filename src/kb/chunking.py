@@ -59,6 +59,11 @@ def _load_image_text(use_ocr: bool, use_captions: bool) -> dict:
     images = read_jsonl(image_path)
 
     for image in images:
+        # photos and decorations (logos, icons, branding), as classified by the vision model,
+        # are skipped: their OCR text ("ie UNIVERSITY"...) would only add noise to the chunks
+        if image.get("image_class", "") in {"photo", "decoration"}:
+            continue
+
         parts = []
 
         if use_ocr and image.get("ocr_text", "").strip():
