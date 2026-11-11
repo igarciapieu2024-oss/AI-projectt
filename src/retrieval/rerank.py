@@ -4,6 +4,7 @@ Owner: Sergio.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import replace
 from functools import lru_cache
 
@@ -27,7 +28,7 @@ def _model(model_name: str):
 
 
 def rerank(query: str, hits: list, top_k: int, cfg) -> list:
-    """Return the highest-scoring top_k hits according to the configured cross-encoder."""
+    """Return top hits scored by sigmoid-normalized cross-encoder confidence."""
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k < 1:
         raise ValueError(f"top_k must be a positive integer; got {top_k!r}")
     if not query.strip() or not hits:
@@ -45,11 +46,19 @@ def rerank(query: str, hits: list, top_k: int, cfg) -> list:
         raise RuntimeError(f"Could not rerank hits with local model {model_name!r}") from exc
     if len(scores) != len(hits):
         raise ValueError("reranker returned a different number of scores than input hits")
+    normalized_scores = []
+    for score in scores:
+        score = float(score)
+        if not math.isfinite(score):
+            raise ValueError("reranker returned a non-finite score")
+        if score >= 0:
+            confidence = 1.0 / (1.0 + math.exp(-score))
+        else:
+            exp_score = math.exp(score)
+            confidence = exp_score / (1.0 + exp_score)
+        normalized_scores.append(confidence)
     ranked = sorted(
-        (
-            (float(score), hit)
-            for hit, score in zip(hits, scores)
-        ),
+        zip(normalized_scores, hits),
         key=lambda item: (-item[0], item[1].chunk.chunk_id),
     )
     return [

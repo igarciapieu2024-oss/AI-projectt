@@ -8,7 +8,7 @@ import math
 
 
 def is_weak(hits: list, cfg) -> bool:
-    """Return whether the strongest reranker score is below its configured threshold."""
+    """Compare normalized cross-encoder confidence to the configured threshold."""
     if not hits:
         return True
     threshold = cfg.generation.get("selfcheck_threshold", 0.2)

@@ -4,12 +4,10 @@ Owner: Sergio.
 """
 from __future__ import annotations
 
-import pickle
-
 from src.config import bm25_path, chunks_path
 from src.kb.build_indexes import tokenize
-from src.schemas import Chunk, Filters, Hit
-from src.utils.io import read_jsonl
+from src.retrieval.index_cache import load_bm25, load_chunks
+from src.schemas import Filters, Hit
 
 
 def _validate_k(k: int) -> None:
@@ -39,8 +37,7 @@ def search(query: str, cfg, filters: Filters | None, k: int) -> list[Hit]:
             f"BM25 index not found: {index_path}. "
             f"Build indexes with `python -m src.pipeline build --config configs/{cfg.name}.yaml`."
         )
-    with index_path.open("rb") as stream:
-        index = pickle.load(stream)
+    index = load_bm25(index_path)
     expected_keys = {"kb_sig", "chunk_ids", "tokenized_corpus", "bm25"}
     if not isinstance(index, dict) or set(index) != expected_keys:
         raise ValueError(f"BM25 index at {index_path} has an invalid format")
@@ -58,7 +55,7 @@ def search(query: str, cfg, filters: Filters | None, k: int) -> list[Hit]:
     chunk_file = chunks_path(cfg.kb_sig)
     if not chunk_file.is_file():
         raise FileNotFoundError(f"Chunk file not found for kb_sig={cfg.kb_sig}: {chunk_file}")
-    chunks = {chunk.chunk_id: chunk for chunk in read_jsonl(chunk_file, Chunk)}
+    chunks = load_chunks(chunk_file)
     try:
         scores = index["bm25"].get_scores(query_tokens)
     except (AttributeError, TypeError) as exc:
