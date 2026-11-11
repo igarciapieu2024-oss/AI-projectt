@@ -8,7 +8,7 @@ from pathlib import Path  # handles file paths the same way on Windows and Mac
 
 import streamlit as st  # for st.cache_data, so each slide picture is made only once
 
-from app_components.engine import pdf_path  # finds a PDF named in the manifest
+from app_components.engine import courses, pdf_path  # course names, and finds a PDF named in the manifest
 from app_components.theme import html, icon, image_data_uri  # our HTML helper, icons and image loader
 from src.config import PATHS  # where the manifest, the PDFs and the image index are
 from src.schemas import Hit  # the agreed format of one source
@@ -97,6 +97,9 @@ def _card(hit: Hit) -> str:
 
     tags = [f'<span class="tag label on">{hit.label}</span>',  # S1 in yellow, like the chip in the answer
             f'<span class="tag">{_DOC_TYPE_NAMES.get(hit.chunk.doc_type, hit.chunk.doc_type)}</span>']  # Syllabus / Slide
+    course_name = courses().get(hit.chunk.course_code, hit.chunk.course_code)  # e.g. "mgmt_control" -> "Management Control"
+    if course_name:  # the course of the source, so a source from the wrong course is visible at a glance
+        tags.append(f'<span class="tag">{html_lib.escape(course_name)}</span>')
     if match:  # the answer can come from a diagram: we say so with its own tag
         tags.append(f'<span class="tag img">From a {html_lib.escape(match.group(1))}</span>')
 
