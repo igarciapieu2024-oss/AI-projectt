@@ -83,10 +83,15 @@ def _prepare_answer(
             rerank_ms = (time.perf_counter() - rerank_started) * 1000
         else:
             hits = hits[:top_k]
-        if cfg.generation.get("selfcheck", False) and selfcheck.is_weak(hits, cfg):
-            hits = []
+        is_weak = cfg.generation.get("selfcheck", False) and selfcheck.is_weak(hits, cfg)
         hits = [replace(hit, rank=rank, label=f"S{rank}") for rank, hit in enumerate(hits, start=1)]
-    messages = build_messages(question, hits, cfg, history) if not rag_enabled or hits else None
+    else:
+        is_weak = False
+    messages = (
+        build_messages(question, hits, cfg, history)
+        if not rag_enabled or (hits and not is_weak)
+        else None
+    )
     return (
         question, rewritten_question, cfg, hits, messages, started,
         rewrite_ms, retrieve_ms, rerank_ms, rag_enabled,
@@ -168,7 +173,7 @@ def answer(
     question, rewritten_question, cfg, hits, messages, started, rewrite_ms, retrieve_ms, rerank_ms, rag_enabled = _prepare_answer(
         question, history, filters, cfg
     )
-    if rag_enabled and not hits:
+    if rag_enabled and messages is None:
         return _make_result(
             question, rewritten_question, filters, cfg, hits, REFUSAL, started,
             rewrite_ms, retrieve_ms, rerank_ms, 0.0, rag_enabled,
@@ -199,7 +204,7 @@ def answer_stream(
     question, rewritten_question, cfg, hits, messages, started, rewrite_ms, retrieve_ms, rerank_ms, rag_enabled = _prepare_answer(
         question, history, filters, cfg
     )
-    if rag_enabled and not hits:
+    if rag_enabled and messages is None:
         result = _make_result(
             question, rewritten_question, filters, cfg, hits, REFUSAL, started,
             rewrite_ms, retrieve_ms, rerank_ms, 0.0, rag_enabled,

@@ -1,3 +1,4 @@
+import math
 import pickle
 import sys
 import types
@@ -10,6 +11,7 @@ import src.retrieval.bm25 as bm25_module
 import src.retrieval.dense as dense_module
 import src.retrieval.embed as embed_module
 import src.retrieval.fusion as fusion_module
+import src.retrieval.index_cache as index_cache
 import src.retrieval.rerank as rerank_module
 from src.schemas import Chunk, Filters, Hit
 from src.utils.io import write_jsonl
@@ -145,6 +147,65 @@ def test_dense_search_reports_missing_index(tmp_path, monkeypatch):
         dense_module.search("query", cfg, None, 2)
 
 
+def test_index_cache_reuses_chunks_and_bm25_artifacts(tmp_path, monkeypatch):
+    chunk_file = tmp_path / "chunks.jsonl"
+    write_jsonl(chunk_file, [_chunk("cached", "Cached chunk")])
+    read_calls = []
+    original_read = index_cache.read_jsonl
+
+    def counted_read(*args, **kwargs):
+        read_calls.append(args[0])
+        return original_read(*args, **kwargs)
+
+    monkeypatch.setattr(index_cache, "read_jsonl", counted_read)
+    index_cache.clear_caches()
+    try:
+        first_chunks = index_cache.load_chunks(chunk_file)
+        second_chunks = index_cache.load_chunks(chunk_file)
+        assert first_chunks is second_chunks
+        assert len(read_calls) == 1
+
+        bm25_file = tmp_path / "bm25.pkl"
+        with bm25_file.open("wb") as stream:
+            pickle.dump({"version": 1}, stream)
+        first_bm25 = index_cache.load_bm25(bm25_file)
+        second_bm25 = index_cache.load_bm25(bm25_file)
+        assert first_bm25 is second_bm25
+        assert first_bm25 == {"version": 1}
+    finally:
+        index_cache.clear_caches()
+
+
+def test_chroma_client_is_reused_between_collection_lookups(tmp_path, monkeypatch):
+    client_instances = []
+
+    class Client:
+        def __init__(self):
+            self.collection = object()
+
+        def get_collection(self, name):
+            return self.collection
+
+    def make_client(**kwargs):
+        client = Client()
+        client_instances.append(client)
+        return client
+
+    monkeypatch.setitem(
+        sys.modules,
+        "chromadb",
+        SimpleNamespace(PersistentClient=make_client),
+    )
+    index_cache.clear_caches()
+    try:
+        first = index_cache.get_chroma_collection(tmp_path, "collection")
+        second = index_cache.get_chroma_collection(tmp_path, "collection")
+        assert first is second
+        assert len(client_instances) == 1
+    finally:
+        index_cache.clear_caches()
+
+
 def test_bm25_search_loads_index_scores_and_filters_chunks(tmp_path, monkeypatch):
     chunks = [
         _chunk("course_a", "Final exam is 40 percent.", sessions=[2], course_code="c01"),
@@ -242,7 +303,7 @@ def test_rerank_sorts_cross_encoder_scores_and_preserves_retrieval_scores(monkey
         ranked = rerank_module.rerank("question", hits, 1, cfg)
 
         assert [hit.chunk.chunk_id for hit in ranked] == ["b"]
-        assert ranked[0].score_rerank == 0.9
+        assert ranked[0].score_rerank == pytest.approx(1 / (1 + math.exp(-0.9)))
         assert ranked[0].score_rrf == 0.01
         assert calls[0][2]["automodel_args"] == {"local_files_only": True}
     finally:

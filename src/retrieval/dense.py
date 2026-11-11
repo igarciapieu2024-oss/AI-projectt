@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from src.config import PATHS, chunks_path
 from src.retrieval.embed import embed
-from src.schemas import Chunk, Filters, Hit
-from src.utils.io import read_jsonl
+from src.retrieval.index_cache import get_chroma_collection, load_chunks
+from src.schemas import Filters, Hit
 
 
 def _validate_k(k: int) -> None:
@@ -28,19 +28,13 @@ def search(query: str, cfg, filters: Filters | None, k: int) -> list[Hit]:
         raise ValueError("query must not be empty")
     _validate_k(k)
 
-    import chromadb
-
-    client = chromadb.PersistentClient(path=str(PATHS["chroma"]))
-    collection_names = {
-        item.name if hasattr(item, "name") else str(item)
-        for item in client.list_collections()
-    }
-    if cfg.collection_name not in collection_names:
+    try:
+        collection = get_chroma_collection(PATHS["chroma"], cfg.collection_name)
+    except FileNotFoundError as exc:
         raise FileNotFoundError(
             f"Chroma collection {cfg.collection_name!r} is missing. "
             f"Build indexes with `python -m src.pipeline build --config configs/{cfg.name}.yaml`."
-        )
-    collection = client.get_collection(name=cfg.collection_name)
+        ) from exc
     count = collection.count()
     if not count:
         return []
@@ -61,7 +55,7 @@ def search(query: str, cfg, filters: Filters | None, k: int) -> list[Hit]:
     chunk_file = chunks_path(cfg.kb_sig)
     if not chunk_file.is_file():
         raise FileNotFoundError(f"Chunk file not found for kb_sig={cfg.kb_sig}: {chunk_file}")
-    chunks = {chunk.chunk_id: chunk for chunk in read_jsonl(chunk_file, Chunk)}
+    chunks = load_chunks(chunk_file)
     hits = []
     for chunk_id, distance in zip(response["ids"][0], response["distances"][0]):
         chunk = chunks.get(chunk_id)

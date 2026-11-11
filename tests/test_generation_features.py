@@ -1,3 +1,4 @@
+import math
 from types import SimpleNamespace
 
 import pytest
@@ -94,6 +95,17 @@ def test_selfcheck_uses_best_reranker_score_and_requires_scores():
         selfcheck_module.is_weak([Hit(chunk=_chunk(), rank=1)], cfg)
 
 
+def test_selfcheck_threshold_uses_probability_scale_for_negative_raw_logits():
+    cfg = SimpleNamespace(generation={"selfcheck_threshold": 0.2})
+    raw_logit = -0.5
+    confidence = 1 / (1 + math.exp(-raw_logit))
+    assert confidence > 0.2
+    assert not selfcheck_module.is_weak(
+        [Hit(chunk=_chunk(), rank=1, score_rerank=confidence)],
+        cfg,
+    )
+
+
 def test_answer_rewrites_before_retrieval_and_refuses_weak_evidence(monkeypatch):
     calls = []
     hit = Hit(chunk=_chunk(), rank=1, score_rerank=0.1)
@@ -140,4 +152,6 @@ def test_answer_rewrites_before_retrieval_and_refuses_weak_evidence(monkeypatch)
     assert result.rewritten_question == "Standalone rewritten question"
     assert result.refused
     assert result.answer_text == "This isn't covered in the course material I have."
-    assert result.context_hits == []
+    assert len(result.context_hits) == 1
+    assert result.context_hits[0].chunk.chunk_id == hit.chunk.chunk_id
+    assert result.context_hits[0].label == "S1"
