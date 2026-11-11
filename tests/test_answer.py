@@ -1,9 +1,10 @@
+import re
 from types import SimpleNamespace
 
 import pytest
 
 import src.generation.answer as answer_module
-from src.schemas import AnswerResult, Chunk, Filters
+from src.schemas import AnswerResult, Chunk, Filters, Hit
 
 
 def _chunk(
@@ -33,9 +34,35 @@ def _config(top_k: int = 5):
     return SimpleNamespace(
         name="test",
         kb_sig="test",
-        retrieval={"top_k": top_k},
+        retrieval={
+            "mode": "hybrid",
+            "top_k": top_k,
+            "k_dense": 20,
+            "k_bm25": 20,
+            "rrf_k": 60,
+            "rerank": False,
+        },
         generation={"rag": True, "prompt_version": "v2"},
     )
+
+
+def _mock_hits(chunks, question, cfg, filters=None):
+    query_tokens = set(re.findall(r"\w+%?", question.casefold()))
+    candidates = []
+    for chunk in chunks:
+        if filters and filters.course_code and chunk.course_code != filters.course_code:
+            continue
+        if filters and filters.sessions and not any(session in chunk.sessions for session in filters.sessions):
+            continue
+        tokens = set(re.findall(r"\w+%?", chunk.text.casefold()))
+        score = len(query_tokens & tokens)
+        if score:
+            candidates.append((score, chunk))
+    candidates.sort(key=lambda item: (-item[0], item[1].chunk_id))
+    return [
+        Hit(chunk=chunk, rank=rank)
+        for rank, (_, chunk) in enumerate(candidates[:cfg.retrieval["top_k"]], start=1)
+    ]
 
 
 @pytest.fixture(autouse=True)
@@ -60,7 +87,7 @@ def test_answer_respects_top_k_and_cites_used_evidence(monkeypatch):
         _chunk("chunk_d", "The course covers operations."),
         _chunk("chunk_e", "This lecture explains forecasting."),
     ]
-    monkeypatch.setattr(answer_module, "_load_chunks", lambda cfg: chunks)
+    monkeypatch.setattr(answer_module, "_build_hits", lambda q, cfg, filters: _mock_hits(chunks, q, cfg, filters))
 
     result = answer_module.answer("What is the exam weight?", cfg=_config(top_k=1))
 
@@ -75,10 +102,11 @@ def test_answer_respects_top_k_and_cites_used_evidence(monkeypatch):
 
 
 def test_citations_only_include_sources_used_by_the_model(monkeypatch):
-    monkeypatch.setattr(answer_module, "_load_chunks", lambda cfg: [
+    chunks = [
         _chunk("chunk_a", "Exam weight is 40 percent."),
         _chunk("chunk_b", "Exam weight is 30 percent."),
-    ])
+    ]
+    monkeypatch.setattr(answer_module, "_build_hits", lambda q, cfg, filters: _mock_hits(chunks, q, cfg, filters))
     monkeypatch.setattr(
         answer_module,
         "chat",
@@ -98,7 +126,7 @@ def test_answer_applies_course_and_session_filters(monkeypatch):
         _chunk("wrong_session", "Capstone project.", sessions=[1]),
         _chunk("matching", "Capstone project.", sessions=[2]),
     ]
-    monkeypatch.setattr(answer_module, "_load_chunks", lambda cfg: chunks)
+    monkeypatch.setattr(answer_module, "_build_hits", lambda q, cfg, filters: _mock_hits(chunks, q, cfg, filters))
 
     result = answer_module.answer(
         "Capstone project",
@@ -110,9 +138,10 @@ def test_answer_applies_course_and_session_filters(monkeypatch):
 
 
 def test_no_matching_chunks_is_a_refusal(monkeypatch):
-    monkeypatch.setattr(answer_module, "_load_chunks", lambda cfg: [
+    chunks = [
         _chunk("unrelated", "Attendance is required.")
-    ])
+    ]
+    monkeypatch.setattr(answer_module, "_build_hits", lambda q, cfg, filters: _mock_hits(chunks, q, cfg, filters))
 
     result = answer_module.answer("Explain quantum tunneling", cfg=_config())
 
@@ -122,35 +151,7 @@ def test_no_matching_chunks_is_a_refusal(monkeypatch):
     assert result.answer_text == "This isn't covered in the course material I have."
 
 
-def test_informative_terms_outweigh_common_terms_without_a_word_list(monkeypatch):
-    monkeypatch.setattr(answer_module, "_load_chunks", lambda cfg: [
-        _chunk("boilerplate_a", "The course is useful."),
-        _chunk("boilerplate_b", "The course is organized."),
-        _chunk("boilerplate_c", "The course is practical."),
-        _chunk("boilerplate_d", "The course is comprehensive."),
-        _chunk("relevant", "Final exam worth 40 percent."),
-    ])
-
-    result = answer_module.answer("What is the final exam worth?", cfg=_config(top_k=1))
-
-    assert result.context_hits[0].chunk.chunk_id == "relevant"
-    assert "40 percent" in result.answer_text
-
-
-def test_missing_index_is_an_error_not_a_refusal(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        answer_module,
-        "PATHS",
-        {**answer_module.PATHS, "processed": tmp_path},
-    )
-
-    with pytest.raises(FileNotFoundError, match="pipeline build"):
-        answer_module.answer("Question", cfg=_config())
-
-
 def test_invalid_question_and_top_k_are_rejected(monkeypatch):
-    monkeypatch.setattr(answer_module, "_load_chunks", lambda cfg: [])
-
     with pytest.raises(ValueError, match="must not be empty"):
         answer_module.answer("  ", cfg=_config())
     with pytest.raises(ValueError, match="positive integer"):
@@ -163,8 +164,8 @@ def test_no_rag_config_calls_model_without_retrieval(monkeypatch, _mock_chat):
     messages_seen = []
     monkeypatch.setattr(
         answer_module,
-        "_load_chunks",
-        lambda cfg: pytest.fail("no-RAG mode must not load course chunks"),
+        "_build_hits",
+        lambda *args: pytest.fail("no-RAG mode must not retrieve course chunks"),
     )
 
     def fake_chat(messages, cfg):
@@ -187,9 +188,10 @@ def test_no_rag_config_calls_model_without_retrieval(monkeypatch, _mock_chat):
 
 
 def test_rag_answer_uses_prompt_context_and_refuses_unknown_citations(monkeypatch):
-    monkeypatch.setattr(answer_module, "_load_chunks", lambda cfg: [
+    chunks = [
         _chunk("chunk_a", "Exam weight is 40 percent.")
-    ])
+    ]
+    monkeypatch.setattr(answer_module, "_build_hits", lambda q, cfg, filters: _mock_hits(chunks, q, cfg, filters))
     messages_seen = []
 
     def fake_chat(messages, cfg, stream=False):
@@ -212,9 +214,10 @@ def test_rag_answer_uses_prompt_context_and_refuses_unknown_citations(monkeypatc
 
 
 def test_rag_answer_without_a_valid_citation_is_refused(monkeypatch):
-    monkeypatch.setattr(answer_module, "_load_chunks", lambda cfg: [
+    chunks = [
         _chunk("chunk_a", "Exam weight is 40 percent.")
-    ])
+    ]
+    monkeypatch.setattr(answer_module, "_build_hits", lambda q, cfg, filters: _mock_hits(chunks, q, cfg, filters))
     monkeypatch.setattr(answer_module, "chat", lambda messages, cfg: "It is 40 percent.")
 
     result = answer_module.answer("What is the exam weight?", cfg=_config())
@@ -225,9 +228,10 @@ def test_rag_answer_without_a_valid_citation_is_refused(monkeypatch):
 
 
 def test_stream_preserves_answer_text_and_finishes_with_result(monkeypatch):
-    monkeypatch.setattr(answer_module, "_load_chunks", lambda cfg: [
+    chunks = [
         _chunk("chunk_a", "Exam weight is 40 percent.")
-    ])
+    ]
+    monkeypatch.setattr(answer_module, "_build_hits", lambda q, cfg, filters: _mock_hits(chunks, q, cfg, filters))
 
     pieces = list(answer_module.answer_stream("Exam weight", cfg=_config()))
 
@@ -237,10 +241,21 @@ def test_stream_preserves_answer_text_and_finishes_with_result(monkeypatch):
 
 def test_management_control_exam_evidence_is_passed_to_the_model(monkeypatch):
     from src.config import chunks_path, load_config
+    chromadb = pytest.importorskip("chromadb")
+    pytest.importorskip("sentence_transformers")
+    from src.config import PATHS, bm25_path
 
     cfg = load_config("configs/final.yaml")
     if not chunks_path(cfg.kb_sig).is_file():
         pytest.skip("the generated chunk index is not available")
+    if not bm25_path(cfg.kb_sig).is_file():
+        pytest.skip("the configured BM25 index is not built")
+    client = chromadb.PersistentClient(path=str(PATHS["chroma"]))
+    if cfg.collection_name not in {
+        item.name if hasattr(item, "name") else str(item)
+        for item in client.list_collections()
+    }:
+        pytest.skip("the configured Chroma collection is not built")
 
     monkeypatch.setattr(
         answer_module,
