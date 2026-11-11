@@ -1,0 +1,12 @@
+{
+  "checked": 50,
+  "correct": 39,
+  "partly": 10,
+  "wrong": 1,
+  "error_types": {
+    "too vague": 4,
+    "invented content": 2,
+    "wrong text": 4,
+    "missing text": 1
+  }
+}
