@@ -20,6 +20,7 @@ def format_answer(text: str) -> str:
     """The answer as HTML: the text escaped, and every [S1] turned into a yellow chip."""
     safe = html_lib.escape(text)  # "<" becomes "&lt;" etc., so nothing in the answer is read as HTML
     chips = _CITATION.sub(r'<span class="cite">\1</span>', safe)  # [S1] -> the chip S1
+    chips = chips.replace("\n", "<br>")  # keeps the LLM's line breaks (lists, "Where:" lines); without this they are joined
     return f'<div class="answer">{chips}</div>'
 
 
