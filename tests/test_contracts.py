@@ -33,8 +33,17 @@ def test_fake_answer_matches_contract():
     assert isinstance(result, AnswerResult)
     again = AnswerResult.from_dict(json.loads(json.dumps(result.to_dict())))
     assert again == result
-    assert [h.label for h in result.context_hits] == ["S1", "S2"]
+    assert [h.label for h in result.context_hits] == [f"S{i}" for i in range(1, 6)]
     assert "total" in result.timings_ms
+
+
+def test_fake_answer_refuses_and_runs_without_rag():
+    from src.config import load_config
+
+    refused = fake.answer("When is the end-of-year party?")
+    assert refused.refused and not refused.context_hits
+    bare = fake.answer("What is the final exam worth?", cfg=load_config("configs/b0_no_rag.yaml"))
+    assert not bare.refused and not bare.context_hits
 
 
 def test_fake_stream_ends_with_result():

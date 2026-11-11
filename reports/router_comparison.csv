@@ -1,0 +1,7 @@
+model,macro_f1_mean,macro_f1_std,accuracy_mean,train_seconds
+svm,0.8413,0.0292,0.8433,0.9822
+logistic_regression,0.8311,0.0349,0.8333,0.6259
+mlp,0.8256,0.032,0.83,11.0871
+random_forest,0.7514,0.0309,0.7633,30.142
+knn,0.6765,0.0396,0.69,0.4532
+llm:llama3.1:8b,0.8913,,0.8933,0.0

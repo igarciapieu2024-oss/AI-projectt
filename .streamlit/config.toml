@@ -1,0 +1,33 @@
+# App look and behaviour (owner: Irene).
+# The brand colours (from the SyllabusAI logo) and the font are set here and in assets/style.css.
+
+[server]
+enableStaticServing = true          # serves the files in static/ (our fonts), so the app needs no internet
+
+[theme]
+#1 the brand colours
+primaryColor = "#2B6FD6"            # lecture blue: buttons, links, the selected page
+backgroundColor = "#F6F7FD"         # paper: the page background
+secondaryBackgroundColor = "#EEF1FB" # light grey-blue: inputs, expanders, the chat box
+textColor = "#1B1747"               # ink: all text
+linkColor = "#2B6FD6"               # links in the same blue as the buttons
+borderColor = "#E1E4F2"             # thin lines around inputs and cards
+baseRadius = "10px"                 # rounded corners of buttons and inputs
+
+#2 the brand font, loaded from static/fonts/ (no Google Fonts, so it works offline)
+font = "Instrument Sans"            # body text and every widget
+headingFont = "Instrument Sans"     # titles, in bold: a clean geometric look like the logo
+
+[[theme.fontFaces]]
+family = "Instrument Sans"
+url = "app/static/fonts/InstrumentSans.woff2"
+weight = "400 700"                  # one variable file covers every weight from regular to bold
+
+[theme.sidebar]
+backgroundColor = "#FFFFFF"         # the menu on the left stays white, so the pages stand out
+
+[client]
+toolbarMode = "minimal"             # hides the developer menu ("Deploy" etc.) during the demo
+
+[browser]
+gatherUsageStats = false            # Streamlit would try to send usage statistics to the internet; offline we don't want that
