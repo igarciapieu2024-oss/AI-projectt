@@ -76,7 +76,12 @@ def shrink(path: str) -> bytes:
     from PIL import Image  # opens and resizes images (already in requirements.txt)
 
     with Image.open(path) as im:  # opens the image file
-        im = im.convert("RGB")  # same colour format for every image (some are black and white or transparent)
+        if im.mode in ("RGBA", "LA") or "transparency" in im.info:  # transparent background (many formulas)
+            im = im.convert("RGBA")  # makes sure there is a transparency channel to read
+            white = Image.new("RGB", im.size, "white")  # transparent parts become white, not black
+            white.paste(im, mask=im.split()[-1])  # pastes only the visible parts
+            im = white
+        im = im.convert("RGB")  # same colour format for every image
         im.thumbnail((MAX_SIDE, MAX_SIDE))  # shrinks it keeping its shape; images already smaller stay the same
         buffer = BytesIO()  # an empty "file" in memory
         im.save(buffer, format="PNG")  # saves the smaller copy there
@@ -93,14 +98,24 @@ def classify_and_describe(path: str, ocr_text: str, model: str) -> tuple[str, st
         model=model,  # the vision model (from configs/base.yaml, or --model to try another one)
         messages=[{"role": "user", "content": prompt, "images": [shrink(path)]}],  # the smaller copy goes with the message
         format="json",  # forces the model to answer with valid JSON, so we can always read it
-        options={"temperature": 0},  # 0 = no randomness, the same image always gets the same answer
+        # 0 = no randomness; num_predict stops the answer at ~400 tokens (120 words fit easily);
+        # repeat_penalty stops it from listing the same label again and again
+        options={"temperature": 0, "num_predict": 400, "repeat_penalty": 1.15},
         keep_alive="30m",  # keeps the model loaded between images, so it is not reloaded each time
     )
     # newer versions of the ollama library return an object, older ones a dictionary; this works with both
     text = reply["message"]["content"] if isinstance(reply, dict) else reply.message.content
-    data = json.loads(text)  # turns the JSON text into a Python dictionary
+    try:
+        data = json.loads(text)  # turns the JSON text into a Python dictionary
+    except json.JSONDecodeError:  # the answer was cut before the closing quote: we rescue what is there
+        import re  # finds the class and the description inside the cut text
+        found_class = re.search(r'"image_class"\s*:\s*"([a-zA-Z]+)', text)  # the class word
+        found_desc = re.search(r'"description"\s*:\s*"(.*)', text, re.S)  # everything after "description": "
+        data = {"image_class": found_class.group(1) if found_class else "",
+                "description": found_desc.group(1).rstrip('"} \n') if found_desc else ""}
 
     image_class = str(data.get("image_class", "")).strip().lower()  # the class, in lower case to compare it
+    image_class = next((c for c in CLASSES if image_class.startswith(c)), image_class)  # keeps "diagram" from "diagram: boxes..."
     if image_class not in CLASSES:  # the model wrote something that is not one of the 6 classes
         raise ValueError(f"unknown class from the model: {image_class!r}")  # the image is retried in the next run
     if image_class not in USEFUL_CLASSES:  # photo or decoration
