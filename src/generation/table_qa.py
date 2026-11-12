@@ -5,6 +5,7 @@ Owner: Sergio.
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -59,6 +60,9 @@ def _row_text(row: CourseRow) -> str:
     parts = [f"{row.course_name} ({row.course_code})"]
     if row.final_exam_weight is not None:
         parts.append(f"final exam {row.final_exam_weight:g}%")
+    else:
+        # said explicitly: without it the model read another component (e.g. "Intermediate Tests 60%") as the final exam
+        parts.append("no final exam")
     components = _components(row.components)
     if components:
         formatted = ", ".join(
@@ -81,6 +85,36 @@ def _row_text(row: CourseRow) -> str:
     return "; ".join(parts)
 
 
+# which column a comparison question is about, and the words that ask for the top or the bottom of it
+_SORT_FIELDS = [
+    (re.compile(r"final exam", re.I), "final_exam_weight"),
+    (re.compile(r"attendance|absence|absences|miss", re.I), "attendance_limit_pct"),
+    (re.compile(r"sessions|classes|long", re.I), "n_sessions"),
+]
+_ASCENDING = re.compile(r"\b(lowest|least|smallest|fewest|minimum|less|shortest)\b", re.I)
+
+
+def _ordered_for(question: str, rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Sort the course rows by the column the question compares, so S1 is the answer and the model only reads it.
+
+    The small local model mixed up the numbers when it had to compare 7 rows itself
+    ("Strategies and Management Control, both 40%"; Strategies is 45%). Rows without a value go last.
+    """
+    field = next((name for pattern, name in _SORT_FIELDS if pattern.search(question)), None)
+    if field is None:
+        return rows
+    ascending = bool(_ASCENDING.search(question))
+
+    def key(row):
+        try:
+            value = float(row.get(field) or "")
+        except ValueError:
+            return (1, 0.0)  # no value: always at the end
+        return (0, value if ascending else -value)
+
+    return sorted(rows, key=key)
+
+
 def answer_from_table(question: str, cfg) -> list[Hit]:
     """Return table-row evidence for every course, or courses named in the question."""
     if not isinstance(question, str) or not question.strip():
@@ -91,6 +125,7 @@ def answer_from_table(question: str, cfg) -> list[Hit]:
     rows = list(_load_rows(*_file_key(path)))
     named_codes = set(mentioned_course_codes(question, rows))
     selected = [row for row in rows if not named_codes or row["course_code"] in named_codes]
+    selected = _ordered_for(question, selected)
     hits = []
     for row in selected:
         components = _components(row.get("components", ""))

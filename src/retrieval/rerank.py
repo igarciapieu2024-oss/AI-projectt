@@ -37,7 +37,7 @@ def rerank(query: str, hits: list, top_k: int, cfg) -> list:
     if not model_name:
         raise ValueError("retrieval.reranker_model must be configured when reranking is enabled")
     pairs = [
-        (query, f"{hit.chunk.outline_path}\n{hit.chunk.text}")
+        (query, hit.chunk.embed_text)  # course name + outline + text, the same text the search used
         for hit in hits
     ]
     try:
