@@ -12,10 +12,11 @@ from dataclasses import replace
 from typing import Iterator
 
 from src.config import Config, load_config
+from src.generation import rewrite, selfcheck, table_qa
 from src.generation.llm import chat
 from src.generation.prompts import build_messages
-from src.generation import rewrite, selfcheck
 from src.retrieval import bm25, dense, fusion, rerank
+from src.retrieval.router import route as route_question
 from src.schemas import AnswerResult, Citation, Filters, Hit, REFUSAL, RouteDecision
 
 _CITATION = re.compile(r"[\[(]S(\d+)[\])]", re.IGNORECASE)
@@ -56,7 +57,10 @@ def _prepare_answer(
     history: list[dict] | None,
     filters: Filters | None,
     cfg: Config | None,
-) -> tuple[str, str, Config, list[Hit], list[dict[str, str]] | None, float, float, float, float, bool]:
+) -> tuple[
+    str, str, Config, list[Hit], list[dict[str, str]] | None, RouteDecision,
+    float, float, float, float, float, bool,
+]:
     question = question.strip()
     if not question:
         raise ValueError("question must not be empty")
@@ -71,11 +75,31 @@ def _prepare_answer(
         rewritten_question = rewrite.rewrite(question, history, cfg)
         rewrite_ms = (time.perf_counter() - rewrite_started) * 1000
 
+    route_ms = 0.0
+    route_decision = RouteDecision(label="none", prob=0.0, source="none")
+    if rag_enabled:
+        route_started = time.perf_counter()
+        route_decision = route_question(rewritten_question, cfg)
+        route_ms = (time.perf_counter() - route_started) * 1000
+
+    if rag_enabled and route_decision.label == "out_of_scope":
+        return (
+            question, rewritten_question, cfg, [], None, route_decision, started,
+            rewrite_ms, route_ms, 0.0, 0.0, rag_enabled,
+        )
+
     retrieval_started = time.perf_counter()
-    hits = _build_hits(rewritten_question, cfg, filters) if rag_enabled else []
+    table_hits = False
+    hits = []
+    if rag_enabled:
+        if route_decision.label == "cross_course":
+            hits = table_qa.answer_from_table(rewritten_question, cfg)
+            table_hits = bool(hits)
+        if not hits:
+            hits = _build_hits(rewritten_question, cfg, filters)
     retrieve_ms = (time.perf_counter() - retrieval_started) * 1000
     rerank_ms = 0.0
-    if rag_enabled and hits:
+    if rag_enabled and hits and not table_hits:
         top_k = _top_k(cfg)
         if cfg.retrieval.get("rerank", False):
             rerank_started = time.perf_counter()
@@ -85,6 +109,9 @@ def _prepare_answer(
             hits = hits[:top_k]
         is_weak = cfg.generation.get("selfcheck", False) and selfcheck.is_weak(hits, cfg)
         hits = [replace(hit, rank=rank, label=f"S{rank}") for rank, hit in enumerate(hits, start=1)]
+    elif table_hits:
+        is_weak = False
+        hits = [replace(hit, rank=rank, label=f"S{rank}") for rank, hit in enumerate(hits, start=1)]
     else:
         is_weak = False
     messages = (
@@ -93,8 +120,8 @@ def _prepare_answer(
         else None
     )
     return (
-        question, rewritten_question, cfg, hits, messages, started,
-        rewrite_ms, retrieve_ms, rerank_ms, rag_enabled,
+        question, rewritten_question, cfg, hits, messages, route_decision, started,
+        rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled,
     )
 
 
@@ -125,12 +152,14 @@ def _validated_answer(answer_text: str, hits: list[Hit], rag_enabled: bool) -> t
 def _make_result(
     question: str,
     rewritten_question: str,
+    route_decision: RouteDecision,
     filters: Filters | None,
     cfg: Config,
     hits: list[Hit],
     answer_text: str,
     started: float,
     rewrite_ms: float,
+    route_ms: float,
     retrieve_ms: float,
     rerank_ms: float,
     generate_ms: float,
@@ -144,7 +173,7 @@ def _make_result(
     return AnswerResult(
         question=question,
         rewritten_question=rewritten_question,
-        route=RouteDecision(label="none", prob=0.0, source="none"),
+        route=route_decision,
         filters_used=filters or Filters(),
         context_hits=hits,
         answer_text=answer_text,
@@ -152,7 +181,7 @@ def _make_result(
         refused=rag_enabled and answer_text == REFUSAL,
         timings_ms={
             "rewrite": round(rewrite_ms, 1),
-            "route": 0.0,
+            "route": round(route_ms, 1),
             "retrieve": round(retrieve_ms, 1),
             "rerank": round(rerank_ms, 1),
             "generate": round(generate_ms, 1),
@@ -170,13 +199,16 @@ def answer(
     cfg: Config | None = None,
 ) -> AnswerResult:
     """Generate an answer from retrieved evidence, or run the no-RAG baseline."""
-    question, rewritten_question, cfg, hits, messages, started, rewrite_ms, retrieve_ms, rerank_ms, rag_enabled = _prepare_answer(
+    (
+        question, rewritten_question, cfg, hits, messages, route_decision, started,
+        rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled,
+    ) = _prepare_answer(
         question, history, filters, cfg
     )
     if rag_enabled and messages is None:
         return _make_result(
-            question, rewritten_question, filters, cfg, hits, REFUSAL, started,
-            rewrite_ms, retrieve_ms, rerank_ms, 0.0, rag_enabled,
+            question, rewritten_question, route_decision, filters, cfg, hits, REFUSAL, started,
+            rewrite_ms, route_ms, retrieve_ms, rerank_ms, 0.0, rag_enabled,
         )
     if messages is None:
         raise RuntimeError("answer prompt was not constructed")
@@ -189,8 +221,8 @@ def answer(
         raise ValueError("chat() returned empty answer text")
     generate_ms = (time.perf_counter() - generation_started) * 1000
     return _make_result(
-        question, rewritten_question, filters, cfg, hits, response, started,
-        rewrite_ms, retrieve_ms, rerank_ms, generate_ms, rag_enabled,
+        question, rewritten_question, route_decision, filters, cfg, hits, response, started,
+        rewrite_ms, route_ms, retrieve_ms, rerank_ms, generate_ms, rag_enabled,
     )
 
 
@@ -201,13 +233,16 @@ def answer_stream(
     cfg: Config | None = None,
 ) -> Iterator[str | AnswerResult]:
     """Yield generated text pieces and then the validated final result."""
-    question, rewritten_question, cfg, hits, messages, started, rewrite_ms, retrieve_ms, rerank_ms, rag_enabled = _prepare_answer(
+    (
+        question, rewritten_question, cfg, hits, messages, route_decision, started,
+        rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled,
+    ) = _prepare_answer(
         question, history, filters, cfg
     )
     if rag_enabled and messages is None:
         result = _make_result(
-            question, rewritten_question, filters, cfg, hits, REFUSAL, started,
-            rewrite_ms, retrieve_ms, rerank_ms, 0.0, rag_enabled,
+            question, rewritten_question, route_decision, filters, cfg, hits, REFUSAL, started,
+            rewrite_ms, route_ms, retrieve_ms, rerank_ms, 0.0, rag_enabled,
         )
         yield result.answer_text
         yield result
@@ -227,7 +262,7 @@ def answer_stream(
         raise ValueError("chat() returned no answer text while streaming")
     generate_ms = (time.perf_counter() - generation_started) * 1000
     result = _make_result(
-        question, rewritten_question, filters, cfg, hits, "".join(pieces), started,
-        rewrite_ms, retrieve_ms, rerank_ms, generate_ms, rag_enabled,
+        question, rewritten_question, route_decision, filters, cfg, hits, "".join(pieces), started,
+        rewrite_ms, route_ms, retrieve_ms, rerank_ms, generate_ms, rag_enabled,
     )
     yield result
