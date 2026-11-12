@@ -14,39 +14,6 @@ from src.utils.ids import chunk_id
 from src.utils.io import read_jsonl, write_jsonl
 
 
-def _split_text(text: str, size: int, overlap: int) -> list[str]:
-    """Split text into overlapping chunks, keeping word boundaries."""
-    text = " ".join((text or "").split())
-
-    if not text:
-        return []
-
-    if len(text) <= size:
-        return [text]
-
-    chunks = []
-    start = 0
-
-    while start < len(text):
-        end = min(start + size, len(text))
-
-        if end < len(text):
-            boundary = text.rfind(" ", start, end)
-            if boundary > start:
-                end = boundary
-
-        piece = text[start:end].strip()
-        if piece:
-            chunks.append(piece)
-
-        if end >= len(text):
-            break
-
-        start = max(end - overlap, start + 1)
-
-    return chunks
-
-
 def _load_image_text(use_ocr: bool, use_captions: bool) -> dict:
     """Group OCR text and image descriptions by slide ID."""
     result = defaultdict(list)
