@@ -20,8 +20,23 @@ def extract_filters(question: str, courses: list[dict]) -> Filters:
     """Extract an unambiguous course name/code and explicitly mentioned sessions."""
     if not isinstance(question, str):
         raise TypeError("question must be a string")
+    course_codes = mentioned_course_codes(question, courses)
+    sessions = sorted({
+        int(match.group(1))
+        for match in re.finditer(r"\b(?:sessions?|sesiones?)\s*(\d+)\b", question, re.IGNORECASE)
+    })
+    return Filters(
+        course_code=course_codes[0] if len(course_codes) == 1 else None,
+        sessions=sessions,
+    )
+
+
+def mentioned_course_codes(question: str, courses: list[dict]) -> list[str]:
+    """Return all course codes whose names or codes are explicitly present."""
+    if not isinstance(question, str):
+        raise TypeError("question must be a string")
     normalized_question = f" {_normalized(question)} "
-    course_codes = set()
+    course_codes = []
     for course in courses:
         code = course.get("course_code")
         name = course.get("course_name")
@@ -31,13 +46,5 @@ def extract_filters(question: str, courses: list[dict]) -> Filters:
         if isinstance(name, str) and name.strip():
             aliases.append(name)
         if any(f" {_normalized(alias)} " in normalized_question for alias in aliases):
-            course_codes.add(code)
-
-    sessions = sorted({
-        int(match.group(1))
-        for match in re.finditer(r"\b(?:sessions?|sesiones?)\s*(\d+)\b", question, re.IGNORECASE)
-    })
-    return Filters(
-        course_code=next(iter(course_codes)) if len(course_codes) == 1 else None,
-        sessions=sessions,
-    )
+            course_codes.append(code)
+    return course_codes

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 import src.generation.answer as answer_module
-from src.schemas import AnswerResult, Chunk, Filters, Hit
+from src.schemas import AnswerResult, Chunk, Filters, Hit, RouteDecision
 
 
 def _chunk(
@@ -237,6 +237,68 @@ def test_stream_preserves_answer_text_and_finishes_with_result(monkeypatch):
 
     assert isinstance(pieces[-1], AnswerResult)
     assert "".join(pieces[:-1]) == pieces[-1].answer_text
+
+
+def test_out_of_scope_route_skips_retrieval(monkeypatch):
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="out_of_scope", prob=0.95, source="classifier"),
+    )
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda *args: pytest.fail("out-of-scope questions must skip retrieval"),
+    )
+
+    result = answer_module.answer("Question outside the materials", cfg=_config())
+
+    assert result.refused
+    assert result.route.label == "out_of_scope"
+    assert result.timings_ms["route"] >= 0
+    assert result.context_hits == []
+
+
+def test_cross_course_route_uses_course_table(monkeypatch):
+    hit = Hit(chunk=_chunk("course_row", "Management Control (c01)"), rank=1, label="S1")
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="cross_course", prob=0.9, source="classifier"),
+    )
+    monkeypatch.setattr(answer_module.table_qa, "answer_from_table", lambda question, cfg: [hit])
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda *args: pytest.fail("table evidence should avoid normal retrieval"),
+    )
+    monkeypatch.setattr(
+        answer_module,
+        "build_messages",
+        lambda question, hits, cfg, history: [{"role": "user", "content": hits[0].chunk.text}],
+    )
+    monkeypatch.setattr(answer_module, "chat", lambda messages, cfg: "Answer [S1]")
+
+    result = answer_module.answer("Compare courses", cfg=_config())
+
+    assert result.route.label == "cross_course"
+    assert result.context_hits[0].chunk.chunk_id == hit.chunk.chunk_id
+    assert result.citations[0].label == "S1"
+
+
+def test_cross_course_route_falls_back_when_course_table_is_empty(monkeypatch):
+    hit = Hit(chunk=_chunk("retrieved", "Exam weight is 40 percent."), rank=1)
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="cross_course", prob=0.9, source="classifier"),
+    )
+    monkeypatch.setattr(answer_module.table_qa, "answer_from_table", lambda question, cfg: [])
+    monkeypatch.setattr(answer_module, "_build_hits", lambda question, cfg, filters: [hit])
+
+    result = answer_module.answer("Compare courses", cfg=_config())
+
+    assert result.context_hits[0].chunk.chunk_id == "retrieved"
 
 
 def test_management_control_exam_evidence_is_passed_to_the_model(monkeypatch):
