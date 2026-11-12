@@ -65,5 +65,20 @@ def test_course_rows_become_hits_and_named_course_is_selected(monkeypatch, tmp_p
 
     all_hits = table_qa.answer_from_table("Compare my courses", cfg)
     assert [hit.chunk.course_code for hit in all_hits] == ["c01", "c02"]
-    assert "final exam" not in all_hits[1].chunk.text
+    assert "no final exam" in all_hits[1].chunk.text  # said explicitly, never a made-up weight
     assert "retake: One retake" in all_hits[1].chunk.text
+
+
+def test_comparison_questions_get_the_rows_in_order():
+    from src.generation.table_qa import _ordered_for
+    rows = [
+        {"course_code": "mc", "final_exam_weight": "40.0", "n_sessions": "25"},
+        {"course_code": "ma", "final_exam_weight": "", "n_sessions": "30"},
+        {"course_code": "st", "final_exam_weight": "45.0", "n_sessions": "30"},
+        {"course_code": "os", "final_exam_weight": "20.0", "n_sessions": "30"},
+    ]
+    codes = lambda q: [r["course_code"] for r in _ordered_for(q, rows)]
+    assert codes("Which courses have the highest final exam weight?") == ["st", "mc", "os", "ma"]
+    assert codes("Which course has the lowest final exam weight?") == ["os", "mc", "st", "ma"]  # no value last
+    assert codes("Which course has the fewest sessions?")[0] == "mc"
+    assert codes("Tell me about my courses") == ["mc", "ma", "st", "os"]  # nothing to compare: order kept

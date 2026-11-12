@@ -10,6 +10,7 @@ kb:
   chunk_overlap: 120
   embed_model: sentence-transformers/all-MiniLM-L6-v2
   dedup: true
+  course_rows: true            # one clean summary chunk per course from the course table
 
 retrieval:
   mode: hybrid                 # dense | hybrid

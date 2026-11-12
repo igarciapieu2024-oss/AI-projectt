@@ -5,6 +5,10 @@ from __future__ import annotations
 from collections import defaultdict
 
 from src.config import PATHS, chunks_path, parents_path
+from src.kb.syllabus_text import (  # readable tables, one summary per course, course names, real headings
+    course_names, course_summary_chunks, is_noise, section_heading, section_text, session_numbers,
+    split_into_chunks, with_course,
+)
 from src.schemas import Chunk, Parent
 from src.utils.ids import chunk_id
 from src.utils.io import read_jsonl, write_jsonl
@@ -98,6 +102,7 @@ def build_chunks(cfg) -> int:
     overlap = max(0, min(overlap, chunk_size - 1))
 
     image_text = _load_image_text(use_ocr, use_captions)
+    names = course_names()  # "mgmt_control" -> "Management Control", added to the searched text of every chunk
 
     chunks = []
     parents = []
@@ -108,13 +113,9 @@ def build_chunks(cfg) -> int:
 
         for section in sections:
             record_id = section["section_id"]
-            text = section.get("text", "")
+            text = section_text(section)  # body + tables written as readable lines ("- Final Exam: 40%. ...")
 
-            tables = section.get("tables", [])
-            if tables:
-                text += "\n\n" + "\n\n".join(tables)
-
-            outline_path = f"Syllabus › {section.get('section_name', 'Section')}"
+            outline_path = f"Syllabus › {section_heading(section)}"  # the real heading, not "OTHER"
             parent_id = f"parent__{record_id}"
 
             parents.append(
@@ -126,7 +127,12 @@ def build_chunks(cfg) -> int:
                 )
             )
 
-            for i, piece in enumerate(_split_text(text, chunk_size, overlap)):
+            # the programme is cut at "SESSION N" so each chunk holds whole sessions and knows their numbers
+            is_program = section.get("section_name") == "PROGRAM"
+            pieces = split_into_chunks(text, chunk_size, overlap, by_session=is_program)
+            piece_sessions: list[int] = []
+            for i, piece in enumerate(pieces):
+                piece_sessions = session_numbers(piece, piece_sessions) if is_program else []
                 chunks.append(
                     Chunk(
                         chunk_id=chunk_id("section", record_id, i),
@@ -134,17 +140,25 @@ def build_chunks(cfg) -> int:
                         strategy="section",
                         doc_type="syllabus_section",
                         course_code=section["course_code"],
-                        sessions=[],
+                        sessions=piece_sessions,
                         source_id=section["source_id"],
                         covers=[record_id],
                         parent_id=parent_id,
                         outline_path=outline_path,
                         text=piece,
-                        embed_text=f"{outline_path}\n{piece}",
+                        embed_text=with_course(names.get(section["course_code"], ""), outline_path, piece),
                         has_image_text=False,
                         duplicate_of=None,
                     )
                 )
+
+        # one clean summary chunk per course from the course table (final exam weight, components, attendance...)
+        if settings.get("course_rows", False):
+            summary_chunks, summary_parents = course_summary_chunks(cfg.kb_sig)
+            if not summary_chunks:
+                print("Course table not found: no course summary chunks (run the course_table step first).")
+            chunks.extend(summary_chunks)
+            parents.extend(summary_parents)
 
     # Process slides and their associated image text
     if "slides" in sources:
@@ -189,7 +203,9 @@ def build_chunks(cfg) -> int:
                 )
             )
 
-            for i, piece in enumerate(_split_text(text, chunk_size, overlap)):
+            for i, piece in enumerate(split_into_chunks(text, chunk_size, overlap)):  # cut at sentence ends
+                if is_noise(piece, has_image_text):
+                    continue  # "THANK YOU", a page number...
                 chunks.append(
                     Chunk(
                         chunk_id=chunk_id("slide", record_id, i),
@@ -203,7 +219,7 @@ def build_chunks(cfg) -> int:
                         parent_id=parent_id,
                         outline_path=outline_path,
                         text=piece,
-                        embed_text=f"{outline_path}\n{piece}",
+                        embed_text=with_course(names.get(slide["course_code"], ""), outline_path, piece),
                         has_image_text=has_image_text,
                         duplicate_of=None,
                     )
