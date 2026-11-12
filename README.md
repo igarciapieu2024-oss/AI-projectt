@@ -17,7 +17,6 @@ pip install -r requirements.txt
 
 ```bash
 ollama pull llama3.1:8b
-ollama pull moondream
 ollama pull qwen2.5:7b
 ```
 
