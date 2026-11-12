@@ -250,6 +250,15 @@ def test_components_sum_to_100_for_each_expected_course(monkeypatch, tmp_path):
                 tables=[markdown_table(table_items)],
             )
         )
+        if code == "strategies":
+            sections.append(
+                _section(
+                    code,
+                    f"{code}_syl_sec02",
+                    "EVALUATION",
+                    tables=[markdown_table([("Class Participation", 15)])],
+                )
+            )
     sections.append(
         _section(
             "mgmt_control",
@@ -272,6 +281,59 @@ def test_components_sum_to_100_for_each_expected_course(monkeypatch, tmp_path):
             (name, float(weight)) for name, weight in expected_components
         ]
         assert sum(item["weight"] for item in actual) == 100
+
+
+def test_strategies_text_and_split_table_participation_are_not_double_counted(monkeypatch, tmp_path):
+    manifest_path = tmp_path / "manifest.csv"
+    sections_path = tmp_path / "syllabus_sections.jsonl"
+    table_path = tmp_path / "course_table.csv"
+    _write_manifest(manifest_path, [("strategies", "Strategies")])
+    write_jsonl(
+        sections_path,
+        [
+            _section(
+                "strategies",
+                "strategies_syl_sec06",
+                "EVALUATION",
+                text=(
+                    "A. FINAL EXAM (45%) … "
+                    "B. ONGOING EVALUATION QUIZZES (25%) … "
+                    "C. CASE STUDY COMPETITION (15%) … "
+                    "D. PARTICIPATION (15%)"
+                ),
+                tables=[
+                    "| Component | Percentage |\n| --- | --- |\n"
+                    "| Final Exam | 45% |\n"
+                    "| Ongoing Evaluation Quizzes | 25% |\n"
+                    "| Case Study Competition | 15% |"
+                ],
+            ),
+            _section(
+                "strategies",
+                "strategies_syl_sec07",
+                "EVALUATION",
+                tables=[
+                    "| Component | Percentage |\n| --- | --- |\n"
+                    "| Class Participation | 15 % |"
+                ],
+            ),
+        ],
+    )
+    monkeypatch.setitem(PATHS, "manifest", manifest_path)
+    monkeypatch.setitem(PATHS, "syllabus_sections", sections_path)
+    monkeypatch.setitem(PATHS, "course_table", table_path)
+
+    assert build_course_table(None) == 1
+
+    [row] = read_csv(table_path)
+    components = json.loads(row["components"])
+    assert [(item["name"], item["weight"]) for item in components] == [
+        ("Final Exam", 45.0),
+        ("Ongoing Evaluation Quizzes", 25.0),
+        ("Case Study Competition", 15.0),
+        ("Participation", 15.0),
+    ]
+    assert sum(item["weight"] for item in components) == 100
 
 
 def test_retake_policy_uses_first_full_sentences_and_skips_title():
