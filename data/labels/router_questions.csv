@@ -1,0 +1,301 @@
+question_id,question,label,origin,author
+rq_001,What is a management control system?,course_content,written,Francesca
+rq_002,What is the Rust ownership model?,out_of_scope,written,Francesca
+rq_003,What is the AI policy in Organizational Behaviour?,course_admin,written,Francesca
+rq_004,What's the difference between precision and recall?,course_content,written,Francesca
+rq_005,What happens if I miss more than 20% of OB sessions?,course_admin,written,Francesca
+rq_006,What's covered in the Corporate Finance course?,out_of_scope,written,Francesca
+rq_007,Compare late submission policies across my courses.,cross_course,written,Francesca
+rq_008,What is the difference between user mode and kernel mode?,course_content,written,Francesca
+rq_009,Does the retake exam in Time Series have a maximum grade?,course_admin,written,Francesca
+rq_010,How does the attention mechanism in transformers work?,out_of_scope,written,Francesca
+rq_011,What percentage is the final project in Time Series?,course_admin,written,Francesca
+rq_012,How do I book a study room at IE?,out_of_scope,written,Francesca
+rq_013,How does the labor market determine wages?,course_content,written,Francesca
+rq_014,Which courses have deliverables every week?,cross_course,written,Francesca
+rq_015,Which courses have the highest individual work weight?,cross_course,written,Francesca
+rq_016,What are the best clubs in Madrid?,out_of_scope,written,Francesca
+rq_017,What's the best restaurant near Plaza de Castilla?,out_of_scope,written,Francesca
+rq_018,What's the maximum grade I can get in the ML retake?,course_admin,written,Francesca
+rq_019,Which courses allow a retake with no grade cap?,cross_course,written,Francesca
+rq_020,Which courses have a case competition or simulation?,cross_course,written,Francesca
+rq_021,What is double-entry bookkeeping?,out_of_scope,written,Francesca
+rq_022,How much is the midterm worth in Macroeconomics?,course_admin,written,Francesca
+rq_023,Which courses have a group project worth more than 25%?,cross_course,written,Francesca
+rq_024,Who teaches Financial Accounting this semester?,out_of_scope,written,Francesca
+rq_025,What is autocorrelation?,course_content,written,Francesca
+rq_026,What is a Nash equilibrium?,course_content,written,Francesca
+rq_027,What are the 4Ps of marketing?,out_of_scope,written,Francesca
+rq_028,Do Macro and Strategies have the same retake rules?,cross_course,written,Francesca
+rq_029,explain logistic regression,course_content,written,Francesca
+rq_030,What is the grading breakdown for Time Series?,course_admin,written,Francesca
+rq_031,Which course is easiest to get a 10 in?,out_of_scope,written,Francesca
+rq_032,How does job satisfaction affect performance?,course_content,written,Francesca
+rq_033,In how many courses is attendance mandatory?,cross_course,written,Francesca
+rq_034,Does Macroeconomics have a midterm exam?,course_admin,written,Francesca
+rq_035,How does speech recognition like Siri work?,out_of_scope,written,Francesca
+rq_036,Do any of my courses have open-book exams?,cross_course,written,Francesca
+rq_037,When is the Marketing Management final exam?,out_of_scope,written,Francesca
+rq_038,What is a responsibility center?,course_content,written,Francesca
+rq_039,What is virtual memory?,course_content,written,Francesca
+rq_040,Does Management Control have a final exam or just continuous evaluation?,course_admin,written,Francesca
+rq_041,What's the attendance policy in the Law degree?,out_of_scope,written,Francesca
+rq_042,What did Keynes write in his letters to Roosevelt?,out_of_scope,written,Francesca
+rq_043,What grade did my group get in the OB presentation?,out_of_scope,written,Francesca
+rq_044,How many classes can I skip in Management Control without losing points?,course_admin,written,Francesca
+rq_045,When is the graduation ceremony?,out_of_scope,written,Francesca
+rq_046,How do net exports affect demand in an open economy?,course_content,written,Francesca
+rq_047,What are the library opening hours on weekends?,out_of_scope,written,Francesca
+rq_048,Do all my courses have a midterm?,cross_course,written,Francesca
+rq_049,Which of my subjects have a final project instead of an exam?,cross_course,written,Francesca
+rq_050,What's the bibliography for Management Control?,course_admin,written,Francesca
+rq_051,Is class participation graded in Management Control?,course_admin,written,Francesca
+rq_052,Does IE offer student housing?,out_of_scope,written,Francesca
+rq_053,Is the final exam in Macro open book?,course_admin,written,Francesca
+rq_054,What is federated learning?,out_of_scope,written,Francesca
+rq_055,How does round-robin scheduling work?,course_content,written,Francesca
+rq_056,What were the main lessons from the Harley Davidson case?,course_content,written,Francesca
+rq_057,Compare the attendance policies of Macro and Strategies.,cross_course,written,Francesca
+rq_058,what's the difference between inflation and deflation,course_content,written,Francesca
+rq_059,How does Harvard teach game theory?,out_of_scope,written,Francesca
+rq_060,Which course gives the most weight to group work?,cross_course,written,Francesca
+rq_061,How do diffusion models like Stable Diffusion work?,out_of_scope,written,Francesca
+rq_062,How did the 2008 crisis affect Iceland's banks?,out_of_scope,written,Francesca
+rq_063,when is the AI ML final presentation,course_admin,written,Francesca
+rq_064,What topics are in International Relations next year?,out_of_scope,written,Francesca
+rq_065,How do GANs generate images?,out_of_scope,written,Francesca
+rq_066,Which of my courses has the smallest final exam weight?,cross_course,written,Francesca
+rq_067,How do recommender systems like Netflix's work?,out_of_scope,written,Francesca
+rq_068,How does a company achieve cost leadership?,course_content,written,Francesca
+rq_069,Is there a group project in Time Series?,course_admin,written,Francesca
+rq_070,Which course should I prioritise if I want to minimise exam weight?,cross_course,written,Francesca
+rq_071,Is attendance mandatory in Management Control?,course_admin,written,Francesca
+rq_072,What is the difference between resources and capabilities?,course_content,written,Francesca
+rq_073,How do I request an official transcript?,out_of_scope,written,Francesca
+rq_074,Which electives should I take next year?,out_of_scope,written,Francesca
+rq_075,What is reinforcement learning with Q-learning?,out_of_scope,written,Francesca
+rq_076,How does the retake work for Operating Systems?,course_admin,written,Francesca
+rq_077,What is the prisoner's dilemma in competition?,course_content,written,Francesca
+rq_078,What is the Keynesian multiplier?,course_content,written,Francesca
+rq_079,Will the Time Series exam be hard?,out_of_scope,written,Francesca
+rq_080,Which professor teaches the most of my courses?,cross_course,written,Francesca
+rq_081,How do I reset my Blackboard password?,out_of_scope,written,Francesca
+rq_082,Which course has the highest final exam weight?,cross_course,written,Francesca
+rq_083,What is the average weight of final exams across my courses?,cross_course,written,Francesca
+rq_084,Which of my courses mention plagiarism penalties?,cross_course,written,Francesca
+rq_085,How do you remove seasonality from a time series?,course_content,written,Francesca
+rq_086,Which courses penalise late submissions?,cross_course,written,Francesca
+rq_087,What is the retake policy for Management Control?,course_admin,written,Francesca
+rq_088,Who won the Champions League last year?,out_of_scope,written,Francesca
+rq_089,Plan my meals for the week.,out_of_scope,written,Francesca
+rq_090,What's the evaluation split between individual and group work in OB?,course_admin,written,Francesca
+rq_091,How many courses have a final worth 40% or more?,cross_course,written,Francesca
+rq_092,Where is the IE Tower cafeteria?,out_of_scope,written,Francesca
+rq_093,How many of my courses are evaluated mostly through group work?,cross_course,written,Francesca
+rq_094,What is the bias-variance tradeoff?,course_content,written,Francesca
+rq_095,How many group assignments are there in Organizational Behaviour?,course_admin,written,Francesca
+rq_096,What is business model innovation?,course_content,written,Francesca
+rq_097,How is GDP measured?,course_content,written,Francesca
+rq_098,What does Modern Monetary Theory say about government debt?,out_of_scope,written,Francesca
+rq_099,What is a confusion matrix?,course_content,written,Francesca
+rq_100,List all my courses and their final exam weights.,cross_course,written,Francesca
+rq_101,What happens in the IS-LM model when the central bank raises interest rates?,course_content,written,Francesca
+rq_102,"Compare the evaluation methods of Time Series, OS and AI/ML.",cross_course,written,Francesca
+rq_103,Which classes include a simulation game or lab?,cross_course,written,Francesca
+rq_104,Which courses don't have a midterm?,cross_course,written,Francesca
+rq_105,What is the difference between L1 and L2 regularization?,course_content,written,Francesca
+rq_106,What is exponential smoothing?,course_content,written,Francesca
+rq_107,how much is the final worth in time series,course_admin,written,Francesca
+rq_108,How many quizzes are there in Macroeconomics?,course_admin,written,Francesca
+rq_109,Is laptop use allowed in Strategies class?,course_admin,written,Francesca
+rq_110,What is the course description of AI Machine Learning Foundations?,course_admin,written,Francesca
+rq_111,How does YOLO detect objects in an image?,course_content,written,Francesca
+rq_112,What is Maslow's hierarchy of needs?,course_content,written,Francesca
+rq_113,How does ChatGPT generate text?,out_of_scope,written,Francesca
+rq_114,Which courses have a peer evaluation?,cross_course,written,Francesca
+rq_115,Which of my courses have a group project?,cross_course,written,Francesca
+rq_116,What are the answers to the AI/ML quiz from last week?,out_of_scope,written,Francesca
+rq_117,Which professors have office hours by appointment only?,cross_course,written,Francesca
+rq_118,What is the AD-AS model used for?,course_content,written,Francesca
+rq_119,"Across my courses, what is the most common final exam weight?",cross_course,written,Francesca
+rq_120,When is the deadline to apply for an exchange semester?,out_of_scope,written,Francesca
+rq_121,What is organizational behaviour?,course_content,written,Francesca
+rq_122,Is there a minimum grade on the final exam to pass Strategies?,course_admin,written,Francesca
+rq_123,What are the Big Five personality traits?,course_content,written,Francesca
+rq_124,How many credits is Organizational Behaviour?,course_admin,written,Francesca
+rq_125,Is Professor Morales a good teacher?,out_of_scope,written,Francesca
+rq_126,Is there a peer evaluation in the AI Machine Learning group work?,course_admin,written,Francesca
+rq_127,How much does the group project count in the ML course?,course_admin,written,Francesca
+rq_128,Does the Macroeconomics professor take attendance every class?,course_admin,written,Francesca
+rq_129,How does a decision tree choose where to split?,course_content,written,Francesca
+rq_130,Which of my courses have no group work at all?,cross_course,written,Francesca
+rq_131,List the attendance requirement for every course.,cross_course,written,Francesca
+rq_132,Who is the professor of Organizational Behaviour?,course_admin,written,Francesca
+rq_133,How do I get a Spanish NIE?,out_of_scope,written,Francesca
+rq_134,What is an activation function in a neural network?,course_content,written,Francesca
+rq_135,What is the grading for the Business Ethics course?,out_of_scope,written,Francesca
+rq_136,What is the Black-Scholes formula used for?,out_of_scope,written,Francesca
+rq_137,What is Tesla's current market share in Europe?,out_of_scope,written,Francesca
+rq_138,What does the LM curve represent?,course_content,written,Francesca
+rq_139,Which courses have individual assignments?,cross_course,written,Francesca
+rq_140,What does the syllabus say about plagiarism in Operating Systems?,course_admin,written,Francesca
+rq_141,How many credits is the Spanish language elective?,out_of_scope,written,Francesca
+rq_142,How does regularization reduce overfitting?,course_content,written,Francesca
+rq_143,What's the professor's email for Management Control?,course_admin,written,Francesca
+rq_144,What are Porter's five forces?,course_content,written,Francesca
+rq_145,What percentage of the OB grade is the final exam?,course_admin,written,Francesca
+rq_146,How do values differ from attitudes?,course_content,written,Francesca
+rq_147,What is the difference between a contract and a tort in Spanish law?,out_of_scope,written,Francesca
+rq_148,What percentage of the final grade is the final exam in AI Machine Learning Foundations?,course_admin,written,Francesca
+rq_149,How does blockchain consensus work?,out_of_scope,written,Francesca
+rq_150,Which of my classes have the strictest attendance rule?,cross_course,written,Francesca
+rq_151,What's the best online course to learn deep learning?,out_of_scope,written,Francesca
+rq_152,What is the difference between supervised and unsupervised learning?,course_content,written,Francesca
+rq_153,How is BERT different from GPT?,out_of_scope,written,Francesca
+rq_154,How does a random forest reduce variance compared to a single tree?,course_content,written,Francesca
+rq_155,What percentage of my courses have a final exam?,cross_course,written,Francesca
+rq_156,Which of my courses has the most sessions?,cross_course,written,Francesca
+rq_157,How many sessions does the Strategies course have?,course_admin,written,Francesca
+rq_158,What's the attendance policy for Operating Systems?,course_admin,written,Francesca
+rq_159,What are entry barriers?,course_content,written,Francesca
+rq_160,What are the rules for the Lobster simulation game grade in Strategies?,course_admin,written,Francesca
+rq_161,How do I connect to the campus WiFi?,out_of_scope,written,Francesca
+rq_162,What is the attendance policy at Universidad Complutense?,out_of_scope,written,Francesca
+rq_163,Which course is the most exam-heavy?,cross_course,written,Francesca
+rq_164,What questions will be on the Strategies final exam?,out_of_scope,written,Francesca
+rq_165,How does the goods market reach equilibrium in a closed economy?,course_content,written,Francesca
+rq_166,Which classes have presentations as part of the grade?,cross_course,written,Francesca
+rq_167,Which courses require more than 80% attendance?,cross_course,written,Francesca
+rq_168,What's the difference between a cost center and a profit center?,course_content,written,Francesca
+rq_169,What is the syllabus of the Data Visualization course?,out_of_scope,written,Francesca
+rq_170,Which course has the lowest participation weight?,cross_course,written,Francesca
+rq_171,How are the Time Series assignments submitted?,course_admin,written,Francesca
+rq_172,What are the learning objectives of Organizational Behaviour?,course_admin,written,Francesca
+rq_173,Who won the last Formula 1 race?,out_of_scope,written,Francesca
+rq_174,Who teaches Strategies?,course_admin,written,Francesca
+rq_175,What are the stages of group development?,course_content,written,Francesca
+rq_176,What is a blue ocean strategy?,course_content,written,Francesca
+rq_177,Which courses use Python?,cross_course,written,Francesca
+rq_178,Which course has the most flexible attendance policy?,cross_course,written,Francesca
+rq_179,What is the difference between nominal and real GDP?,course_content,written,Francesca
+rq_180,Which courses let me retake the exam in July?,cross_course,written,Francesca
+rq_181,What's the total number of sessions across all my courses?,cross_course,written,Francesca
+rq_182,How does a balanced scorecard work?,course_content,written,Francesca
+rq_183,What is the difference between a moving average and an autoregressive model?,course_content,written,Francesca
+rq_184,Which of my courses are taught by the same department?,cross_course,written,Francesca
+rq_185,When does diversification create value?,course_content,written,Francesca
+rq_186,What does it mean for a time series to be stationary?,course_content,written,Francesca
+rq_187,How do I apply for an IE scholarship?,out_of_scope,written,Francesca
+rq_188,What's the email of the Time Series professor?,course_admin,written,Francesca
+rq_189,Does the ML course have a midterm?,course_admin,written,Francesca
+rq_190,Are the Strategies case presentations individual or in groups?,course_admin,written,Francesca
+rq_191,What is a race condition?,course_content,written,Francesca
+rq_192,Which subjects have continuous evaluation only?,cross_course,written,Francesca
+rq_193,What do other students think about the Macro course?,out_of_scope,written,Francesca
+rq_194,What is social loafing?,course_content,written,Francesca
+rq_195,Compare the grading of AI/ML and Management Control.,cross_course,written,Francesca
+rq_196,Which course has the most quizzes?,cross_course,written,Francesca
+rq_197,"Between Management Control and OB, which has a bigger final exam?",cross_course,written,Francesca
+rq_198,How do I book a meeting with career services?,out_of_scope,written,Francesca
+rq_199,How do you read an ACF plot?,course_content,written,Francesca
+rq_200,Are there extra credit opportunities in Macroeconomics?,course_admin,written,Francesca
+rq_201,Can you give me a recipe for paella?,out_of_scope,written,Francesca
+rq_202,Can you write my Strategies case report for me?,out_of_scope,written,Francesca
+rq_203,What is the natural rate of unemployment?,course_content,written,Francesca
+rq_204,What does the kernel trick do?,course_content,written,Francesca
+rq_205,What happens if I fail the final exam in Macro?,course_admin,written,Francesca
+rq_206,How do I calculate the derivative of ln(x)?,out_of_scope,written,Francesca
+rq_207,What books are recommended for Macroeconomics?,course_admin,written,Francesca
+rq_208,Is the participation weight the same in all my courses?,cross_course,written,Francesca
+rq_209,Show me the final exam weight of each course.,cross_course,written,Francesca
+rq_210,Why do CNNs use pooling layers?,course_content,written,Francesca
+rq_211,Which courses have the same professor?,cross_course,written,Francesca
+rq_212,"In Strategies, how is class participation assessed?",course_admin,written,Francesca
+rq_213,What's my current grade in Macroeconomics?,out_of_scope,written,Francesca
+rq_214,Where do I get a new student card?,out_of_scope,written,Francesca
+rq_215,Is the final exam worth more in OS or in Time Series?,cross_course,written,Francesca
+rq_216,Does the AI/ML professor have office hours?,course_admin,written,Francesca
+rq_217,How does Kubernetes schedule containers?,out_of_scope,written,Francesca
+rq_218,What's the purpose of a semaphore?,course_content,written,Francesca
+rq_219,How do I fine-tune a large language model?,out_of_scope,written,Francesca
+rq_220,Who should I contact if I have an issue with my Management Control grade?,course_admin,written,Francesca
+rq_221,Compare the AI policies of my courses.,cross_course,written,Francesca
+rq_222,What are the advantages of vertical integration?,course_content,written,Francesca
+rq_223,How much is the OS lab work worth?,course_admin,written,Francesca
+rq_224,What is quantum computing?,out_of_scope,written,Francesca
+rq_225,In which courses is participation worth more than 10%?,cross_course,written,Francesca
+rq_226,What is the policy on late submissions in Organizational Behaviour?,course_admin,written,Francesca
+rq_227,How many of my courses have a group presentation?,cross_course,written,Francesca
+rq_228,Did I pass the Operating Systems midterm?,out_of_scope,written,Francesca
+rq_229,Where is participation graded the most: OB or Strategies?,cross_course,written,Francesca
+rq_230,"I missed three Macro classes, am I still allowed to take the final?",course_admin,written,Francesca
+rq_231,which courses have a minimum grade on the final,cross_course,written,Francesca
+rq_232,What's the passing grade for AI Machine Learning Foundations?,course_admin,written,Francesca
+rq_233,What is gradient descent?,course_content,written,Francesca
+rq_234,What is the IS curve?,course_content,written,Francesca
+rq_235,What is the weight of the case analyses in Strategies?,course_admin,written,Francesca
+rq_236,How is the unemployment rate calculated?,course_content,written,Francesca
+rq_237,Do all my courses have the same passing grade?,cross_course,written,Francesca
+rq_238,Which courses let me use AI tools in assignments?,cross_course,written,Francesca
+rq_239,How does paging work?,course_content,written,Francesca
+rq_240,What is the price of Bitcoin right now?,out_of_scope,written,Francesca
+rq_241,What is the money multiplier?,course_content,written,Francesca
+rq_242,Do I lose points for being late to OS class?,course_admin,written,Francesca
+rq_243,Which professors teach more than one of my courses?,cross_course,written,Francesca
+rq_244,Is the Time Series final exam in person?,course_admin,written,Francesca
+rq_245,Are there any courses with no retake option?,cross_course,written,Francesca
+rq_246,How is the Management Control course evaluated?,course_admin,written,Francesca
+rq_247,what's the grading for the ML final project presentation,course_admin,written,Francesca
+rq_248,Which of my courses have both a midterm and a final?,cross_course,written,Francesca
+rq_249,Can I retake OB in the June/July call?,course_admin,written,Francesca
+rq_250,In which courses can I fail just by missing classes?,cross_course,written,Francesca
+rq_251,how much is participation worth in OB,course_admin,written,Francesca
+rq_252,Can I use ChatGPT in the Operating Systems assignments?,course_admin,written,Francesca
+rq_253,Which courses have quizzes?,cross_course,written,Francesca
+rq_254,When does enrollment for next semester open?,out_of_scope,written,Francesca
+rq_255,What does ARIMA stand for?,course_content,written,Francesca
+rq_256,Are there courses where the final exam is optional?,cross_course,written,Francesca
+rq_257,Which of my courses have no final exam?,cross_course,written,Francesca
+rq_258,What are the office hours for the Macroeconomics professor?,course_admin,written,Francesca
+rq_259,Which of my courses have the lightest workload in assignments?,cross_course,written,Francesca
+rq_260,How much do the quizzes count in OS?,course_admin,written,Francesca
+rq_261,What is a graph neural network?,out_of_scope,written,Francesca
+rq_262,what's the attendance requirement in ML,course_admin,written,Francesca
+rq_263,What are the stages of the industry life cycle?,course_content,written,Francesca
+rq_264,Compare Macroeconomics and Time Series exam weights.,cross_course,written,Francesca
+rq_265,Which classes cap the retake grade?,cross_course,written,Francesca
+rq_266,Is the Strategies final exam cumulative?,course_admin,written,Francesca
+rq_267,Which subjects require a minimum attendance of 70%?,cross_course,written,Francesca
+rq_268,What's the weather in Madrid tomorrow?,out_of_scope,written,Francesca
+rq_269,How do I open a bank account in Spain?,out_of_scope,written,Francesca
+rq_270,Rank my courses by final exam weight.,cross_course,written,Francesca
+rq_271,What is transfer pricing?,course_content,written,Francesca
+rq_272,What is a support vector in an SVM?,course_content,written,Francesca
+rq_273,How many absences have I already used in Management Control?,out_of_scope,written,Francesca
+rq_274,What do the retake policies of all my courses have in common?,cross_course,written,Francesca
+rq_275,Write me a cover letter for a consulting internship.,out_of_scope,written,Francesca
+rq_276,How does k-means clustering work?,course_content,written,Francesca
+rq_277,How many sessions can I miss in Strategies before I fail?,course_admin,written,Francesca
+rq_278,What are the components of a time series?,course_content,written,Francesca
+rq_279,What is an LSTM and when should I use it?,out_of_scope,written,Francesca
+rq_280,What is the difference between a process and a thread?,course_content,written,Francesca
+rq_281,Which courses have the longest bibliography?,cross_course,written,Francesca
+rq_282,Recommend me a Netflix series.,out_of_scope,written,Francesca
+rq_283,What shifts the aggregate demand curve?,course_content,written,Francesca
+rq_284,When is the Management Control final exam?,course_admin,written,Francesca
+rq_285,What's the tuition fee for the BBA?,out_of_scope,written,Francesca
+rq_286,What is a context switch?,course_content,written,Francesca
+rq_287,Why are budgets used as a control tool?,course_content,written,Francesca
+rq_288,How many absences are allowed in Macro?,course_admin,written,Francesca
+rq_289,Is the Strategies case competition graded?,course_admin,written,Francesca
+rq_290,What's the weight of the individual assignments in AI/ML?,course_admin,written,Francesca
+rq_291,Which courses count participation above 15%?,cross_course,written,Francesca
+rq_292,What prerequisites does the Time Series course have?,course_admin,written,Francesca
+rq_293,Can you do my Time Series homework?,out_of_scope,written,Francesca
+rq_294,How can I contact the Operating Systems professor?,course_admin,written,Francesca
+rq_295,What's the late penalty for Operating Systems homework?,course_admin,written,Francesca
+rq_296,What is a deadlock and how can it be prevented?,course_content,written,Francesca
+rq_297,What's the difference between intrinsic and extrinsic motivation?,course_content,written,Francesca
+rq_298,Why was the US airline industry so unprofitable?,course_content,written,Francesca
+rq_299,What's the evaluation criteria for Time Series Analysis?,course_admin,written,Francesca
+rq_300,What's the format of the Operating Systems final exam?,course_admin,written,Francesca

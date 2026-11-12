@@ -59,16 +59,24 @@ def _load_image_text(use_ocr: bool, use_captions: bool) -> dict:
     images = read_jsonl(image_path)
 
     for image in images:
+        # photos and decorations (logos, icons, branding), as classified by the vision model,
+        # are skipped: their OCR text ("ie UNIVERSITY"...) would only add noise to the chunks
+        if image.get("image_class", "") in {"photo", "decoration"}:
+            continue
+
         parts = []
 
         if use_ocr and image.get("ocr_text", "").strip():
-            parts.append(f"Image OCR: {image['ocr_text'].strip()}")
+            parts.append(f"OCR: {image['ocr_text'].strip()}")  # the text read inside the image
 
         if use_captions and image.get("description", "").strip():
-            parts.append(f"Image description: {image['description'].strip()}")
+            parts.append(f"Description: {image['description'].strip()}")  # what the vision model saw
 
         if parts:
-            result[image["slide_id"]].extend(parts)
+            # same format as the plan: "[Image: diagram] OCR: ... Description: ..."
+            # the app looks for "[Image: <class>]" to show the "From a diagram" tag and the image text box
+            image_class = image.get("image_class") or "image"
+            result[image["slide_id"]].append(f"[Image: {image_class}] " + " ".join(parts))
 
     return result
 

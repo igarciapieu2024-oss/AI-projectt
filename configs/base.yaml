@@ -28,8 +28,8 @@ routing:
 
 generation:
   rag: true
-  llm_model: llama3.1:8b       # set after D2 (demo laptop)
-  vision_model: moondream      # set after D2 (demo laptop)
+  llm_model: llama3.2:3b       # selected after local latency benchmark
+  vision_model: qwen2.5vl:7b   # classifies + describes slide images; use qwen2.5vl:3b if the laptop runs out of memory
   prompt_version: v2
   temperature: 0.1
   rewrite: true

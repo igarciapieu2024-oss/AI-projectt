@@ -4,7 +4,130 @@ Owner: Sergio.
 """
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+from pathlib import Path
 
-def answer_from_table(question: str, cfg) -> list:
-    """Return matching course rows as hits."""
-    raise NotImplementedError("answer_from_table: not built yet")
+from src.config import PATHS
+from src.retrieval.filters import mentioned_course_codes
+from src.schemas import Chunk, CourseRow, Hit
+from src.utils.io import read_csv
+
+
+def _file_key(path: Path) -> tuple[str, int, int]:
+    stat = path.stat()
+    return str(path.resolve()), stat.st_mtime_ns, stat.st_size
+
+
+@lru_cache(maxsize=2)
+def _load_rows(path: str, modified_ns: int, size: int) -> tuple[dict[str, str], ...]:
+    del modified_ns, size
+    return tuple(read_csv(path))
+
+
+def _components(value: str) -> list[dict]:
+    if not value:
+        return []
+    try:
+        components = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"course table has invalid components JSON: {value!r}") from exc
+    if not isinstance(components, list) or any(not isinstance(item, dict) for item in components):
+        raise ValueError("course table components must be a JSON list of objects")
+    return components
+
+
+def _optional_float(value: str) -> float | None:
+    if not value:
+        return None
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise ValueError(f"course table contains an invalid numeric value: {value!r}") from exc
+
+
+def _optional_int(value: str) -> int | None:
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError(f"course table contains an invalid session count: {value!r}") from exc
+
+
+def _row_text(row: CourseRow) -> str:
+    parts = [f"{row.course_name} ({row.course_code})"]
+    if row.final_exam_weight is not None:
+        parts.append(f"final exam {row.final_exam_weight:g}%")
+    components = _components(row.components)
+    if components:
+        formatted = ", ".join(
+            f"{item.get('name', 'component')}: {item['weight']:g}%"
+            for item in components
+            if isinstance(item.get("weight"), (int, float))
+        )
+        if formatted:
+            parts.append(f"components: {formatted}")
+    if row.attendance_limit_pct is not None:
+        parts.append(f"attendance limit {row.attendance_limit_pct:g}%")
+    if row.retake_policy:
+        parts.append(f"retake: {row.retake_policy}")
+    if row.professor:
+        parts.append(f"professor: {row.professor}")
+    if row.n_sessions is not None:
+        parts.append(f"{row.n_sessions} sessions")
+    if row.language:
+        parts.append(f"language: {row.language}")
+    return "; ".join(parts)
+
+
+def answer_from_table(question: str, cfg) -> list[Hit]:
+    """Return table-row evidence for every course, or courses named in the question."""
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError("question must not be empty")
+    path = PATHS["course_table"]
+    if not path.is_file():
+        return []
+    rows = list(_load_rows(*_file_key(path)))
+    named_codes = set(mentioned_course_codes(question, rows))
+    selected = [row for row in rows if not named_codes or row["course_code"] in named_codes]
+    hits = []
+    for row in selected:
+        components = _components(row.get("components", ""))
+        course = CourseRow(
+            course_code=row["course_code"],
+            course_name=row["course_name"],
+            final_exam_weight=_optional_float(row.get("final_exam_weight", "")),
+            components=json.dumps(components, ensure_ascii=False),
+            attendance_limit_pct=_optional_float(row.get("attendance_limit_pct", "")),
+            retake_policy=row.get("retake_policy", ""),
+            professor=row.get("professor", ""),
+            n_sessions=_optional_int(row.get("n_sessions", "")),
+            language=row.get("language", ""),
+            evidence_section_ids=row.get("evidence_section_ids", ""),
+            human_checked=row.get("human_checked", "").strip().lower() in {"true", "1", "yes"},
+        )
+        rank = len(hits) + 1
+        covers = [value for value in course.evidence_section_ids.split(";") if value]
+        text = _row_text(course)
+        chunk = Chunk(
+            chunk_id=f"course_row__{course.course_code}",
+            kb_sig=cfg.kb_sig,
+            strategy="section",
+            doc_type="course_row",
+            course_code=course.course_code,
+            sessions=[],
+            source_id=course.course_code,
+            covers=covers,
+            parent_id=f"course_row__{course.course_code}",
+            outline_path=course.course_name,
+            text=text,
+            embed_text=text,
+        )
+        hits.append(Hit(chunk=chunk, rank=rank, label=f"S{rank}"))
+    return hits
+
+
+def clear_table_cache() -> None:
+    """Clear cached course rows after rebuilding the course table."""
+    _load_rows.cache_clear()
