@@ -24,8 +24,10 @@ _COMPONENT_ALIASES = {
     "finalexamination": "Final Exam",
     "intermediatetest": "Intermediate Test",
     "intermediatetests": "Intermediate Tests",
-    "midtermexam": "Midterm Exam",
-    "midtermexams": "Midterm Exams",
+    "individualwork": "Individual Work",
+    "midtermexam": "Midterm",
+    "midtermexams": "Midterms",
+    "midterm": "Midterm",
     "classtest": "Class Test",
     "classtests": "Class Tests",
     "classparticipation": "Class Participation",
@@ -36,6 +38,14 @@ _COMPONENT_TERMS = re.compile(
     r"exercises?|cases?|papers?|reports?|work)\b",
     re.IGNORECASE,
 )
+
+_NON_COMPONENT_PHRASES = re.compile(
+    r"\b(?:personal|work reasons|will have|weight of|missing|absence|absent|"
+    r"grade of|in case|because)\b",
+    re.IGNORECASE,
+)
+
+
 def _weight_value(match: re.Match[str]) -> float:
     return float(match.group("weight").replace(",", "."))
 
@@ -91,12 +101,20 @@ def _table_components(table: str) -> list[dict[str, float | str]]:
 
 def _text_components(text: str, *, require_component_term: bool) -> list[dict[str, float | str]]:
     components = []
-    for segment in re.split(r"\n|;|…|\.{2,}|•", text):
+    segments = re.split(r"\n|;|…|\.{2,}|•", text)
+    previous_label = ""
+    for segment in segments:
         match = _WEIGHT.search(segment)
         if not match:
+            previous_label = segment.strip()
             continue
         name = segment[:match.start()]
+        if not name.strip() and previous_label:
+            name = previous_label
+        previous_label = ""
         if require_component_term and not _COMPONENT_TERMS.search(name):
+            continue
+        if _NON_COMPONENT_PHRASES.search(name) or len(name.split()) > 6:
             continue
         item = _component(name, _weight_value(match))
         if item:
@@ -126,21 +144,29 @@ def _attendance_value(sections: list[SyllabusSection]) -> tuple[float | None, st
 
 
 def _retake_policy(sections: list[SyllabusSection]) -> tuple[str, str | None]:
+    title_pattern = re.compile(
+        r"^\s*(?:re[\s-]?sit|re[\s-]?take|retake)"
+        r"(?:\s*/\s*(?:re[\s-]?sit|re[\s-]?take|retake))?\s+policy\s*$",
+        re.IGNORECASE,
+    )
     for section in sections:
         if section.section_name != "RESIT":
             continue
-        content = "\n".join([section.text, *section.tables])
-        sentences = re.split(r"(?<=[.!?])\s+|\n+", content)
-        relevant = [
-            re.sub(r"\s+", " ", sentence).strip(" |")
-            for sentence in sentences
-            if re.search(r"\b(resit|re-sit|retake|re-exam(?:ination)?)\b", sentence, re.IGNORECASE)
+        lines = [line.strip(" |") for line in section.text.splitlines()]
+        lines = [line for line in lines if line and not title_pattern.fullmatch(line)]
+        content = re.sub(r"\s+", " ", " ".join(lines)).strip()
+        sentences = [
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+", content)
+            if sentence.strip()
         ]
-        if relevant:
-            policy = " ".join(relevant)
-            if len(policy) > 300:
-                policy = policy[:297].rsplit(" ", 1)[0] + "..."
-            return policy, section.section_id
+        selected = []
+        for sentence in sentences[:3]:
+            if selected and sum(len(value) + 1 for value in selected) + len(sentence) > 300:
+                break
+            selected.append(sentence)
+        if selected:
+            return " ".join(selected), section.section_id
     return "", None
 
 
@@ -187,33 +213,48 @@ def _course_row(
     manifest_row: dict[str, str],
     sections: list[SyllabusSection],
 ) -> CourseRow:
-    components: list[dict[str, float | str]] = []
-    component_sources: list[str] = []
-
     evaluation_sections = [section for section in sections if section.section_name == "EVALUATION"]
+    table_components: list[dict[str, float | str]] = []
+    table_sources: list[str] = []
     for section in evaluation_sections:
         for table in section.tables:
             for item in _table_components(table):
-                if _component_key(item) not in {_component_key(existing) for existing in components}:
-                    components.append(item)
-                    component_sources.append(section.section_id)
-        for item in _text_components(section.text, require_component_term=True):
-            if _component_key(item) not in {_component_key(existing) for existing in components}:
-                components.append(item)
-                component_sources.append(section.section_id)
+                if _component_key(item) not in {_component_key(existing) for existing in table_components}:
+                    table_components.append(item)
+                    table_sources.append(section.section_id)
 
-    total = sum(float(item["weight"]) for item in components)
-    if components and abs(total - 100) > 1:
-        for section in sections:
-            if section.section_name != "OTHER":
-                continue
+    table_total = sum(float(item["weight"]) for item in table_components)
+    if table_components and abs(table_total - 100) <= 1:
+        components = table_components
+        component_sources = table_sources
+    else:
+        text_components = []
+        text_sources = []
+        for section in evaluation_sections:
             for item in _text_components(section.text, require_component_term=True):
-                if _component_key(item) not in {_component_key(existing) for existing in components}:
-                    components.append(item)
-                    component_sources.append(section.section_id)
-            total = sum(float(item["weight"]) for item in components)
-            if abs(total - 100) <= 1:
-                break
+                if _component_key(item) not in {_component_key(existing) for existing in text_components}:
+                    text_components.append(item)
+                    text_sources.append(section.section_id)
+        if text_components:
+            components = text_components
+            component_sources = text_sources
+        else:
+            # Some extracted tables spill their final label and percentage into OTHER.
+            components = table_components
+            component_sources = table_sources
+            for section in sections:
+                if section.section_name != "OTHER":
+                    continue
+                continuation = _text_components(section.text, require_component_term=True)
+                combined_keys = {_component_key(item) for item in components}
+                if any(_component_key(item) in combined_keys for item in continuation):
+                    continue
+                combined = components + continuation
+                combined_total = sum(float(item["weight"]) for item in combined)
+                if continuation and abs(combined_total - 100) <= 1:
+                    components = combined
+                    component_sources.extend([section.section_id] * len(continuation))
+                    break
 
     final_exam_weight = next(
         (
