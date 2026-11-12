@@ -123,7 +123,19 @@ def _text_components(text: str, *, require_component_term: bool) -> list[dict[st
 
 
 def _component_key(component: dict[str, float | str]) -> str:
-    return re.sub(r"[^a-z]", "", str(component["name"]).casefold())
+    key = re.sub(r"[^a-z]", "", str(component["name"]).casefold())
+    return "participation" if key in {"participation", "classparticipation"} else key
+
+
+def _contains_component(
+    components: list[dict[str, float | str]],
+    candidate: dict[str, float | str],
+) -> bool:
+    return any(
+        _component_key(item) == _component_key(candidate)
+        and abs(float(item["weight"]) - float(candidate["weight"])) < 0.01
+        for item in components
+    )
 
 
 def _attendance_value(sections: list[SyllabusSection]) -> tuple[float | None, str | None]:
@@ -219,42 +231,55 @@ def _course_row(
     for section in evaluation_sections:
         for table in section.tables:
             for item in _table_components(table):
-                if _component_key(item) not in {_component_key(existing) for existing in table_components}:
+                if not _contains_component(table_components, item):
                     table_components.append(item)
                     table_sources.append(section.section_id)
 
     table_total = sum(float(item["weight"]) for item in table_components)
-    if table_components and abs(table_total - 100) <= 1:
+    text_components = []
+    text_sources = []
+    for section in evaluation_sections:
+        for item in _text_components(section.text, require_component_term=True):
+            if not _contains_component(text_components, item):
+                text_components.append(item)
+                text_sources.append(section.section_id)
+    text_total = sum(float(item["weight"]) for item in text_components)
+
+    text_is_complete = bool(text_components) and abs(text_total - 100) <= 1
+    text_and_table_overlap = any(
+        _contains_component(table_components, item)
+        for item in text_components
+    )
+    if text_is_complete and (
+        not table_components or abs(table_total - 100) > 1 or text_and_table_overlap
+    ):
+        components = text_components
+        component_sources = text_sources
+    elif table_components and abs(table_total - 100) <= 1:
         components = table_components
         component_sources = table_sources
     else:
-        text_components = []
-        text_sources = []
-        for section in evaluation_sections:
-            for item in _text_components(section.text, require_component_term=True):
-                if _component_key(item) not in {_component_key(existing) for existing in text_components}:
-                    text_components.append(item)
-                    text_sources.append(section.section_id)
-        if text_components:
+        # Some extracted tables spill their final label and percentage into OTHER.
+        components = table_components
+        component_sources = table_sources
+        for section in sections:
+            if section.section_name != "OTHER":
+                continue
+            continuation = _text_components(section.text, require_component_term=True)
+            combined = list(components)
+            added = []
+            for item in continuation:
+                if not _contains_component(combined, item):
+                    combined.append(item)
+                    added.append(item)
+            combined_total = sum(float(item["weight"]) for item in combined)
+            if added and abs(combined_total - 100) <= 1:
+                components = combined
+                component_sources.extend([section.section_id] * len(added))
+                break
+        if not components:
             components = text_components
             component_sources = text_sources
-        else:
-            # Some extracted tables spill their final label and percentage into OTHER.
-            components = table_components
-            component_sources = table_sources
-            for section in sections:
-                if section.section_name != "OTHER":
-                    continue
-                continuation = _text_components(section.text, require_component_term=True)
-                combined_keys = {_component_key(item) for item in components}
-                if any(_component_key(item) in combined_keys for item in continuation):
-                    continue
-                combined = components + continuation
-                combined_total = sum(float(item["weight"]) for item in combined)
-                if continuation and abs(combined_total - 100) <= 1:
-                    components = combined
-                    component_sources.extend([section.section_id] * len(continuation))
-                    break
 
     final_exam_weight = next(
         (
