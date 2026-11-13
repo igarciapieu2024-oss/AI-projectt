@@ -98,10 +98,69 @@ def test_chat_uses_configured_answer_token_limit(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "ollama", SimpleNamespace(Client=FakeClient))
     cfg = _config()
-    cfg.generation["num_predict"] = 256
+    cfg.generation["num_predict"] = 400
 
     assert chat([{"role": "user", "content": "Question"}], cfg) == "Short answer"
-    assert calls[0]["options"] == {"temperature": 0.25, "num_predict": 256}
+    assert calls[0]["options"] == {"temperature": 0.25, "num_predict": 400}
+
+
+def test_chat_allows_small_query_token_limit_override(monkeypatch):
+    calls = []
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def chat(self, **kwargs):
+            calls.append(kwargs)
+            return {"message": {"content": "Short query"}}
+
+    monkeypatch.setitem(sys.modules, "ollama", SimpleNamespace(Client=FakeClient))
+    cfg = _config()
+    cfg.generation["num_predict"] = 400
+
+    assert chat([{"role": "user", "content": "Translate"}], cfg, num_predict=96) == "Short query"
+    assert calls[0]["options"]["num_predict"] == 96
+
+
+def test_chat_retains_completion_reason_for_truncated_responses(monkeypatch):
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def chat(self, **kwargs):
+            return {
+                "message": {"content": "Complete. [S1] Cut off"},
+                "done_reason": "length",
+            }
+
+    monkeypatch.setitem(sys.modules, "ollama", SimpleNamespace(Client=FakeClient))
+
+    response = chat([{"role": "user", "content": "Question"}], _config())
+
+    assert response == "Complete. [S1] Cut off"
+    assert response.done_reason == "length"
+
+
+def test_chat_stream_retains_final_completion_reason(monkeypatch):
+    chunks = iter([
+        {"message": {"content": "Complete. [S1] "}},
+        {"message": {"content": "Cut off"}},
+        {"message": {"content": ""}, "done_reason": "length"},
+    ])
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def chat(self, **kwargs):
+            return chunks
+
+    monkeypatch.setitem(sys.modules, "ollama", SimpleNamespace(Client=FakeClient))
+    response = chat([{"role": "user", "content": "Question"}], _config(), stream=True)
+
+    assert list(response) == ["Complete. [S1] ", "Cut off"]
+    assert response.done_reason == "length"
 
 
 @pytest.mark.parametrize("value", [0, -1, True, 1.5, "256"])

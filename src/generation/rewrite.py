@@ -38,6 +38,7 @@ def translate_to_english(question: str, cfg) -> str:
             {"role": "user", "content": question},
         ],
         cfg,
+        num_predict=_query_token_limit(cfg),
     )
     if not isinstance(result, str):
         raise TypeError("chat() must return text when stream=False")
@@ -86,7 +87,7 @@ def rewrite(
             raise ValueError("history entries must have user/assistant roles and string content")
         messages.append({"role": item["role"], "content": item["content"]})
     messages.append({"role": "user", "content": question})
-    result = chat(messages, cfg)
+    result = chat(messages, cfg, num_predict=_query_token_limit(cfg))
     if not isinstance(result, str):
         raise TypeError("chat() must return text when stream=False")
     rewritten = result.strip().strip("\"'")
@@ -100,3 +101,8 @@ def translate_to_english_query(question: str, cfg) -> str:
     if detect_language(question) == "en":
         return question
     return translate_to_english(question, cfg)
+
+
+def _query_token_limit(cfg) -> int:
+    """Keep short query transformations on their own small generation budget."""
+    return getattr(cfg, "generation", {}).get("query_num_predict", 96)

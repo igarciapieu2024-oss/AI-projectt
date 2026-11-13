@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 import src.generation.answer as answer_module
+from src.generation.llm import ChatText
 from src.schemas import AnswerResult, Chunk, Filters, Hit, RouteDecision
 
 
@@ -227,6 +228,64 @@ def test_rag_answer_without_a_valid_citation_is_refused(monkeypatch):
     assert result.citations == []
 
 
+def test_length_truncated_answer_keeps_only_last_complete_cited_sentence(monkeypatch):
+    hit = _chunk("chunk_a", "Exam weight is 40 percent.")
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda question, cfg, filters: [Hit(chunk=hit, rank=1)],
+    )
+    monkeypatch.setattr(
+        answer_module,
+        "chat",
+        lambda messages, cfg: ChatText(
+            "The exam is worth 40%. [S1] It is an important part of the grade [S1",
+            "length",
+        ),
+    )
+
+    result = answer_module.answer("Exam weight", cfg=_config())
+
+    assert result.answer_text == "The exam is worth 40%. [S1]"
+    assert [citation.label for citation in result.citations] == ["S1"]
+
+
+def test_length_truncated_answer_without_complete_citation_is_refused(monkeypatch):
+    hit = _chunk("chunk_a", "Exam weight is 40 percent.")
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda question, cfg, filters: [Hit(chunk=hit, rank=1)],
+    )
+    monkeypatch.setattr(
+        answer_module,
+        "chat",
+        lambda messages, cfg: ChatText("The exam is worth 40% [S1", "length"),
+    )
+
+    result = answer_module.answer("Exam weight", cfg=_config())
+
+    assert result.refused
+    assert result.answer_text == "This isn't covered in the course material I have."
+
+
+def test_length_truncated_no_rag_answer_keeps_last_complete_sentence(monkeypatch):
+    cfg = _config()
+    cfg.generation = {"rag": False}
+    monkeypatch.setattr(
+        answer_module,
+        "chat",
+        lambda messages, config: ChatText(
+            "A general answer is complete. Another thought is cut off",
+            "length",
+        ),
+    )
+
+    result = answer_module.answer("General question", cfg=cfg)
+
+    assert result.answer_text == "A general answer is complete."
+
+
 def test_stream_preserves_answer_text_and_finishes_with_result(monkeypatch):
     chunks = [
         _chunk("chunk_a", "Exam weight is 40 percent.")
@@ -237,6 +296,38 @@ def test_stream_preserves_answer_text_and_finishes_with_result(monkeypatch):
 
     assert isinstance(pieces[-1], AnswerResult)
     assert "".join(pieces[:-1]) == pieces[-1].answer_text
+
+
+def test_answer_stream_never_yields_incomplete_length_truncated_sentence(monkeypatch):
+    hit = _chunk("chunk_a", "Exam weight is 40 percent.")
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda question, cfg, filters: [Hit(chunk=hit, rank=1)],
+    )
+
+    class LimitedStream:
+        done_reason = "length"
+
+        def __iter__(self):
+            return iter([
+                "The exam is worth 40%. [S1] ",
+                "This sentence is cut off [S1",
+            ])
+
+    monkeypatch.setattr(
+        answer_module,
+        "chat",
+        lambda messages, cfg, stream=False: LimitedStream(),
+    )
+
+    pieces = list(answer_module.answer_stream("Exam weight", cfg=_config()))
+
+    assert "".join(piece for piece in pieces[:-1] if isinstance(piece, str)) == (
+        "The exam is worth 40%. [S1]"
+    )
+    assert isinstance(pieces[-1], AnswerResult)
+    assert pieces[-1].answer_text == "The exam is worth 40%. [S1]"
 
 
 def test_out_of_scope_route_skips_retrieval(monkeypatch):

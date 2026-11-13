@@ -20,6 +20,20 @@ from src.retrieval.router import route as route_question
 from src.schemas import AnswerResult, Citation, Filters, Hit, REFUSAL, RouteDecision
 
 _CITATION = re.compile(r"[\[(]S(\d+)[\])]", re.IGNORECASE)
+_COMPLETE_CITED_SENTENCE = re.compile(
+    r"[.!?]\s*\[S\d+\](?:[.!?])?",
+    re.IGNORECASE,
+)
+_COMPLETE_SENTENCE = re.compile(r"[.!?](?=\s|$)")
+
+
+def _trim_to_last_complete_sentence(answer_text: str, rag_enabled: bool) -> str:
+    """Drop a length-truncated tail that does not end in a complete sentence."""
+    sentence_pattern = _COMPLETE_CITED_SENTENCE if rag_enabled else _COMPLETE_SENTENCE
+    completed = list(sentence_pattern.finditer(answer_text))
+    if not completed:
+        return ""
+    return answer_text[:completed[-1].end()].rstrip()
 
 
 def _top_k(cfg: Config) -> int:
@@ -230,11 +244,14 @@ def answer(
     response = chat(messages, cfg)
     if not isinstance(response, str):
         raise TypeError("chat() must return text when stream=False")
-    if not response.strip():
+    answer_text = str(response)
+    if getattr(response, "done_reason", None) == "length":
+        answer_text = _trim_to_last_complete_sentence(answer_text, rag_enabled)
+    if not answer_text.strip() and getattr(response, "done_reason", None) != "length":
         raise ValueError("chat() returned empty answer text")
     generate_ms = (time.perf_counter() - generation_started) * 1000
     return _make_result(
-        question, rewritten_question, route_decision, filters, cfg, hits, response, started,
+        question, rewritten_question, route_decision, filters, cfg, hits, answer_text, started,
         rewrite_ms, route_ms, retrieve_ms, rerank_ms, generate_ms, rag_enabled,
     )
 
@@ -268,14 +285,29 @@ def answer_stream(
     if isinstance(response, str):
         raise TypeError("chat() must return an iterator when stream=True")
     pieces: list[str] = []
+    pending = ""
     for piece in response:
         pieces.append(piece)
-        yield piece
-    if not "".join(pieces).strip():
+        pending += piece
+        sentence_pattern = _COMPLETE_CITED_SENTENCE if rag_enabled else _COMPLETE_SENTENCE
+        completed = list(sentence_pattern.finditer(pending))
+        if completed:
+            end = completed[-1].end()
+            yield pending[:end]
+            pending = pending[end:]
+    done_reason = getattr(response, "done_reason", None)
+    if done_reason != "length" and pending:
+        yield pending
+    answer_text = "".join(pieces)
+    if done_reason == "length":
+        answer_text = _trim_to_last_complete_sentence(answer_text, rag_enabled)
+    if not answer_text.strip() and done_reason != "length":
         raise ValueError("chat() returned no answer text while streaming")
     generate_ms = (time.perf_counter() - generation_started) * 1000
     result = _make_result(
-        question, rewritten_question, route_decision, filters, cfg, hits, "".join(pieces), started,
+        question, rewritten_question, route_decision, filters, cfg, hits, answer_text, started,
         rewrite_ms, route_ms, retrieve_ms, rerank_ms, generate_ms, rag_enabled,
     )
+    if not answer_text.strip():
+        yield result.answer_text
     yield result

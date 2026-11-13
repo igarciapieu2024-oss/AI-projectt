@@ -54,8 +54,9 @@ def test_extract_filters_does_not_guess_between_multiple_courses():
 def test_rewrite_uses_history_and_returns_only_standalone_question(monkeypatch):
     calls = []
 
-    def fake_chat(messages, cfg):
+    def fake_chat(messages, cfg, **kwargs):
         calls.append(messages)
+        assert kwargs == {"num_predict": 96}
         return "What is the minimum grade to pass Management Control?"
 
     monkeypatch.setattr(rewrite_module, "chat", fake_chat)
@@ -74,8 +75,9 @@ def test_rewrite_uses_history_and_returns_only_standalone_question(monkeypatch):
 def test_rewrite_can_resolve_and_translate_a_follow_up(monkeypatch):
     calls = []
 
-    def fake_chat(messages, cfg):
+    def fake_chat(messages, cfg, **kwargs):
         calls.append(messages)
+        assert kwargs == {"num_predict": 96}
         return "What is the attendance limit for Management Control?"
 
     monkeypatch.setattr(rewrite_module, "chat", fake_chat)
@@ -106,7 +108,7 @@ def test_rewrite_skips_model_without_history_and_rejects_empty_response(monkeypa
     with pytest.raises(ValueError, match="history entries"):
         rewrite_module.rewrite("Question", [{"role": "system", "content": "bad"}], object())
 
-    monkeypatch.setattr(rewrite_module, "chat", lambda *args: " ")
+    monkeypatch.setattr(rewrite_module, "chat", lambda *args, **kwargs: " ")
     with pytest.raises(ValueError, match="empty rewritten"):
         rewrite_module.rewrite("Question", [{"role": "user", "content": "Earlier"}], object())
 
@@ -210,6 +212,7 @@ def test_rag_answer_prompt_preserves_the_question_language():
     messages = build_messages("¿Cuánto vale el examen final?", [hit], cfg)
 
     assert "same language as the user's question" in messages[0]["content"]
+    assert "at most 5 sentences" in messages[0]["content"]
 
 
 def test_answer_rewrites_before_retrieval_and_refuses_weak_evidence(monkeypatch):
