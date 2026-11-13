@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 
 from src.config import PATHS, chunks_path, parents_path
@@ -12,6 +13,22 @@ from src.kb.syllabus_text import (  # readable tables, one summary per course, c
 from src.schemas import Chunk, Parent
 from src.utils.ids import chunk_id
 from src.utils.io import read_jsonl, write_jsonl
+
+
+_DESCRIPTION_FILLER_PREFIX = re.compile(
+    r"^\s*(?:the\s+image\s+(?:shows|is|contains|illustrates)|"
+    r"the\s+chart\s+(?:shows|is|displays))\b"
+    r"(?:\s*[,.:;!?…]+)?(?:\s*[–—]\s*)?\s*",
+    re.IGNORECASE,
+)
+
+
+def _strip_description_filler(description: str) -> str:
+    """Remove a generic description opening without altering later wording."""
+    match = _DESCRIPTION_FILLER_PREFIX.match(description)
+    if not match:
+        return description
+    return description[match.end():].lstrip()
 
 
 def _load_image_text(use_ocr: bool, use_captions: bool) -> dict:
@@ -41,7 +58,9 @@ def _load_image_text(use_ocr: bool, use_captions: bool) -> dict:
             parts.append(f"OCR: {image['ocr_text'].strip()}")  # the text read inside the image
 
         if use_captions and image.get("description", "").strip():
-            parts.append(f"Description: {image['description'].strip()}")  # what the vision model saw
+            description = _strip_description_filler(image["description"])
+            if description.strip():
+                parts.append(f"Description: {description.strip()}")  # what the vision model saw
 
         if parts:
             # same format as the plan: "[Image: diagram] OCR: ... Description: ..."
