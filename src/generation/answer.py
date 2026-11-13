@@ -152,6 +152,18 @@ def _prepare_answer(
     )
 
 
+def _ranking_answer(hits: list[Hit]) -> str | None:
+    """1. Comparison questions are answered with the ranking line itself, without calling the model.
+
+    2. Even with the ranking written out as S1, the 3B model kept merging the first two groups
+       ("Strategies and Management Control, both 40%"; Strategies is 45%). The table already holds
+       the right answer, so copying it is exact and also saves the generation time.
+    """
+    if hits and hits[0].chunk.chunk_id == "course_ranking":
+        return f"{hits[0].chunk.text} [{hits[0].label}]"
+    return None
+
+
 def _validated_answer(answer_text: str, hits: list[Hit], rag_enabled: bool) -> tuple[str, list[Hit]]:
     if not rag_enabled:
         return answer_text.strip(), []
@@ -240,6 +252,13 @@ def answer(
     if messages is None:
         raise RuntimeError("answer prompt was not constructed")
 
+    ranking_text = _ranking_answer(hits) if rag_enabled else None
+    if ranking_text:
+        return _make_result(
+            question, rewritten_question, route_decision, filters, cfg, hits, ranking_text, started,
+            rewrite_ms, route_ms, retrieve_ms, rerank_ms, 0.0, rag_enabled,
+        )
+
     generation_started = time.perf_counter()
     response = chat(messages, cfg)
     if not isinstance(response, str):
@@ -279,6 +298,16 @@ def answer_stream(
         return
     if messages is None:
         raise RuntimeError("answer prompt was not constructed")
+
+    ranking_text = _ranking_answer(hits) if rag_enabled else None
+    if ranking_text:
+        result = _make_result(
+            question, rewritten_question, route_decision, filters, cfg, hits, ranking_text, started,
+            rewrite_ms, route_ms, retrieve_ms, rerank_ms, 0.0, rag_enabled,
+        )
+        yield result.answer_text
+        yield result
+        return
 
     generation_started = time.perf_counter()
     response = chat(messages, cfg, stream=True)
