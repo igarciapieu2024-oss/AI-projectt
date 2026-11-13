@@ -212,7 +212,7 @@ def test_rag_answer_prompt_preserves_the_question_language():
     messages = build_messages("¿Cuánto vale el examen final?", [hit], cfg)
 
     assert "same language as the user's question" in messages[0]["content"]
-    assert "at most 5 sentences" in messages[0]["content"]
+    assert "1 to 3 sentences" in messages[0]["content"]
 
 
 def test_answer_rewrites_before_retrieval_and_refuses_weak_evidence(monkeypatch):

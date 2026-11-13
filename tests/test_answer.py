@@ -459,6 +459,29 @@ def test_cross_course_route_uses_course_table(monkeypatch):
     assert result.citations[0].label == "S1"
 
 
+
+def test_comparison_question_is_answered_with_the_ranking_line_without_the_model(monkeypatch):
+    # 1. The 3B model merged the first two groups of the ranking, so the line is returned as it is
+    ranking_text = "Highest final exam weight: Strategies (45%). Then: Management Control (40%)."
+    ranking = Hit(chunk=_chunk("course_ranking", ranking_text, course_code=""), rank=1, label="S1")
+    row = Hit(chunk=_chunk("course_row__c01", "Strategies (c01)"), rank=2, label="S2")
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="cross_course", prob=0.9, source="classifier"),
+    )
+    monkeypatch.setattr(answer_module.table_qa, "answer_from_table", lambda question, cfg: [ranking, row])
+    monkeypatch.setattr(answer_module, "chat", lambda *args, **kwargs: pytest.fail("the model should not be called"))
+
+    result = answer_module.answer("Which course has the highest final exam weight?", cfg=_config())
+    assert result.answer_text == ranking_text + " [S1]"
+    assert [citation.label for citation in result.citations] == ["S1"]
+    assert not result.refused
+
+    pieces = list(answer_module.answer_stream("Which course has the highest final exam weight?", cfg=_config()))
+    assert pieces[0] == ranking_text + " [S1]"
+    assert isinstance(pieces[-1], AnswerResult)
+
 def test_cross_course_route_falls_back_when_course_table_is_empty(monkeypatch):
     hit = Hit(chunk=_chunk("retrieved", "Exam weight is 40 percent."), rank=1)
     monkeypatch.setattr(
