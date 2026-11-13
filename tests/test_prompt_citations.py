@@ -15,7 +15,8 @@ def _hit():
 def test_v2_prompt_ends_with_the_citation_rule():
     cfg = load_config("configs/final.yaml")
     content = build_messages("What is the final exam worth?", [_hit()], cfg)[-1]["content"]
-    assert content.rstrip().endswith("say that the material does not cover it.")
+    assert content.rstrip().endswith("Use at most 5 sentences.")
+    assert "say that the material does not cover it." in content
     assert "in square brackets" in content
 
 
