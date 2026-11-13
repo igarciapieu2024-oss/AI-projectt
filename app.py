@@ -7,11 +7,17 @@ Run with the real engine (from Wed 11):    streamlit run app.py
 import streamlit as st  # the library that builds the web app
 
 import app_content as content  # the company name and the logo files
+from app_components.engine import USING_FAKE, warm_up_models
 from app_components.theme import apply_theme  # our CSS (colours, fonts, cards)
 
 #1 browser tab and page width
 # the tab shows the logo and the name; "wide" uses the whole screen width, better for the projector
 st.set_page_config(page_title=f"{content.COMPANY_NAME}, {content.SUBTITLE.lower()}", page_icon=content.LOGO_MARK, layout="wide")
+
+# Load local retrieval models before the first assistant question. The fake app
+# does not need the real knowledge-base models.
+if not USING_FAKE:
+    warm_up_models()
 
 #2 the brand
 apply_theme()  # loads assets/style.css before any page is drawn

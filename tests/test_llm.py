@@ -85,6 +85,33 @@ def test_chat_json_mode_requests_json_format(monkeypatch):
     assert calls[0]["format"] == "json"
 
 
+def test_chat_uses_configured_answer_token_limit(monkeypatch):
+    calls = []
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def chat(self, **kwargs):
+            calls.append(kwargs)
+            return {"message": {"content": "Short answer"}}
+
+    monkeypatch.setitem(sys.modules, "ollama", SimpleNamespace(Client=FakeClient))
+    cfg = _config()
+    cfg.generation["num_predict"] = 256
+
+    assert chat([{"role": "user", "content": "Question"}], cfg) == "Short answer"
+    assert calls[0]["options"] == {"temperature": 0.25, "num_predict": 256}
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, "256"])
+def test_chat_rejects_invalid_answer_token_limit(monkeypatch, value):
+    cfg = _config()
+    cfg.generation["num_predict"] = value
+    with pytest.raises(ValueError, match="generation.num_predict"):
+        chat([{"role": "user", "content": "Question"}], cfg)
+
+
 def test_chat_rejects_empty_messages_and_missing_model(monkeypatch):
     with pytest.raises(ValueError, match="at least one"):
         chat([], _config())

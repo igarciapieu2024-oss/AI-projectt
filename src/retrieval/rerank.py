@@ -65,3 +65,13 @@ def rerank(query: str, hits: list, top_k: int, cfg) -> list:
         replace(hit, rank=rank, score_rerank=score)
         for rank, (score, hit) in enumerate(ranked[:top_k], start=1)
     ]
+
+
+def warm_up(cfg) -> None:
+    """Load the configured reranker without running a question."""
+    if not cfg.retrieval.get("rerank", False):
+        return
+    model_name = cfg.retrieval.get("reranker_model")
+    if not model_name:
+        raise ValueError("retrieval.reranker_model must be configured when reranking is enabled")
+    _model(model_name)

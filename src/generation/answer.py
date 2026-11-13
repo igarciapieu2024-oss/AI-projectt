@@ -70,9 +70,22 @@ def _prepare_answer(
     rewritten_question = question
     rag_enabled = cfg.generation.get("rag", True)
     rewrite_ms = 0.0
-    if history and cfg.generation.get("rewrite", False):
+    translation_enabled = rag_enabled and cfg.generation.get("translate_query", False)
+    if (history and cfg.generation.get("rewrite", False)) or translation_enabled:
         rewrite_started = time.perf_counter()
-        rewritten_question = rewrite.rewrite(question, history, cfg)
+        translate_to_english = translation_enabled and rewrite.detect_language(question) != "en"
+        if history and cfg.generation.get("rewrite", False):
+            if translate_to_english:
+                rewritten_question = rewrite.rewrite(
+                    question,
+                    history,
+                    cfg,
+                    translate_to_english=True,
+                )
+            else:
+                rewritten_question = rewrite.rewrite(question, history, cfg)
+        elif translate_to_english:
+            rewritten_question = rewrite.translate_to_english(question, cfg)
         rewrite_ms = (time.perf_counter() - rewrite_started) * 1000
 
     route_ms = 0.0

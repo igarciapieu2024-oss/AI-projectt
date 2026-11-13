@@ -41,6 +41,11 @@ def chat(
     temperature = cfg.generation.get("temperature")
     if temperature is not None:
         options["temperature"] = temperature
+    num_predict = cfg.generation.get("num_predict")
+    if num_predict is not None:
+        if isinstance(num_predict, bool) or not isinstance(num_predict, int) or num_predict < 1:
+            raise ValueError(f"generation.num_predict must be a positive integer; got {num_predict!r}")
+        options["num_predict"] = num_predict
 
     request: dict[str, Any] = {
         "model": model,
