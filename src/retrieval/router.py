@@ -96,3 +96,17 @@ def route(question: str, cfg) -> RouteDecision:
 def clear_router_cache() -> None:
     """Clear the cached classifier after replacing its model artifact."""
     _load_router.cache_clear()
+
+
+def warm_up(cfg) -> None:
+    """Load the configured classifier and its embedder before the first question."""
+    if getattr(cfg, "routing", {}).get("router", "none") != "classifier":
+        return
+    model_path = PATHS["router_model"]
+    if not model_path.is_file():
+        logger.warning("Router model is missing: %s", model_path)
+        return
+    try:
+        _load_router(str(model_path.resolve()))
+    except Exception:
+        logger.exception("Classifier warm-up failed; routing will continue without classifier")

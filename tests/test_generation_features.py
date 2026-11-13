@@ -7,7 +7,7 @@ import src.generation.answer as answer_module
 import src.generation.rewrite as rewrite_module
 import src.generation.selfcheck as selfcheck_module
 from src.retrieval.filters import extract_filters
-from src.schemas import Chunk, Filters, Hit
+from src.schemas import Chunk, Filters, Hit, RouteDecision
 
 
 def _chunk():
@@ -54,8 +54,9 @@ def test_extract_filters_does_not_guess_between_multiple_courses():
 def test_rewrite_uses_history_and_returns_only_standalone_question(monkeypatch):
     calls = []
 
-    def fake_chat(messages, cfg):
+    def fake_chat(messages, cfg, **kwargs):
         calls.append(messages)
+        assert kwargs == {"num_predict": 96}
         return "What is the minimum grade to pass Management Control?"
 
     monkeypatch.setattr(rewrite_module, "chat", fake_chat)
@@ -71,6 +72,32 @@ def test_rewrite_uses_history_and_returns_only_standalone_question(monkeypatch):
     assert calls[0][1:] == history + [{"role": "user", "content": "And what is the minimum grade?"}]
 
 
+def test_rewrite_can_resolve_and_translate_a_follow_up(monkeypatch):
+    calls = []
+
+    def fake_chat(messages, cfg, **kwargs):
+        calls.append(messages)
+        assert kwargs == {"num_predict": 96}
+        return "What is the attendance limit for Management Control?"
+
+    monkeypatch.setattr(rewrite_module, "chat", fake_chat)
+    history = [
+        {"role": "user", "content": "¿Cuál es la asistencia mínima?"},
+        {"role": "assistant", "content": "El curso exige un 80% de asistencia."},
+    ]
+
+    result = rewrite_module.rewrite(
+        "¿Y en Management Control?",
+        history,
+        object(),
+        translate_to_english=True,
+    )
+
+    assert result == "What is the attendance limit for Management Control?"
+    assert "translate it into English" in calls[0][0]["content"]
+    assert calls[0][-1]["content"] == "¿Y en Management Control?"
+
+
 def test_rewrite_skips_model_without_history_and_rejects_empty_response(monkeypatch):
     monkeypatch.setattr(
         rewrite_module,
@@ -81,9 +108,79 @@ def test_rewrite_skips_model_without_history_and_rejects_empty_response(monkeypa
     with pytest.raises(ValueError, match="history entries"):
         rewrite_module.rewrite("Question", [{"role": "system", "content": "bad"}], object())
 
-    monkeypatch.setattr(rewrite_module, "chat", lambda *args: " ")
+    monkeypatch.setattr(rewrite_module, "chat", lambda *args, **kwargs: " ")
     with pytest.raises(ValueError, match="empty rewritten"):
         rewrite_module.rewrite("Question", [{"role": "user", "content": "Earlier"}], object())
+
+
+def test_language_detection_recognizes_spanish():
+    assert rewrite_module.detect_language("¿Quién da la asignatura de Strategies?") == "es"
+
+
+def test_translation_helper_skips_english_and_translates_spanish(monkeypatch):
+    calls = []
+
+    def fake_translate(question, cfg):
+        calls.append(question)
+        return "Who teaches Strategies?"
+
+    monkeypatch.setattr(rewrite_module, "translate_to_english", fake_translate)
+
+    assert rewrite_module.translate_to_english_query("Who teaches Strategies?", object()) == (
+        "Who teaches Strategies?"
+    )
+    assert rewrite_module.translate_to_english_query(
+        "¿Quién da la asignatura de Strategies?", object()
+    ) == "Who teaches Strategies?"
+    assert calls == ["¿Quién da la asignatura de Strategies?"]
+
+
+def test_answer_translates_search_query_but_keeps_original_question_for_generation(monkeypatch):
+    original_question = "¿Cuánto vale el examen final de Management Control?"
+    search_question = "What is the final exam worth in Management Control?"
+    hit = Hit(chunk=_chunk(), rank=1)
+    searched = []
+    generated = []
+    cfg = SimpleNamespace(
+        name="test",
+        kb_sig="test",
+        retrieval={"mode": "dense", "top_k": 1, "rerank": False},
+        generation={
+            "rag": True,
+            "translate_query": True,
+            "prompt_version": "v2",
+        },
+    )
+    monkeypatch.setattr(rewrite_module, "detect_language", lambda question: "es")
+    monkeypatch.setattr(
+        rewrite_module,
+        "translate_to_english",
+        lambda question, config: search_question,
+    )
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, config: RouteDecision(label="none", prob=0.0, source="none"),
+    )
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda question, config, filters: searched.append(question) or [hit],
+    )
+
+    def fake_chat(messages, config, stream=False):
+        generated.append(messages)
+        return "El examen final vale el 40%. [S1]"
+
+    monkeypatch.setattr(answer_module, "chat", fake_chat)
+
+    result = answer_module.answer(original_question, cfg=cfg)
+
+    assert searched == [search_question]
+    assert result.rewritten_question == search_question
+    assert original_question in generated[0][-1]["content"]
+    assert "same language as the user's question" in generated[0][0]["content"]
+    assert result.answer_text == "El examen final vale el 40%. [S1]"
 
 
 def test_selfcheck_uses_best_reranker_score_and_requires_scores():
@@ -104,6 +201,18 @@ def test_selfcheck_threshold_uses_probability_scale_for_negative_raw_logits():
         [Hit(chunk=_chunk(), rank=1, score_rerank=confidence)],
         cfg,
     )
+
+
+def test_rag_answer_prompt_preserves_the_question_language():
+    from src.generation.prompts import build_messages
+
+    cfg = SimpleNamespace(generation={"rag": True, "prompt_version": "v2"})
+    hit = Hit(chunk=_chunk(), rank=1, label="S1")
+
+    messages = build_messages("¿Cuánto vale el examen final?", [hit], cfg)
+
+    assert "same language as the user's question" in messages[0]["content"]
+    assert "at most 5 sentences" in messages[0]["content"]
 
 
 def test_answer_rewrites_before_retrieval_and_refuses_weak_evidence(monkeypatch):

@@ -17,6 +17,7 @@ import time
 
 from src.config import PATHS, load_config
 from src.generation.answer import _build_hits
+from src.generation.rewrite import translate_to_english_query
 from src.retrieval import rerank
 from src.utils.io import read_jsonl
 
@@ -95,37 +96,68 @@ def rank_of_first_hit(hits, gold: set[str]) -> int | None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/final.yaml")
+    parser.add_argument("--group", choices=["all", *(name for name, _ in GROUPS)], default="all")
+    parser.add_argument("--k-dense", type=int)
+    parser.add_argument("--k-bm25", type=int)
     args = parser.parse_args()
     cfg = load_config(args.config)
+    if args.k_dense is not None:
+        cfg.retrieval["k_dense"] = args.k_dense
+    if args.k_bm25 is not None:
+        cfg.retrieval["k_bm25"] = args.k_bm25
+    for key in ("k_dense", "k_bm25"):
+        value = cfg.retrieval.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            parser.error(f"{key.replace('_', '-')} must be a positive integer")
     sections = read_jsonl(PATHS["syllabus_sections"])
     slides = read_jsonl(PATHS["slides"])
     model = rerank._model(cfg.retrieval["reranker_model"])
-    print(f"config={cfg.name}  kb_sig={cfg.kb_sig}  embed_model={cfg.kb['embed_model']}\n")
+    print(
+        f"config={cfg.name}  kb_sig={cfg.kb_sig}  embed_model={cfg.kb['embed_model']}  "
+        f"k_dense={cfg.retrieval['k_dense']}  k_bm25={cfg.retrieval['k_bm25']}  "
+        f"translate_query={cfg.generation.get('translate_query', False)}\n"
+    )
 
     results = {}
     started = time.perf_counter()
     for group, cases in GROUPS:
-      fused_ranks, reranked_ranks = [], []
-      print(f"--- {group}")
-      for question, course, target in cases:
-        gold = gold_ids(course, target, sections, slides)
-        fused = _build_hits(question, cfg, None)  # no course filter on purpose
-        scores = model.predict([(question, h.chunk.embed_text) for h in fused], show_progress_bar=False)
-        reranked = [h for _, h in sorted(zip(scores, fused), key=lambda x: -x[0])]
-        f, r = rank_of_first_hit(fused, gold), rank_of_first_hit(reranked, gold)
-        fused_ranks.append(f)
-        reranked_ranks.append(r)
-        print(f"fusion #{f if f else '-':>2}  rerank #{r if r else '-':>2}  ({len(gold):2} gold)  {question}")
-      results[group] = (fused_ranks, reranked_ranks)
+        if args.group != "all" and group != args.group:
+            continue
+        fused_ranks, reranked_ranks = [], []
+        print(f"--- {group}")
+        for question, course, target in cases:
+            gold = gold_ids(course, target, sections, slides)
+            query = question
+            if cfg.generation.get("translate_query", False):
+                query = translate_to_english_query(question, cfg)
+            fused = _build_hits(query, cfg, None)  # no course filter on purpose
+            scores = model.predict(
+                [(query, hit.chunk.embed_text) for hit in fused],
+                show_progress_bar=False,
+            )
+            reranked = [hit for _, hit in sorted(zip(scores, fused), key=lambda item: -item[0])]
+            fused_rank = rank_of_first_hit(fused, gold)
+            reranked_rank = rank_of_first_hit(reranked, gold)
+            fused_ranks.append(fused_rank)
+            reranked_ranks.append(reranked_rank)
+            print(
+                f"fusion #{fused_rank if fused_rank else '-':>2}  "
+                f"rerank #{reranked_rank if reranked_rank else '-':>2}  "
+                f"({len(gold):2} gold)  {question}"
+            )
+            if query != question:
+                print(f"  search query: {query}")
+        results[group] = (fused_ranks, reranked_ranks)
 
-    def summary(name, ranks):  # noqa: E306
+    def summary(name, ranks):
         n = len(ranks)
         hit1 = sum(1 for r in ranks if r == 1) / n
         hit5 = sum(1 for r in ranks if r and r <= 5) / n
         mrr = sum(1 / r for r in ranks if r) / n
         print(f"{name:15} hit@1 {hit1:.2f}   hit@5 {hit5:.2f}   MRR {mrr:.2f}")
 
-    print(f"\n{sum(len(c) for _, c in GROUPS)} questions, {time.perf_counter() - started:.0f} s")
+    count = sum(len(cases) for group, cases in GROUPS if args.group in {"all", group})
+    print(f"\n{count} questions, {time.perf_counter() - started:.0f} s")
     for group, (fused_ranks, reranked_ranks) in results.items():
         print(f"[{group}]")
         summary("after fusion", fused_ranks)

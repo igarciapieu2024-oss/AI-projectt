@@ -76,7 +76,7 @@ def explain_error(error: Exception) -> tuple[str, str]:
                 "Open the Ollama app, wait a few seconds and ask again.")
     if "not found" in message and "model" in message:  # Ollama is running but the model wasn't downloaded
         return ("The language model isn't installed on this laptop.",
-                "Run: ollama pull llama3.1:8b (the model names are in configs/base.yaml).")
+                "Run ollama pull with the model configured as generation.llm_model in configs/base.yaml.")
     if isinstance(error, FileNotFoundError) or "does not exist" in message or "collection" in message:
         return ("The knowledge base hasn't been built on this laptop.",
                 "Run: python -m src.pipeline build --config configs/final.yaml")

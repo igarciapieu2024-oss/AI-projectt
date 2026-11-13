@@ -8,6 +8,7 @@ chromadb>=0.5
 sentence-transformers>=3.0
 rank-bm25>=0.2.2
 wordninja>=2.0         # splits words glued together in the syllabus tables ("FinalExam" -> "Final Exam")
+langid>=1.1.6          # detects non-English questions so only those are translated before retrieval
 rapidfuzz>=3.6
 ollama>=0.3
 streamlit>=1.46
