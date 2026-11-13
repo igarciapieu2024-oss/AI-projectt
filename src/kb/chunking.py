@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from urllib.parse import urlsplit
 
 from src.config import PATHS, chunks_path, parents_path
 from src.kb.syllabus_text import (  # readable tables, one summary per course, course names, real headings
@@ -21,6 +22,8 @@ _DESCRIPTION_FILLER_PREFIX = re.compile(
     r"(?:\s*[,.:;!?…]+)?(?:\s*[–—]\s*)?\s*",
     re.IGNORECASE,
 )
+_URL_PATTERN = re.compile(r"(?i)\b(?:https?://|www\.)[^\s<>\[\]{}]+")
+_URL_TRAILING_PUNCTUATION = ".,;:!?)]}\"'"
 
 
 def _strip_description_filler(description: str) -> str:
@@ -29,6 +32,22 @@ def _strip_description_filler(description: str) -> str:
     if not match:
         return description
     return description[match.end():].lstrip()
+
+
+def _shorten_urls(text: str) -> str:
+    """Replace retrieval-facing URLs with their host while retaining surrounding punctuation."""
+    def replace(match: re.Match[str]) -> str:
+        value = match.group(0)
+        url = value.rstrip(_URL_TRAILING_PUNCTUATION)
+        punctuation = value[len(url):]
+        parsed = urlsplit(url if "://" in url else f"//{url}")
+        host = (parsed.hostname or "").lower()
+        if not host:
+            return value
+        domain = host[4:] if host.startswith("www.") else host
+        return f"source: {domain}{punctuation}"
+
+    return _URL_PATTERN.sub(replace, text)
 
 
 def _load_image_text(use_ocr: bool, use_captions: bool) -> dict:
@@ -210,6 +229,10 @@ def build_chunks(cfg) -> int:
                         duplicate_of=None,
                     )
                 )
+
+    # Both dense and BM25 indexes use embed_text. Keep the original URL in text for traceability.
+    for chunk in chunks:
+        chunk.embed_text = _shorten_urls(chunk.embed_text)
 
     write_jsonl(chunks_path(cfg.kb_sig), chunks)
     write_jsonl(parents_path(cfg.kb_sig), parents)
