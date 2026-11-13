@@ -250,6 +250,35 @@ def test_length_truncated_answer_keeps_only_last_complete_cited_sentence(monkeyp
     assert [citation.label for citation in result.citations] == ["S1"]
 
 
+def test_length_truncated_citation_before_period_keeps_completed_sentences(monkeypatch):
+    hits = [
+        Hit(chunk=_chunk("chunk_a", "Final exam is worth 40%."), rank=1),
+        Hit(chunk=_chunk("chunk_b", "Attendance is 80%."), rank=2),
+    ]
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda question, cfg, filters: hits,
+    )
+    monkeypatch.setattr(
+        answer_module,
+        "chat",
+        lambda messages, cfg: ChatText(
+            "The final exam is worth 40% of the final grade [S1]. "
+            "Attendance is 80% [S2]. Class participation will be",
+            "length",
+        ),
+    )
+
+    result = answer_module.answer("Course requirements", cfg=_config())
+
+    assert result.answer_text == (
+        "The final exam is worth 40% of the final grade [S1]. "
+        "Attendance is 80% [S2]."
+    )
+    assert [citation.label for citation in result.citations] == ["S1", "S2"]
+
+
 def test_length_truncated_answer_without_complete_citation_is_refused(monkeypatch):
     hit = _chunk("chunk_a", "Exam weight is 40 percent.")
     monkeypatch.setattr(
@@ -328,6 +357,59 @@ def test_answer_stream_never_yields_incomplete_length_truncated_sentence(monkeyp
     )
     assert isinstance(pieces[-1], AnswerResult)
     assert pieces[-1].answer_text == "The exam is worth 40%. [S1]"
+
+
+def test_answer_stream_emits_citation_before_period_sentences_promptly(monkeypatch):
+    hits = [
+        Hit(chunk=_chunk("chunk_a", "Final exam is worth 40%."), rank=1),
+        Hit(chunk=_chunk("chunk_b", "Attendance is 80%."), rank=2),
+    ]
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda question, cfg, filters: hits,
+    )
+
+    class LimitedStream:
+        done_reason = "length"
+
+        def __init__(self):
+            self.consumed = []
+
+        def __iter__(self):
+            for piece in [
+                "The final exam is worth 40% of the final grade [S1]. ",
+                "Attendance is 80% [S2]. ",
+                "Class participation will be",
+            ]:
+                self.consumed.append(piece)
+                yield piece
+
+    response = LimitedStream()
+    monkeypatch.setattr(
+        answer_module,
+        "chat",
+        lambda messages, cfg, stream=False: response,
+    )
+    answer_pieces = answer_module.answer_stream("Course requirements", cfg=_config())
+
+    first_piece = next(answer_pieces)
+
+    assert first_piece == "The final exam is worth 40% of the final grade [S1]."
+    assert len(response.consumed) == 1
+
+    rest = list(answer_pieces)
+    assert "".join([first_piece] + [
+        piece for piece in rest[:-1] if isinstance(piece, str)
+    ]) == (
+        "The final exam is worth 40% of the final grade [S1]. "
+        "Attendance is 80% [S2]."
+    )
+    assert isinstance(rest[-1], AnswerResult)
+    assert rest[-1].answer_text == (
+        "The final exam is worth 40% of the final grade [S1]. "
+        "Attendance is 80% [S2]."
+    )
 
 
 def test_out_of_scope_route_skips_retrieval(monkeypatch):

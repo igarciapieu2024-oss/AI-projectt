@@ -4,11 +4,15 @@ Run with the fake engine (works today):   USE_FAKE=1 streamlit run app.py
 Windows PowerShell:                         $env:USE_FAKE=1; streamlit run app.py
 Run with the real engine (from Wed 11):    streamlit run app.py
 """
+import logging
+
 import streamlit as st  # the library that builds the web app
 
 import app_content as content  # the company name and the logo files
 from app_components.engine import USING_FAKE, warm_up_models
 from app_components.theme import apply_theme  # our CSS (colours, fonts, cards)
+
+logger = logging.getLogger(__name__)
 
 #1 browser tab and page width
 # the tab shows the logo and the name; "wide" uses the whole screen width, better for the projector
@@ -17,7 +21,10 @@ st.set_page_config(page_title=f"{content.COMPANY_NAME}, {content.SUBTITLE.lower(
 # Load local retrieval models before the first assistant question. The fake app
 # does not need the real knowledge-base models.
 if not USING_FAKE:
-    warm_up_models()
+    try:
+        warm_up_models()
+    except Exception:
+        logger.exception("Model warm-up failed; the app will continue starting.")
 
 #2 the brand
 apply_theme()  # loads assets/style.css before any page is drawn

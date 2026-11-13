@@ -21,7 +21,7 @@ from src.schemas import AnswerResult, Citation, Filters, Hit, REFUSAL, RouteDeci
 
 _CITATION = re.compile(r"[\[(]S(\d+)[\])]", re.IGNORECASE)
 _COMPLETE_CITED_SENTENCE = re.compile(
-    r"[.!?]\s*\[S\d+\](?:[.!?])?",
+    r"(?:\s*\[S\d+\])*[.!?](?:\s*\[S\d+\])*(?=\s|$)",
     re.IGNORECASE,
 )
 _COMPLETE_SENTENCE = re.compile(r"[.!?](?=\s|$)")
