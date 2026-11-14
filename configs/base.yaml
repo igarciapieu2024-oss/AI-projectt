@@ -35,6 +35,7 @@ generation:
   temperature: 0.1
   num_predict: 400
   query_num_predict: 96
+  translate_num_predict: 48
   translate_query: true
   rewrite: true
   selfcheck: true
