@@ -135,6 +135,27 @@ def test_translation_helper_skips_english_and_translates_spanish(monkeypatch):
     assert calls == ["¿Quién da la asignatura de Strategies?"]
 
 
+def test_translation_uses_domain_context_and_short_generation_budget(monkeypatch):
+    seen = []
+
+    def fake_chat(messages, cfg, **kwargs):
+        seen.append((messages, kwargs))
+        return "What are transfer prices?"
+
+    monkeypatch.setattr(rewrite_module, "chat", fake_chat)
+
+    translated = rewrite_module.translate_to_english(
+        "¿Qué son los precios de transferencia?",
+        SimpleNamespace(generation={"translate_num_predict": 48}),
+    )
+
+    prompt = seen[0][0][0]["content"]
+    assert "conventional technical term" in prompt
+    assert "without quotes, labels, or other text" in prompt
+    assert translated == "What are transfer prices?"
+    assert seen[0][1] == {"num_predict": 48}
+
+
 def test_answer_translates_search_query_but_keeps_original_question_for_generation(monkeypatch):
     original_question = "¿Cuánto vale el examen final de Management Control?"
     search_question = "What is the final exam worth in Management Control?"

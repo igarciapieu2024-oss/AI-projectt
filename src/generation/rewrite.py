@@ -29,16 +29,18 @@ def translate_to_english(question: str, cfg) -> str:
             {
                 "role": "system",
                 "content": (
-                    "Translate the user's question into English for searching course "
-                    "materials. Preserve course names, technical terms, and numbers. "
-                    "Do not answer the question or add facts. Output only the English "
-                    "translation."
+                    "Translate the full question faithfully into English for searching "
+                    "university course materials in economics, management, computer "
+                    "science, statistics, and social science. Use the conventional "
+                    "technical term for the relevant subject. Preserve course names, "
+                    "acronyms, and numbers. Do not answer, shorten, or explain. Output "
+                    "only the English question itself, without quotes, labels, or other text."
                 ),
             },
             {"role": "user", "content": question},
         ],
         cfg,
-        num_predict=_query_token_limit(cfg),
+        num_predict=_translation_token_limit(cfg),
     )
     if not isinstance(result, str):
         raise TypeError("chat() must return text when stream=False")
@@ -106,3 +108,8 @@ def translate_to_english_query(question: str, cfg) -> str:
 def _query_token_limit(cfg) -> int:
     """Keep short query transformations on their own small generation budget."""
     return getattr(cfg, "generation", {}).get("query_num_predict", 96)
+
+
+def _translation_token_limit(cfg) -> int:
+    """Keep the one-line query translation on a minimal generation budget."""
+    return getattr(cfg, "generation", {}).get("translate_num_predict", 48)
