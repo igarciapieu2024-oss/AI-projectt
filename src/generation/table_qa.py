@@ -87,11 +87,19 @@ def _row_text(row: CourseRow) -> str:
 
 # which column a comparison question is about, and the words that ask for the top or the bottom of it
 _SORT_FIELDS = [
-    (re.compile(r"final exam", re.I), "final_exam_weight"),
+    (re.compile(r"final[\s-]exam", re.I), "final_exam_weight"),
     (re.compile(r"attendance|absence|absences|miss", re.I), "attendance_limit_pct"),
     (re.compile(r"sessions|classes|long", re.I), "n_sessions"),
 ]
 _ASCENDING = re.compile(r"\b(lowest|least|smallest|fewest|minimum|less|shortest)\b", re.I)
+# 1. Words that ask to order or compare courses. Without one of them the question is about something else that only
+#    mentions the field ("Which two courses require a minimum of 4.5 on the final exam?", "What happens if I fall
+#    below 80% attendance?"), and the ranking line would answer a different question.
+_RANKING = re.compile(
+    r"\b(highest|lowest|most|least|largest|smallest|larger|smaller|higher|lower|bigger|biggest|greatest|"
+    r"fewest|longest|shortest|compare|comparison|rank|ranking|order)\b",
+    re.I,
+)
 
 
 # how each compared column is named and printed in the ranking line
@@ -114,7 +122,7 @@ def _ranking_text(question: str, rows: list[dict[str, str]]) -> str | None:
     first sentence states the top course(s) on its own, ties grouped, and the rest follows in order.
     """
     field = _compared_field(question)
-    if field is None or len(rows) < 2:
+    if field is None or len(rows) < 2 or not _RANKING.search(question):
         return None
     label, unit, missing = _FIELD_WORDS[field]
     lowest = bool(_ASCENDING.search(question))
