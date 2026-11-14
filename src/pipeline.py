@@ -26,11 +26,13 @@ def _step(name: str, fn, *args) -> None:
 
 
 def build(cfg) -> None:
-    from src.kb import build_indexes, chunking, dedup, parse_slides, parse_syllabi
+    from src.kb import build_indexes, chunking, course_table, dedup, parse_slides, parse_syllabi
 
     print(f"Building knowledge base for {cfg.name} (kb_sig={cfg.kb_sig})")
     _step("parse_syllabi", parse_syllabi.parse_syllabi, cfg)
     _step("parse_slides", parse_slides.parse_slides, cfg)
+    # the course table is built before the chunks, because each course also gets a summary chunk made from it
+    _step("course_table", course_table.build_course_table, cfg)
     _step("chunking", chunking.build_chunks, cfg)
     if cfg.kb.get("dedup", True):
         _step("dedup", dedup.dedup, cfg)
@@ -38,11 +40,9 @@ def build(cfg) -> None:
 
 
 def run_all(cfg) -> None:
-    from src.kb import course_table
     from src.train import train_router
 
-    build(cfg)
-    _step("course_table", course_table.build_course_table, cfg)
+    build(cfg)  # includes the course table
     _step("train_router", train_router.train, cfg)
     print("Then: python -m eval.run_eval --config", cfg.path.name, "--split dev")
 

@@ -58,3 +58,27 @@ def test_missing_classifier_model_returns_none(monkeypatch, tmp_path):
 
     assert decision.label == "none"
     assert decision.source == "none"
+
+
+def test_router_warm_up_keeps_missing_model_as_logged_fallback(monkeypatch, tmp_path, caplog):
+    monkeypatch.setitem(router_module.PATHS, "router_model", tmp_path / "missing.joblib")
+
+    router_module.warm_up(_cfg(router="classifier"))
+
+    assert "Router model is missing" in caplog.text
+
+
+def test_router_warm_up_logs_load_errors_and_continues(monkeypatch, tmp_path, caplog):
+    model_path = tmp_path / "router.joblib"
+    model_path.touch()
+    monkeypatch.setitem(router_module.PATHS, "router_model", model_path)
+
+    def fail_load(path):
+        raise RuntimeError("broken model")
+
+    monkeypatch.setattr(router_module, "_load_router", fail_load)
+
+    router_module.warm_up(_cfg(router="classifier"))
+
+    assert "Classifier warm-up failed" in caplog.text
+    assert "broken model" in caplog.text

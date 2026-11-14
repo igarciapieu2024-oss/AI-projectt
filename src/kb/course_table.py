@@ -246,18 +246,14 @@ def _course_row(
     text_total = sum(float(item["weight"]) for item in text_components)
 
     text_is_complete = bool(text_components) and abs(text_total - 100) <= 1
-    text_and_table_overlap = any(
-        _contains_component(table_components, item)
-        for item in text_components
-    )
-    if text_is_complete and (
-        not table_components or abs(table_total - 100) > 1 or text_and_table_overlap
-    ):
-        components = text_components
-        component_sources = text_sources
-    elif table_components and abs(table_total - 100) <= 1:
+    # a complete table (summing to ~100%) wins: the text often names the same parts differently,
+    # e.g. AI/ML's table says "FinalExam 35%" while its text says "Quiz (final) [35%]", which hid the final exam weight
+    if table_components and abs(table_total - 100) <= 1:
         components = table_components
         component_sources = table_sources
+    elif text_is_complete:
+        components = text_components
+        component_sources = text_sources
     else:
         # Some extracted tables spill their final label and percentage into OTHER.
         components = table_components

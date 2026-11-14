@@ -6,6 +6,7 @@ kb:
   use_captions: false
   chunk_strategy: section
   dedup: false
+  course_rows: false
 retrieval:
   mode: dense
   rerank: false

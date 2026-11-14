@@ -12,6 +12,7 @@ from pathlib import Path
 import pymupdf
 
 from src.config import PATHS
+from src.kb.clean import remove_repeated_footers
 from src.schemas import SlideRecord
 from src.utils.ids import slide_id
 from src.utils.io import read_csv, write_jsonl
@@ -288,4 +289,5 @@ def parse_slides(cfg) -> int:
 
         all_records.extend(records)
 
+    all_records = remove_repeated_footers(all_records)
     return write_jsonl(output_path, all_records)

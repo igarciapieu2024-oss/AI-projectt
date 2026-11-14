@@ -44,3 +44,8 @@ def embed(texts: list[str], model_name: str):
     if len(vectors) != len(texts):
         raise ValueError("embedding model returned a different number of vectors than input texts")
     return vectors
+
+
+def warm_up(model_name: str) -> None:
+    """Load the configured embedder and initialize its inference path."""
+    embed(["warm-up"], model_name)

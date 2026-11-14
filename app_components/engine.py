@@ -29,6 +29,16 @@ def config(name: str):
     return load_config(f"configs/{name}.yaml")
 
 
+@st.cache_resource(show_spinner="Loading local retrieval models...")
+def warm_up_models(name: str = "final") -> str:
+    """Load this configuration's retrieval models once when the app starts."""
+    from src.warmup import warm_up
+
+    cfg = config(name)
+    warm_up(cfg)
+    return cfg.kb_sig
+
+
 @st.cache_data  # reads the manifest once, not on every click
 def courses() -> dict[str, str]:
     """course_code -> course_name, from data/manifest.csv; the placeholders until it has rows."""

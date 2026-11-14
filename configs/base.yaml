@@ -10,6 +10,7 @@ kb:
   chunk_overlap: 120
   embed_model: sentence-transformers/all-MiniLM-L6-v2
   dedup: true
+  course_rows: true            # one clean summary chunk per course from the course table
 
 retrieval:
   mode: hybrid                 # dense | hybrid
@@ -32,6 +33,9 @@ generation:
   vision_model: qwen2.5vl:7b   # classifies + describes slide images; use qwen2.5vl:3b if the laptop runs out of memory
   prompt_version: v2
   temperature: 0.1
+  num_predict: 400
+  query_num_predict: 96
+  translate_query: true
   rewrite: true
   selfcheck: true
   selfcheck_threshold: 0.2     # tuned on dev by Elena (Sat 14)

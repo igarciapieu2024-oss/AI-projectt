@@ -223,7 +223,7 @@ def test_components_sum_to_100_for_each_expected_course(monkeypatch, tmp_path):
         "mgmt_control": [("Final Exam", 40), ("Class Participation", 10), ("Intermediate Tests", 30), ("Assignments", 20)],
         "os": [("Class Participation", 10), ("Individual Work", 20), ("Group Presentation", 30), ("Intermediate Tests", 20), ("Final Exam", 20)],
         "ob": [("Class Participation", 20), ("Group Presentation", 20), ("Midterm", 20), ("Final Exam", 40)],
-        "strategies": [("Final Exam", 45), ("Ongoing Evaluation Quizzes", 25), ("Case Study Competition", 15), ("Participation", 15)],
+        "strategies": [("Final Exam", 45), ("Ongoing Evaluation Quizzes", 25), ("Case Study Competition", 15), ("Class Participation", 15)],  # complete table wins over the text names,
         "time_series": [("Final Exam", 30), ("Group Work", 20), ("Class Participation", 10), ("Intermediate Tests", 30), ("Individual Work", 10)],
     }
 
@@ -331,7 +331,7 @@ def test_strategies_text_and_split_table_participation_are_not_double_counted(mo
         ("Final Exam", 45.0),
         ("Ongoing Evaluation Quizzes", 25.0),
         ("Case Study Competition", 15.0),
-        ("Participation", 15.0),
+        ("Class Participation", 15.0),  # the table (45+25+15+15) is complete, so its names are used
     ]
     assert sum(item["weight"] for item in components) == 100
 

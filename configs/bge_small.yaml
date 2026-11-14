@@ -1,0 +1,5 @@
+# Experiment: the same system as final.yaml with the BAAI/bge-small-en-v1.5 embedding model instead of MiniLM.
+# Build its own index once:  python -m src.pipeline build --config configs/bge_small.yaml
+extends: final.yaml
+kb:
+  embed_model: BAAI/bge-small-en-v1.5

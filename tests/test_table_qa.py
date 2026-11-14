@@ -65,5 +65,56 @@ def test_course_rows_become_hits_and_named_course_is_selected(monkeypatch, tmp_p
 
     all_hits = table_qa.answer_from_table("Compare my courses", cfg)
     assert [hit.chunk.course_code for hit in all_hits] == ["c01", "c02"]
-    assert "final exam" not in all_hits[1].chunk.text
+    assert "no final exam" in all_hits[1].chunk.text  # said explicitly, never a made-up weight
     assert "retake: One retake" in all_hits[1].chunk.text
+
+
+def test_comparison_questions_get_the_rows_in_order():
+    from src.generation.table_qa import _ordered_for
+    rows = [
+        {"course_code": "mc", "final_exam_weight": "40.0", "n_sessions": "25"},
+        {"course_code": "ma", "final_exam_weight": "", "n_sessions": "30"},
+        {"course_code": "st", "final_exam_weight": "45.0", "n_sessions": "30"},
+        {"course_code": "os", "final_exam_weight": "20.0", "n_sessions": "30"},
+    ]
+    codes = lambda q: [r["course_code"] for r in _ordered_for(q, rows)]
+    assert codes("Which courses have the highest final exam weight?") == ["st", "mc", "os", "ma"]
+    assert codes("Which course has the lowest final exam weight?") == ["os", "mc", "st", "ma"]  # no value last
+    assert codes("Which course has the fewest sessions?")[0] == "mc"
+    assert codes("Tell me about my courses") == ["mc", "ma", "st", "os"]  # nothing to compare: order kept
+
+
+def test_comparison_questions_start_with_the_ranking_written_out():
+    from src.generation.table_qa import _ranking_text
+    rows = [
+        {"course_name": "Strategies", "final_exam_weight": "45.0", "n_sessions": "20"},
+        {"course_name": "Management Control", "final_exam_weight": "40.0", "n_sessions": "20"},
+        {"course_name": "Organizational Behaviour", "final_exam_weight": "40.0", "n_sessions": "25"},
+        {"course_name": "Macroeconomics", "final_exam_weight": "", "n_sessions": "30"},
+    ]
+    # 1. the top course stands alone in the first sentence; ties are grouped, never merged with the top
+    assert _ranking_text("Which courses have the highest final exam weight?", rows) == (
+        "Highest final exam weight: Strategies (45%)."
+        " Then: Management Control and Organizational Behaviour (40%). Macroeconomics: no final exam."
+    )
+    assert _ranking_text("Which course has the fewest sessions?", rows).startswith(
+        "Lowest number of sessions: Strategies and Management Control (20)."
+    )
+    assert _ranking_text("Tell me about my courses", rows) is None  # nothing compared: no ranking
+    assert _ranking_text("What is the final exam worth?", rows[:1]) is None  # one course: nothing to rank
+
+
+def test_ranking_line_only_for_questions_that_ask_to_order_courses():
+    from src.generation.table_qa import _ranking_text
+
+    rows = [
+        {"course_name": "Strategies", "final_exam_weight": "45", "attendance_limit_pct": "80"},
+        {"course_name": "Operating Systems", "final_exam_weight": "20", "attendance_limit_pct": "80"},
+    ]
+    # 1. these ask to order or compare, so they get the ranking line
+    assert _ranking_text("Which course has the highest final exam weight?", rows).startswith("Highest final exam weight: Strategies (45%)")
+    assert _ranking_text("Compare the final exam weights in Strategies and Operating Systems.", rows) is not None
+    assert _ranking_text("Which course has a larger final exam weight, Strategies or Operating Systems?", rows) is not None
+    # 2. these only mention the field, so the model answers them from the course rows
+    assert _ranking_text("Which two courses require a minimum of 4.5 on the final exam to pass?", rows) is None
+    assert _ranking_text("In Strategies and Operating Systems, what happens if a student falls below the 80% attendance requirement?", rows) is None
