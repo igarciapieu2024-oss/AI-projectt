@@ -102,3 +102,19 @@ def test_comparison_questions_start_with_the_ranking_written_out():
     )
     assert _ranking_text("Tell me about my courses", rows) is None  # nothing compared: no ranking
     assert _ranking_text("What is the final exam worth?", rows[:1]) is None  # one course: nothing to rank
+
+
+def test_ranking_line_only_for_questions_that_ask_to_order_courses():
+    from src.generation.table_qa import _ranking_text
+
+    rows = [
+        {"course_name": "Strategies", "final_exam_weight": "45", "attendance_limit_pct": "80"},
+        {"course_name": "Operating Systems", "final_exam_weight": "20", "attendance_limit_pct": "80"},
+    ]
+    # 1. these ask to order or compare, so they get the ranking line
+    assert _ranking_text("Which course has the highest final exam weight?", rows).startswith("Highest final exam weight: Strategies (45%)")
+    assert _ranking_text("Compare the final exam weights in Strategies and Operating Systems.", rows) is not None
+    assert _ranking_text("Which course has a larger final exam weight, Strategies or Operating Systems?", rows) is not None
+    # 2. these only mention the field, so the model answers them from the course rows
+    assert _ranking_text("Which two courses require a minimum of 4.5 on the final exam to pass?", rows) is None
+    assert _ranking_text("In Strategies and Operating Systems, what happens if a student falls below the 80% attendance requirement?", rows) is None
