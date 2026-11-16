@@ -1,0 +1,5 @@
+question_id,original_score,reviewed_score,status,reason
+FRA17,0,1,corrected,Valid semantic refusal. The answer states that the requested information is unavailable.
+IRE17,0,1,corrected,Valid semantic refusal. The answer states that the assignment length is not specified.
+SER17,0,1,corrected,Valid semantic refusal. Personal grades are not available in the course materials.
+SA13,0,,needs_review,The answer contains the essential correct VRIO facts but includes irrelevant information from other diagrams.

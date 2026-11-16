@@ -1,0 +1,4 @@
+question_id,automatic_refusal,semantic_refusal,review_reason
+FRA17,0,1,The answer explicitly states that the guest speaker information is unavailable in the provided sources.
+IRE17,0,1,The answer explicitly states that the assignment length is not specified in the provided sources.
+SER17,0,1,The answer explicitly states that the student's personal assignment grade is not covered by the course materials.

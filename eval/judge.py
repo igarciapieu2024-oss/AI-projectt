@@ -1,117 +1,128 @@
-
-"""LLM judge for answer correctness, claims, and citations.
-
-Uses the shared Ollama chat interface and the configured judge model.
+"""
+Evaluate RAG answer correctness using an LLM judge.
 
 Owner: Elena.
 """
+
 from __future__ import annotations
 
-import copy
+import argparse
+import csv
 import json
 import re
-from typing import Any, Callable
 
-from src.generation.llm import chat
+from pathlib import Path
+from statistics import mean
+
+
+SYSTEM = (
+    "You are an impartial evaluator of a university course Q&A system. "
+    "Assess ONLY factual correctness against the supplied reference answer. "
+    "Do not reward confident guesses. "
+    "Ignore writing style and citation format; those are measured separately. "
+    "The candidate may paraphrase correctly. "
+    'Return JSON with keys "correct" (true or false), '
+    '"score" (0, 0.5, or 1), and "reason" (one short sentence). '
+    "Score 1 if all essential facts are correct; "
+    "0.5 if partly correct without a major contradiction; "
+    "0 if wrong, misleading, or unsupported."
+)
+def build_judge_messages(
+    answer_text: str,
+    reference_answer: str,
+    sources: list[dict],
+) -> list[dict[str, str]]:
+    """Build messages for claim-level factual correctness evaluation."""
+
+    system = (
+        "You are an impartial evaluator of a university course Q&A system. "
+        "Compare the candidate answer against the reference answer and "
+        "the supplied evidence. Do not invent facts. "
+        "Return ONLY a JSON object with: "
+        "'correctness' (integer 1 to 5), "
+        "'claims' (list of objects with 'text' and 'supported'), "
+        "and 'reasoning' (string). "
+        "Use correctness 5 for a fully correct answer and 1 for an "
+        "incorrect answer. Evaluate each factual claim independently."
+    )
+
+    evidence = []
+
+    for source in sources:
+        evidence.append(
+            f"Label: {source.get('label', '')}\n"
+            f"Source IDs: {source.get('covers', [])}\n"
+            f"Text: {source.get('text', '')}"
+        )
+
+    user_content = (
+        f"Reference answer:\n{reference_answer}\n\n"
+        f"Candidate answer:\n{answer_text}\n\n"
+        f"Retrieved evidence:\n"
+        + "\n\n".join(evidence)
+    )
+
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user_content},
+    ]
 
 
 def check_citations(
     answer_text: str,
-    sources: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Check whether citation labels refer to supplied sources."""
-    used = set(re.findall(r"\[(S\d+)\]", answer_text))
-    available = {
-        source["label"]
+    sources: list[dict],
+) -> dict:
+    """Check whether citation labels refer to retrieved sources."""
+
+    valid_labels = {
+        str(source.get("label", "")).upper()
         for source in sources
-        if source.get("label")
     }
+
+    cited_labels = list(dict.fromkeys(
+        label.upper()
+        for label in re.findall(
+            r"\[(S\d+)\]",
+            answer_text,
+            flags=re.IGNORECASE,
+        )
+    ))
+
+    invalid_labels = [
+        label
+        for label in cited_labels
+        if label not in valid_labels
+    ]
 
     return {
-        "valid_labels": sorted(used & available),
-        "invalid_labels": sorted(used - available),
-        "citation_labels_valid": not bool(used - available),
+        "citation_labels_valid": len(invalid_labels) == 0,
+        "cited_labels": cited_labels,
+        "invalid_labels": invalid_labels,
     }
-
-
-def build_judge_messages(
-    answer_text: str,
-    reference_answer: str,
-    sources: list[dict[str, Any]],
-) -> list[dict[str, str]]:
-    """Build a prompt for evidence-based answer evaluation."""
-    source_text = json.dumps(
-        sources, ensure_ascii=False, indent=2
-    )
-
-    system = """
-You are an independent evaluator of a course assistant.
-
-Evaluate the answer using ONLY the supplied reference answer
-and retrieved source texts.
-
-Instructions:
-1. Give correctness a score from 1 to 5.
-   1 = incorrect, 3 = partially correct, 5 = correct.
-2. Identify factual claims made in the answer.
-3. Mark a claim supported only when the provided evidence
-   actually supports it.
-4. Do not assume a citation makes a claim supported.
-5. Do not invent missing evidence.
-6. Return ONLY a JSON object with this structure:
-
-{
-  "correctness": 1,
-  "claims": [
-    {
-      "text": "A factual claim",
-      "supported": true
-    }
-  ],
-  "reasoning": "Brief explanation"
-}
-
-The claims list must include the factual claims being evaluated.
-Use JSON booleans true and false.
-"""
-
-    user = (
-        f"REFERENCE ANSWER:\n{reference_answer}\n\n"
-        f"ASSISTANT ANSWER:\n{answer_text}\n\n"
-        f"RETRIEVED SOURCES:\n{source_text}"
-    )
-
-    return [
-        {"role": "system", "content": system.strip()},
-        {"role": "user", "content": user},
-    ]
 
 
 def judge_answer(
     answer_text: str,
     reference_answer: str,
-    sources: list[dict[str, Any]],
-    cfg: Any,
-    chat_fn: Callable | None = None,
-) -> dict[str, Any]:
-    """Evaluate one answer with the configured LLM judge.
+    sources: list[dict],
+    cfg,
+    chat_fn=None,
+) -> dict:
+    """Evaluate factual claims using the 1-5 judge interface."""
 
-    chat_fn allows deterministic tests without running Ollama.
-    """
-    judge_model = cfg.eval.get("judge_model")
+    from dataclasses import replace
 
-    if not judge_model:
-        raise ValueError(
-            "Missing eval.judge_model in configuration."
-        )
+    if chat_fn is None:
+        from src.generation.llm import chat
+        chat_fn = chat
 
-    # Keep the original generation configuration unchanged.
-    judge_cfg = copy.copy(cfg)
-    judge_cfg.generation = {
-        **cfg.generation,
-        "llm_model": judge_model,
-        "temperature": 0.0,
-    }
+    judge_cfg = replace(
+        cfg,
+        generation={
+            **cfg.generation,
+            "llm_model": "qwen2.5:7b",
+        },
+    )
 
     messages = build_judge_messages(
         answer_text,
@@ -119,58 +130,44 @@ def judge_answer(
         sources,
     )
 
-    call_chat = chat_fn if chat_fn is not None else chat
-
-    raw = call_chat(
+    raw = chat_fn(
         messages,
         judge_cfg,
-        stream=False,
         json=True,
     )
 
-    if not isinstance(raw, str):
-        raise ValueError("LLM judge must return a JSON string.")
-
     try:
-        # Allow a response wrapped in a Markdown JSON code fence.
-        cleaned = raw.strip()
-        cleaned = re.sub(
-            r"^```(?:json)?\s*|\s*```$",
-            "",
-            cleaned,
-        )
-        data = json.loads(cleaned)
+        response = json.loads(str(raw))
     except (json.JSONDecodeError, TypeError) as exc:
-        raise ValueError(
-            "LLM judge returned invalid JSON."
-        ) from exc
+        raise ValueError("Judge returned invalid JSON") from exc
 
-    if not isinstance(data, dict):
-        raise ValueError("LLM judge response must be an object.")
+    if not isinstance(response, dict):
+        raise ValueError("Judge returned invalid JSON object")
 
-    correctness = data.get("correctness")
-    claims = data.get("claims")
-    reasoning = data.get("reasoning")
+    correctness = response.get("correctness")
 
     if (
-        type(correctness) is not int
-        or not 1 <= correctness <= 5
+        isinstance(correctness, bool)
+        or not isinstance(correctness, int)
+        or correctness < 1
+        or correctness > 5
     ):
-        raise ValueError("Correctness must be an integer from 1 to 5.")
+        raise ValueError(
+            "Correctness must be an integer between 1 and 5"
+        )
+
+    claims = response.get("claims")
 
     if not isinstance(claims, list):
-        raise ValueError("Claims must be a list.")
-
-    if not isinstance(reasoning, str):
-        raise ValueError("Reasoning must be a string.")
+        raise ValueError("Claims must be a list")
 
     for claim in claims:
         if (
             not isinstance(claim, dict)
             or not isinstance(claim.get("text"), str)
-            or type(claim.get("supported")) is not bool
+            or not isinstance(claim.get("supported"), bool)
         ):
-            raise ValueError("Invalid claim structure.")
+            raise ValueError("Invalid claim format")
 
     unsupported = [
         claim["text"]
@@ -178,21 +175,426 @@ def judge_answer(
         if not claim["supported"]
     ]
 
+    n_claims = len(claims)
+    n_unsupported = len(unsupported)
+
     hallucination_rate = (
-        len(unsupported) / len(claims)
-        if claims else None
+        n_unsupported / n_claims
+        if n_claims
+        else None
     )
 
     return {
-        "judge_model": judge_model,
         "correctness": correctness,
         "claims": claims,
-        "n_claims": len(claims),
+        "reasoning": response.get("reasoning", ""),
+        "n_claims": n_claims,
         "unsupported_claims": unsupported,
-        "n_unsupported_claims": len(unsupported),
+        "n_unsupported_claims": n_unsupported,
         "hallucination_rate": hallucination_rate,
         "citation_check": check_citations(
-            answer_text, sources
+            answer_text,
+            sources,
         ),
-        "reasoning": reasoning,
     }
+
+def parse_json_response(raw: str) -> dict:
+
+    text = raw.strip()
+
+    if text.startswith("```"):
+
+        text = re.sub(
+            r"^```(?:json)?\s*|\s*```$",
+            "",
+            text,
+            flags=re.I
+        )
+
+    try:
+
+        obj = json.loads(text)
+
+    except json.JSONDecodeError:
+
+        match = re.search(
+            r"\{.*\}",
+            text,
+            flags=re.S
+        )
+
+        if not match:
+            raise ValueError(
+                f"Judge did not return JSON: {raw[:200]}"
+            )
+
+        obj = json.loads(match.group())
+
+    if not isinstance(obj, dict):
+        raise ValueError(
+            "Judge output must be a JSON object"
+        )
+
+    score = obj.get("score")
+
+    if isinstance(score, bool) or not isinstance(
+        score,
+        (int, float)
+    ):
+        raise ValueError(
+            "Judge score must be numeric"
+        )
+
+    score = float(score)
+
+    if score not in {0.0, 0.5, 1.0}:
+        raise ValueError(
+            "Judge score must be 0, 0.5, or 1"
+        )
+
+    if not isinstance(obj.get("reason"), str):
+        raise ValueError(
+            "Judge must provide a reason"
+        )
+
+    return {
+        "score": score,
+        "correct": score == 1.0,
+        "reason": obj["reason"]
+    }
+
+
+def judge_one(row: dict, model: str) -> dict:
+
+    result = row.get("result") or {}
+
+    answerable = (
+        str(row.get("answerable", "")).strip() == "1"
+    )
+
+    refused = bool(
+        result.get("refused")
+    )
+
+    answer = str(
+        result.get("answer_text") or ""
+    ).strip()
+
+    # Evaluate refusals automatically
+
+    if refused:
+
+        score = 0.0 if answerable else 1.0
+
+        return {
+            "score": score,
+            "correct": score == 1.0,
+            "reason": (
+                "False refusal on an answerable question"
+                if answerable
+                else "Correct refusal on an unanswerable question"
+            ),
+            "judge_method": "deterministic"
+        }
+
+    # Incorrect acceptance of unanswerable questions
+
+    if not answerable:
+
+        return {
+            "score": 0.0,
+            "correct": False,
+            "reason": "Answered a question marked unanswerable",
+            "judge_method": "deterministic"
+        }
+
+    # Empty response
+
+    if not answer:
+
+        return {
+            "score": 0.0,
+            "correct": False,
+            "reason": "Empty answer",
+            "judge_method": "deterministic"
+        }
+
+    # Evaluate substantive answers using Ollama
+
+    import ollama
+
+    prompt = (
+        f"Question:\n{row.get('question', '')}\n\n"
+        f"Reference answer:\n{row.get('reference_answer', '')}\n\n"
+        f"Essential key facts:\n{row.get('key_facts', '')}\n\n"
+        f"Candidate answer:\n{answer}\n\n"
+        "Return only the requested JSON object."
+    )
+
+    response = ollama.chat(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": SYSTEM
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        format="json",
+        options={
+            "temperature": 0,
+            "num_predict": 350
+        }
+    )
+
+    if isinstance(response, dict):
+
+        raw = response["message"]["content"]
+
+    else:
+
+        raw = response.message.content
+
+    verdict = parse_json_response(raw)
+
+    verdict["judge_method"] = "llm"
+
+    return verdict
+
+
+def main():
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--run-dir",
+        type=Path,
+        required=True
+    )
+
+    parser.add_argument(
+        "--model",
+        default="qwen2.5:7b"
+    )
+
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None
+    )
+
+    parser.add_argument(
+        "--allow-test",
+        action="store_true"
+    )
+
+    args = parser.parse_args()
+
+    if args.limit is not None and args.limit < 1:
+        parser.error("--limit must be positive")
+
+    # Load saved RAG results
+
+    run_path = (
+        args.run_dir / "results.jsonl"
+    )
+
+    with run_path.open(encoding="utf-8") as file:
+
+        rows = [
+            json.loads(line)
+            for line in file
+            if line.strip()
+        ]
+
+    # Protect the test set
+
+    if not args.allow_test:
+
+        if any(
+            row.get("split") == "test"
+            for row in rows
+        ):
+
+            parser.error(
+                "Test set is protected"
+            )
+
+    # Keep successful executions
+
+    rows = [
+        row
+        for row in rows
+        if row.get("status") == "ok"
+    ]
+
+    if args.limit is not None:
+        rows = rows[:args.limit]
+
+    if not rows:
+        parser.error(
+            "No successful answers in run"
+        )
+
+    output = []
+
+    # Judge every answer
+
+    for i, row in enumerate(rows, start=1):
+
+        qid = row.get("question_id", "")
+
+        print(
+            f"[{i}/{len(rows)}] Judging {qid}",
+            flush=True
+        )
+
+        try:
+
+            verdict = judge_one(
+                row,
+                args.model
+            )
+
+            output.append({
+                "question_id": qid,
+                "status": "ok",
+                **verdict
+            })
+
+        except Exception as exc:
+
+            print(
+                f"ERROR: {type(exc).__name__}: {exc}",
+                flush=True
+            )
+
+            output.append({
+                "question_id": qid,
+                "status": "error",
+                "score": "",
+                "correct": "",
+                "reason": (
+                    f"{type(exc).__name__}: {exc}"
+                ),
+                "judge_method": "failed"
+            })
+
+    # Aggregate results
+
+    scores = [
+        row["score"]
+        for row in output
+        if row["status"] == "ok"
+    ]
+
+    summary = {
+        "run_dir": str(args.run_dir),
+
+        "judge_model": args.model,
+
+        "evaluated": len(scores),
+
+        "failed": len(output) - len(scores),
+
+        "mean_correctness_score": (
+            round(mean(scores), 4)
+            if scores
+            else None
+        ),
+
+        "exact_correct_rate": (
+            round(
+                mean(score == 1 for score in scores),
+                4
+            )
+            if scores
+            else None
+        ),
+
+        "methods": {
+            "deterministic": sum(
+                row["judge_method"] == "deterministic"
+                for row in output
+            ),
+
+            "llm": sum(
+                row["judge_method"] == "llm"
+                for row in output
+            )
+        },
+
+        "note": (
+            "Evaluates factual correctness. "
+            "Retrieval and citations are scored separately."
+        )
+    }
+
+    # Save individual judgments
+
+    csv_path = (
+        args.run_dir / "judge_questions.csv"
+    )
+
+    with csv_path.open(
+        "w",
+        encoding="utf-8",
+        newline=""
+    ) as file:
+
+        writer = csv.DictWriter(
+            file,
+            fieldnames=[
+                "question_id",
+                "status",
+                "score",
+                "correct",
+                "reason",
+                "judge_method"
+            ]
+        )
+
+        writer.writeheader()
+
+        writer.writerows(output)
+
+    # Save summary
+
+    json_path = (
+        args.run_dir / "judge_summary.json"
+    )
+
+    json_path.write_text(
+        json.dumps(
+            summary,
+            ensure_ascii=False,
+            indent=2
+        ) + "\n",
+        encoding="utf-8"
+    )
+
+    print(
+        "\n========== JUDGE RESULTS =========="
+    )
+
+    print(
+        json.dumps(
+            summary,
+            ensure_ascii=False,
+            indent=2
+        )
+    )
+
+    print(
+        "==================================="
+    )
+
+    if len(output) != len(scores):
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

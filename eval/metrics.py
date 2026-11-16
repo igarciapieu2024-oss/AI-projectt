@@ -1,107 +1,256 @@
+"""
+Compute evaluation metrics from saved RAG results.
 
-"""Evaluation metrics for retrieval, refusals, and latency.
+Metrics:
+- Recall@k
+- MRR@k
+- Refusal accuracy
+- False refusal rate
+- Citation validity
+- Citation presence
+- Latency
 
 Owner: Elena.
 """
+
 from __future__ import annotations
 
-import math
+import argparse
+import csv
+import json
+
+from pathlib import Path
 from statistics import mean
 
 
-def _as_groups(
-    retrieved_ids: list[str] | list[list[str]],
-) -> list[set[str]]:
-    """Treat each retrieved source as one ranking position."""
+def load_run(path: Path) -> list[dict]:
+
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Results file not found: {path}"
+        )
+
+    with path.open(encoding="utf-8") as file:
+
+        return [
+            json.loads(line)
+            for line in file
+            if line.strip()
+        ]
+
+
+def source_ids(hit: dict) -> set[str]:
+    """Identify the original sources covered by a chunk."""
+
+    chunk = hit.get("chunk") or {}
+
+    ids = set(chunk.get("covers") or [])
+
+    if chunk.get("source_id"):
+        ids.add(str(chunk["source_id"]))
+
+    if chunk.get("slide_id"):
+        ids.add(str(chunk["slide_id"]))
+
+    if chunk.get("section_id"):
+        ids.add(str(chunk["section_id"]))
+
+    return ids
+
+
+def score_question(row: dict, k: int) -> dict:
+
+    result = row["result"]
+
+    hits = result.get("context_hits") or []
+
+    citations = result.get("citations") or []
+
+    gold = {
+        item.strip()
+        for item in str(
+            row.get("gold_ids") or ""
+        ).split(";")
+        if item.strip()
+    }
+
+    answerable = (
+        str(row.get("answerable", "")).strip() == "1"
+    )
+
+    refused = bool(
+        result.get("refused")
+    )
+
+    # Retrieval metrics
+
+    first_rank = None
+
+    if answerable:
+
+        for rank, hit in enumerate(
+            hits[:k],
+            start=1
+        ):
+
+            retrieved_ids = source_ids(hit)
+
+            if gold.intersection(retrieved_ids):
+
+                first_rank = rank
+
+                break
+
+    # Citation validation
+
+    labels = {
+        hit.get("label"): (
+            hit.get("chunk") or {}
+        ).get("chunk_id")
+        for hit in hits
+    }
+
+    valid_citations = sum(
+        citation.get("label") in labels
+        and labels[citation.get("label")]
+        == citation.get("chunk_id")
+        for citation in citations
+    )
+
+    total_citations = len(citations)
+
+    # Build question-level metrics
+
+    return {
+        "question_id": row.get("question_id", ""),
+        "type": row.get("type", ""),
+        "answerable": int(answerable),
+        "refused": int(refused),
+
+        "correct_refusal_decision": int(
+            refused != answerable
+        ),
+
+        "recall_at_k": (
+            int(first_rank is not None)
+            if answerable
+            else ""
+        ),
+
+        "reciprocal_rank": (
+            round(1 / first_rank, 6)
+            if first_rank
+            else (0.0 if answerable else "")
+        ),
+
+        "retrieved_count": len(hits),
+
+        "citation_count": total_citations,
+
+        "valid_citation_count": valid_citations,
+
+        "citation_present": int(
+            total_citations > 0
+        ),
+
+        "citation_precision": (
+            round(
+                valid_citations / total_citations,
+                6
+            )
+            if total_citations
+            else ""
+        ),
+
+        "latency_ms": (
+            result.get("timings_ms") or {}
+        ).get("total", "")
+    }
+
+
+def average(values: list[float]):
+
+    if not values:
+        return None
+
+    return round(
+        mean(values),
+        4
+    )
+def _source_sets(retrieved):
+    """Represent each retrieved source as a set of covered IDs."""
     return [
-        {item} if isinstance(item, str) else set(item)
-        for item in retrieved_ids
+        {source} if isinstance(source, str) else set(source)
+        for source in retrieved
     ]
 
 
-def recall_at_k(
-    retrieved_ids: list[str] | list[list[str]],
-    gold_ids: list[str],
-    k: int = 5,
-) -> float:
-    """Fraction of gold IDs covered by the first k sources."""
-    gold = set(gold_ids)
-
-    if not gold:
+def recall_at_k(retrieved, gold, k=5):
+    """Fraction of gold source IDs retrieved within the first k sources."""
+    if k < 1:
         return 0.0
 
-    found = set()
+    gold_set = set(gold)
 
-    for group in _as_groups(retrieved_ids)[:k]:
-        found.update(group & gold)
+    if not gold_set:
+        return 0.0
 
-    return len(found) / len(gold)
+    retrieved_ids = set()
+
+    for source in _source_sets(retrieved)[:k]:
+        retrieved_ids.update(source)
+
+    return len(retrieved_ids & gold_set) / len(gold_set)
 
 
-def reciprocal_rank(
-    retrieved_ids: list[str] | list[list[str]],
-    gold_ids: list[str],
-) -> float:
-    """Reciprocal rank of the first relevant source."""
-    gold = set(gold_ids)
+def reciprocal_rank(retrieved, gold):
+    """Reciprocal position of the first source covering a gold ID."""
+    gold_set = set(gold)
 
-    for rank, group in enumerate(
-        _as_groups(retrieved_ids), start=1
-    ):
-        if group & gold:
+    if not gold_set:
+        return 0.0
+
+    for rank, source in enumerate(_source_sets(retrieved), start=1):
+        if source & gold_set:
             return 1.0 / rank
 
     return 0.0
 
 
+def ndcg_at_k(retrieved, gold, k=5):
+    """Normalized discounted cumulative gain with binary relevance."""
+    from math import log2
 
-def ndcg_at_k(
-    retrieved_ids: list[str] | list[list[str]],
-    gold_ids: list[str],
-    k: int = 10,
-) -> float:
-    """Binary nDCG@k based on relevant retrieved sources."""
-    if k <= 0:
+    if k < 1:
         return 0.0
 
-    gold = set(gold_ids)
+    gold_set = set(gold)
 
-    if not gold:
+    if not gold_set:
         return 0.0
 
-    groups = _as_groups(retrieved_ids)
-
-    # Each source counts as relevant (1) or irrelevant (0).
-    relevance = [
-        int(bool(group & gold))
-        for group in groups
-    ]
+    sources = _source_sets(retrieved)[:k]
 
     dcg = sum(
-        rel / math.log2(rank + 1)
-        for rank, rel in enumerate(relevance[:k], start=1)
+        1.0 / log2(rank + 1)
+        for rank, source in enumerate(sources, start=1)
+        if source & gold_set
     )
 
-    # Number of relevant sources, capped at k.
-    ideal_hits = min(sum(relevance), k)
+    ideal_count = min(len(gold_set), k)
 
     idcg = sum(
-        1.0 / math.log2(rank + 1)
-        for rank in range(1, ideal_hits + 1)
+        1.0 / log2(rank + 1)
+        for rank in range(1, ideal_count + 1)
     )
 
     return dcg / idcg if idcg else 0.0
 
 
-
-
-def refusal_metrics(
-    expected: list[bool],
-    predicted: list[bool],
-) -> dict[str, float]:
+def refusal_metrics(expected, predicted):
     """Calculate refusal precision, recall, and accuracy."""
     if len(expected) != len(predicted):
-        raise ValueError("Expected and predicted lengths must match.")
+        raise ValueError("Expected and predicted lengths must match")
 
     if not expected:
         return {
@@ -110,12 +259,24 @@ def refusal_metrics(
             "refusal_accuracy": 0.0,
         }
 
-    tp = sum(e and p for e, p in zip(expected, predicted))
-    fp = sum(not e and p for e, p in zip(expected, predicted))
-    fn = sum(e and not p for e, p in zip(expected, predicted))
+    tp = sum(
+        bool(e) and bool(p)
+        for e, p in zip(expected, predicted)
+    )
+
+    fp = sum(
+        not bool(e) and bool(p)
+        for e, p in zip(expected, predicted)
+    )
+
+    fn = sum(
+        bool(e) and not bool(p)
+        for e, p in zip(expected, predicted)
+    )
 
     correct = sum(
-        e == p for e, p in zip(expected, predicted)
+        bool(e) == bool(p)
+        for e, p in zip(expected, predicted)
     )
 
     return {
@@ -125,8 +286,209 @@ def refusal_metrics(
     }
 
 
-def average_latency(
-    timings_ms: list[float],
-) -> float:
-    """Calculate average response latency in milliseconds."""
-    return mean(timings_ms) if timings_ms else 0.0
+def average_latency(latencies):
+    """Mean response latency in milliseconds."""
+    return sum(latencies) / len(latencies) if latencies else 0.0
+
+def main():
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--run-dir",
+        type=Path,
+        required=True
+    )
+
+    parser.add_argument(
+        "--k",
+        type=int,
+        default=5
+    )
+
+    args = parser.parse_args()
+
+    if args.k < 1:
+        parser.error("--k must be at least 1")
+
+    # Load results
+
+    results_path = (
+        args.run_dir / "results.jsonl"
+    )
+
+    rows = load_run(results_path)
+
+    successful = [
+        row
+        for row in rows
+        if row.get("status") == "ok"
+    ]
+
+    failed = [
+        row
+        for row in rows
+        if row.get("status") != "ok"
+    ]
+
+    if not successful:
+        parser.error(
+            "No successful question results to score"
+        )
+
+    # Score each question
+
+    scores = [
+        score_question(row, args.k)
+        for row in successful
+    ]
+
+    answerable = [
+        row
+        for row in scores
+        if row["answerable"] == 1
+    ]
+
+    unanswerable = [
+        row
+        for row in scores
+        if row["answerable"] == 0
+    ]
+
+    all_citations = sum(
+        row["citation_count"]
+        for row in scores
+    )
+
+    valid_citations = sum(
+        row["valid_citation_count"]
+        for row in scores
+    )
+
+    # Aggregate metrics
+
+    summary = {
+        "run_dir": str(args.run_dir),
+
+        "evaluated": len(scores),
+
+        "failed": len(failed),
+
+        "answerable": len(answerable),
+
+        "unanswerable": len(unanswerable),
+
+        "recall_at_k": average([
+            row["recall_at_k"]
+            for row in answerable
+        ]),
+
+        "mrr_at_k": average([
+            row["reciprocal_rank"]
+            for row in answerable
+        ]),
+
+        "refusal_accuracy": average([
+            row["correct_refusal_decision"]
+            for row in scores
+        ]),
+
+        "false_refusal_rate": average([
+            row["refused"]
+            for row in answerable
+        ]),
+
+        "correct_unanswerable_refusal_rate": average([
+            row["refused"]
+            for row in unanswerable
+        ]),
+
+        "citation_presence_rate": average([
+            row["citation_present"]
+            for row in scores
+        ]),
+
+        "citation_validity": (
+            round(
+                valid_citations / all_citations,
+                4
+            )
+            if all_citations
+            else None
+        ),
+
+        "mean_latency_ms": average([
+            float(row["latency_ms"])
+            for row in scores
+            if row["latency_ms"] != ""
+        ]),
+
+        "notes": [
+            "Recall and MRR check whether a top-k chunk covers a gold source ID.",
+            "Citation validity checks cited labels and chunk IDs.",
+            "Citation validity is null if no citations were generated.",
+            "Answer correctness requires a separate judge."
+        ]
+    }
+
+    # Save question-level metrics
+
+    csv_path = (
+        args.run_dir / "metrics_questions.csv"
+    )
+
+    with csv_path.open(
+        "w",
+        encoding="utf-8",
+        newline=""
+    ) as file:
+
+        writer = csv.DictWriter(
+            file,
+            fieldnames=list(scores[0].keys())
+        )
+
+        writer.writeheader()
+
+        writer.writerows(scores)
+
+    # Save aggregate metrics
+
+    json_path = (
+        args.run_dir / "metrics_summary.json"
+    )
+
+    json_path.write_text(
+        json.dumps(
+            summary,
+            indent=2,
+            ensure_ascii=False
+        ) + "\n",
+        encoding="utf-8"
+    )
+
+    # Display results
+
+    print(
+        "\n========== EVALUATION METRICS =========="
+    )
+
+    print(
+        json.dumps(
+            summary,
+            indent=2,
+            ensure_ascii=False
+        )
+    )
+
+    print(
+        "========================================"
+    )
+
+    print(f"\nSaved: {csv_path}")
+
+    print(f"Saved: {json_path}")
+
+
+if __name__ == "__main__":
+    main()

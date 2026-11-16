@@ -1,447 +1,600 @@
-
-"""Run evaluation and save individual and aggregate results.
+"""
+Run RAG evaluation on dev or test questions.
 
 Usage:
-    python -m eval.run_eval --config configs/b1_v1.yaml --split dev --fake
-
-    python -m eval.run_eval --config configs/b1_v1.yaml --split dev --judge
+python -m eval.run_eval --config configs/b1_v1.yaml --split dev --limit 2
 
 Owner: Elena.
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
 import json
+import math
+import time
+
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from statistics import mean
 
-from eval.metrics import (
-    average_latency,
-    ndcg_at_k,
-    recall_at_k,
-    reciprocal_rank,
-    refusal_metrics,
-)
-from src.config import PATHS, load_config
-from src.schemas import Filters
+from src.config import load_config, PATHS
+from src.generation.answer import answer
 
 
+def make_jsonable(value):
+    """Convert dataclass results into JSON-compatible data."""
+
+    if hasattr(value, "__dataclass_fields__"):
+        return make_jsonable(asdict(value))
+
+    if isinstance(value, dict):
+        return {
+            str(key): make_jsonable(item)
+            for key, item in value.items()
+        }
+
+    if isinstance(value, (list, tuple)):
+        return [make_jsonable(item) for item in value]
+
+    if isinstance(value, Path):
+        return str(value)
+
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+
+    return value
+
+
+def read_questions(path: Path, split: str):
+
+    with path.open(
+        encoding="utf-8-sig",
+        newline=""
+    ) as file:
+
+        rows = list(csv.DictReader(file))
+
+    selected = [
+        row
+        for row in rows
+        if row.get("split", "").strip() == split
+    ]
+
+    if not selected:
+        raise ValueError(
+            f"No questions assigned to split={split}"
+        )
+
+    return selected
+
+
+def save_jsonl(path: Path, record: dict):
+
+    with path.open("a", encoding="utf-8") as file:
+
+        file.write(
+            json.dumps(
+                record,
+                ensure_ascii=False,
+                default=str
+            ) + "\n"
+        )
 def evaluate(
-    config_path: str,
-    split: str,
-    use_fake: bool = False,
-    questions_path: Path | None = None,
-    use_judge: bool = False,
+    config_path="configs/b1_v1.yaml",
+    split="dev",
+    use_fake=False,
+    questions_path=None,
+    use_judge=False,
     judge_fn=None,
-) -> Path:
-    """Evaluate questions and save detailed and aggregate results."""
+):
+    """Evaluation interface supporting deterministic fake-mode tests.
 
-    # Keep the final test set locked.
+    This interface is separate from the production CLI runner.
+    """
+
+    if split == "test":
+        raise ValueError("The test split is locked")
+
     if split != "dev":
-        raise ValueError(
-            "The test set is locked. Only dev is allowed for now."
-        )
-
-    # Fake RAG answers must not be judged as real results.
-    if use_fake and use_judge:
-        raise ValueError(
-            "The LLM judge must not score simulated RAG answers."
-        )
+        raise ValueError(f"Unsupported split: {split}")
 
     cfg = load_config(config_path)
 
-    # Select the answer engine.
+    if questions_path is None:
+        questions_path = PATHS["root"] / "eval" / "questions.csv"
+
+    questions_path = Path(questions_path)
+
+    selected = read_questions(questions_path, split)
+
     if use_fake:
-        from src.generation.fake import answer
+        from src.generation.fake import answer as answer_fn
     else:
-        from src.generation.answer import answer
+        from importlib import import_module
+        answer_fn = import_module(
+            "src.generation.answer"
+        ).answer
 
-    # Use a temporary CSV for tests or the official dataset.
-    questions_path = (
-        Path(questions_path)
-        if questions_path is not None
-        else PATHS["questions"]
-    )
+    if use_judge and judge_fn is None:
+        from eval.judge import judge_answer
+        judge_fn = judge_answer
 
-    with questions_path.open(
-        newline="", encoding="utf-8"
-    ) as file:
-        questions = [
-            row
-            for row in csv.DictReader(file)
-            if row["split"].strip() == split
-        ]
-
-    if not questions:
-        raise ValueError(
-            "No dev questions found. Assign dev splits before evaluation."
-        )
-
-    results = []
-
-    for row in questions:
-        # Follow-up questions can include previous conversation context.
-        history = (
-            [{"role": "user", "content": row["turn1"]}]
-            if row["turn1"].strip()
-            else []
-        )
-
-        filters = Filters(
-            course_code=row["course_code"].strip() or None
-        )
-
-        # Generate the answer.
-        result = answer(
-            question=row["question"],
-            history=history,
-            filters=filters,
-            cfg=cfg,
-        )
-
-        gold_ids = sorted({
-            value.strip()
-            for value in row["gold_ids"].split(";")
-            if value.strip()
-        })
-
-        # Each group represents one retrieved source.
-        retrieved_groups = [
-            hit.chunk.covers
-            for hit in result.context_hits
-        ]
-
-        retrieved_ids = [
-            source_id
-            for group in retrieved_groups
-            for source_id in group
-        ]
-
-        # Retrieval metrics only apply when gold evidence exists.
-        has_gold = bool(gold_ids)
-
-        recall5 = (
-            recall_at_k(retrieved_groups, gold_ids, k=5)
-            if has_gold else None
-        )
-
-        rr = (
-            reciprocal_rank(retrieved_groups, gold_ids)
-            if has_gold else None
-        )
-
-        ndcg10 = (
-            ndcg_at_k(retrieved_groups, gold_ids, k=10)
-            if has_gold else None
-        )
-
-        expected_refusal = row["answerable"].strip() == "0"
-
-        # Optional LLM-based evaluation.
-        judge_result = None
-
-        if use_judge:
-            from eval.judge import judge_answer
-
-            sources = [
-                {
-                    "label": hit.label,
-                    "chunk_id": hit.chunk.chunk_id,
-                    "covers": hit.chunk.covers,
-                    "text": hit.chunk.text,
-                }
-                for hit in result.context_hits
-            ]
-
-            run_judge = (
-                judge_fn if judge_fn is not None
-                else judge_answer
-            )
-
-            judge_result = run_judge(
-                answer_text=result.answer_text,
-                reference_answer=row["reference_answer"],
-                sources=sources,
-                cfg=cfg,
-            )
-
-        # Save individual question metrics.
-        results.append({
-            "question_id": row["question_id"],
-            "split": split,
-            "type": row["type"],
-            "config": cfg.name,
-            "fake_mode": use_fake,
-            "question": row["question"],
-            "answer": result.answer_text,
-            "reference_answer": row["reference_answer"],
-            "gold_ids": gold_ids,
-            "retrieved_ids": retrieved_ids,
-            "retrieved_groups": retrieved_groups,
-            "retrieval_hit": (
-                recall5 > 0 if recall5 is not None else None
-            ),
-            "recall_at_5": recall5,
-            "reciprocal_rank": rr,
-            "ndcg_at_10": ndcg10,
-            "expected_refusal": expected_refusal,
-            "refused": result.refused,
-            "refusal_correct": (
-                result.refused == expected_refusal
-            ),
-            "citations": [
-                {
-                    "label": citation.label,
-                    "chunk_id": citation.chunk_id,
-                    "covers": citation.covers,
-                }
-                for citation in result.citations
-            ],
-            "timings_ms": result.timings_ms,
-            "time_ms": result.timings_ms.get("total", 0.0),
-            "judge": judge_result,
-        })
-
-    # Aggregate retrieval metrics.
-    retrieval_results = [
-        item for item in results
-        if item["recall_at_5"] is not None
-    ]
-
-    expected = [
-        item["expected_refusal"] for item in results
-    ]
-
-    predicted = [
-        item["refused"] for item in results
-    ]
-
-    refusals = refusal_metrics(expected, predicted)
-
-    def metric_mean(items, key):
-        values = [
-            item[key]
-            for item in items
-            if item.get(key) is not None
-        ]
-        return mean(values) if values else None
-
-    summary = {
-        "config": cfg.name,
-        "split": split,
-        "fake_mode": use_fake,
-        "n_questions": len(results),
-        "n_retrieval_scored": len(retrieval_results),
-        "recall_at_5": metric_mean(
-            retrieval_results, "recall_at_5"
-        ),
-        "mrr": metric_mean(
-            retrieval_results, "reciprocal_rank"
-        ),
-        "ndcg_at_10": metric_mean(
-            retrieval_results, "ndcg_at_10"
-        ),
-        **refusals,
-        "average_latency_ms": average_latency([
-            item["time_ms"] for item in results
-        ]),
-    }
-
-    # Aggregate LLM judge metrics when available.
-    judge_results = [
-        item["judge"]
-        for item in results
-        if item["judge"] is not None
-    ]
-
-    summary["n_judged"] = len(judge_results)
-    summary["mean_correctness"] = metric_mean(
-        judge_results, "correctness"
-    )
-
-    total_claims = sum(
-        item["n_claims"]
-        for item in judge_results
-    )
-
-    total_unsupported = sum(
-        item["n_unsupported_claims"]
-        for item in judge_results
-    )
-
-    summary["hallucination_rate"] = (
-        total_unsupported / total_claims
-        if total_claims else None
-    )
-
-    # Save each run in a separate directory.
-    run_id = datetime.now(timezone.utc).strftime(
-        "%Y%m%d_%H%M%S_%f"
+    timestamp = datetime.now(timezone.utc).strftime(
+        "%Y%m%dT%H%M%S%fZ"
     )
 
     run_dir = (
         PATHS["root"]
         / "eval"
         / "runs"
-        / f"{run_id}_{cfg.name}"
+        / f"{timestamp}_{cfg.name}_{split}"
     )
 
     run_dir.mkdir(parents=True, exist_ok=False)
 
-    results_file = run_dir / "results.json"
-    summary_file = run_dir / "summary.json"
+    output_path = run_dir / "results.json"
 
-    results_file.write_text(
+    results = []
+
+    for row in selected:
+        question = row["question"]
+
+        history = None
+        first_turn = (row.get("turn1") or "").strip()
+
+        if first_turn:
+            first_result = answer_fn(first_turn, cfg=cfg)
+
+            history = [
+                {
+                    "role": "user",
+                    "content": first_turn,
+                },
+                {
+                    "role": "assistant",
+                    "content": first_result.answer_text,
+                },
+            ]
+
+        result = answer_fn(
+            question,
+            history=history,
+            cfg=cfg,
+        )
+
+        gold = {
+            item.strip()
+            for item in row.get("gold_ids", "").split(";")
+            if item.strip()
+        }
+
+        retrieved = [
+            set(hit.chunk.covers)
+            for hit in result.context_hits
+        ]
+
+        found = set()
+
+        for source in retrieved[:5]:
+            found.update(source)
+
+        answerable = row["answerable"] == "1"
+
+        retrieval_hit = bool(gold & found)
+
+        recall = (
+            len(gold & found) / len(gold)
+            if gold
+            else None
+        )
+
+        record = {
+            "question_id": row["question_id"],
+            "question": question,
+            "answer_text": result.answer_text,
+            "retrieval_hit": retrieval_hit,
+            "recall_at_5": recall,
+            "refused": bool(result.refused),
+            "refusal_correct": (
+                bool(result.refused) != answerable
+            ),
+            "citations": make_jsonable(result.citations),
+            "latency_ms": result.timings_ms.get("total", 0),
+        }
+
+        if use_judge:
+            sources = [
+                {
+                    "label": hit.label,
+                    "text": hit.chunk.text,
+                    "covers": hit.chunk.covers,
+                }
+                for hit in result.context_hits
+            ]
+
+            record["judge"] = judge_fn(
+                answer_text=result.answer_text,
+                reference_answer=row.get("reference_answer", ""),
+                sources=sources,
+                cfg=cfg,
+            )
+
+        results.append(record)
+
+    output_path.write_text(
         json.dumps(results, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
 
-    summary["run_id"] = run_dir.name
+    retrieval_scores = [
+        row["recall_at_5"]
+        for row in results
+        if row["recall_at_5"] is not None
+    ]
 
-    summary_file.write_text(
-        json.dumps(summary, indent=2, ensure_ascii=False),
+    judged = [
+        row["judge"]
+        for row in results
+        if "judge" in row
+    ]
+
+    def mean_or_none(values):
+        return sum(values) / len(values) if values else None
+
+    hallucination_scores = [
+        row["hallucination_rate"]
+        for row in judged
+        if row.get("hallucination_rate") is not None
+    ]
+
+    summary = {
+        "config": cfg.name,
+        "split": split,
+        "fake_mode": bool(use_fake),
+        "n_questions": len(results),
+        "n_retrieval_scored": len(retrieval_scores),
+        "recall_at_5": mean_or_none(retrieval_scores),
+        "refusal_accuracy": mean_or_none([
+            float(row["refusal_correct"])
+            for row in results
+        ]),
+        "n_judged": len(judged),
+        "mean_correctness": mean_or_none([
+            row["correctness"]
+            for row in judged
+        ]),
+        "hallucination_rate": mean_or_none(
+            hallucination_scores
+        ),
+    }
+
+    (run_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2),
         encoding="utf-8",
     )
 
-    # Append aggregate metrics to the experiment report.
     reports_dir = PATHS["root"] / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
 
-    report_file = reports_dir / f"ablation_{split}.csv"
+    report_path = reports_dir / f"ablation_{split}.csv"
 
-    fieldnames = [
-        "run_id",
-        "config",
-        "split",
-        "fake_mode",
-        "n_questions",
-        "n_retrieval_scored",
-        "recall_at_5",
-        "mrr",
-        "ndcg_at_10",
-        "refusal_precision",
-        "refusal_recall",
-        "refusal_accuracy",
-        "average_latency_ms",
-        "n_judged",
-        "mean_correctness",
-        "hallucination_rate",
-    ]
+    report_columns = list(summary.keys())
 
-    # Preserve previous reports when adding new columns.
     previous_rows = []
 
-    if report_file.exists() and report_file.stat().st_size:
-        with report_file.open(
-            newline="", encoding="utf-8"
-        ) as file:
-            reader = csv.DictReader(file)
-            previous_rows = list(reader)
+    if report_path.exists():
+        with report_path.open(
+            encoding="utf-8",
+            newline="",
+        ) as f:
+            previous_rows = list(csv.DictReader(f))
 
-            existing_columns = reader.fieldnames or []
-
-        if existing_columns != fieldnames:
-            with report_file.open(
-                "w", newline="", encoding="utf-8"
-            ) as file:
-                writer = csv.DictWriter(
-                    file, fieldnames=fieldnames
-                )
-                writer.writeheader()
-
-                for previous in previous_rows:
-                    writer.writerow({
-                        key: previous.get(key, "")
-                        for key in fieldnames
-                    })
-
-    write_header = (
-        not report_file.exists()
-        or report_file.stat().st_size == 0
-    )
-
-    with report_file.open(
-        "a", newline="", encoding="utf-8"
-    ) as file:
+    with report_path.open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as f:
         writer = csv.DictWriter(
-            file, fieldnames=fieldnames
+            f,
+            fieldnames=report_columns,
         )
 
-        if write_header:
-            writer.writeheader()
+        writer.writeheader()
 
-        writer.writerow({
-            key: summary[key]
-            for key in fieldnames
-        })
+        for previous in previous_rows:
+            writer.writerow({
+                key: previous.get(key, "")
+                for key in report_columns
+            })
 
-    print(f"Evaluated {len(results)} questions")
-    print(f"Configuration: {cfg.name}")
-    print(f"Fake mode: {use_fake}")
-    print(f"Recall@5: {summary['recall_at_5']}")
-    print(f"MRR: {summary['mrr']}")
-    print(f"nDCG@10: {summary['ndcg_at_10']}")
-    print(
-        f"Refusal accuracy: "
-        f"{summary['refusal_accuracy']:.3f}"
+        writer.writerow(summary)
+
+    return output_path
+
+def main():
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--config",
+        default="configs/b1_v1.yaml"
     )
-    print(
-        f"Average latency: "
-        f"{summary['average_latency_ms']:.1f} ms"
-    )
-
-    if use_judge:
-        print(
-            f"Mean correctness: "
-            f"{summary['mean_correctness']}"
-        )
-        print(
-            f"Hallucination rate: "
-            f"{summary['hallucination_rate']}"
-        )
-
-    print(f"Results saved to: {results_file}")
-    print(f"Summary saved to: {summary_file}")
-    print(f"Report updated: {report_file}")
-
-    return results_file
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Run the evaluation harness."
-    )
-
-    parser.add_argument("--config", required=True)
 
     parser.add_argument(
         "--split",
         choices=["dev", "test"],
-        required=True,
+        default="dev"
     )
 
     parser.add_argument(
-        "--fake",
-        action="store_true",
-        help="Use simulated answers instead of real RAG.",
+        "--questions",
+        type=Path,
+        default=Path("eval/questions.csv")
     )
 
     parser.add_argument(
-        "--judge",
-        action="store_true",
-        help="Evaluate real answers with the configured LLM judge.",
+        "--limit",
+        type=int,
+        default=None
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("eval/runs")
+    )
+
+    parser.add_argument(
+        "--allow-test",
+        action="store_true"
     )
 
     args = parser.parse_args()
 
-    evaluate(
-        config_path=args.config,
-        split=args.split,
-        use_fake=args.fake,
-        use_judge=args.judge,
+    # Protect the test set
+
+    if args.split == "test" and not args.allow_test:
+
+        parser.error(
+            "Test split is protected. "
+            "Use --allow-test for the final evaluation."
+        )
+
+    if args.limit is not None and args.limit < 1:
+
+        parser.error(
+            "--limit must be a positive number"
+        )
+
+    # Load configuration
+
+    cfg = load_config(args.config)
+
+    # Load questions
+
+    selected = read_questions(
+        args.questions,
+        args.split
     )
+
+    if args.limit is not None:
+        selected = selected[:args.limit]
+
+    # Create run directory
+
+    timestamp = datetime.now(
+        timezone.utc
+    ).strftime("%Y%m%dT%H%M%SZ")
+
+    run_id = (
+        f"{timestamp}_{cfg.name}_{args.split}"
+    )
+
+    folder = args.output_dir / run_id
+
+    folder.mkdir(
+        parents=True,
+        exist_ok=False
+    )
+
+    results_path = folder / "results.jsonl"
+
+    started = time.perf_counter()
+
+    successes = 0
+    failures = 0
+
+    latencies = []
+
+    print(
+        f"Run: {run_id}"
+    )
+
+    print(
+        f"Config: {cfg.name}"
+    )
+
+    print(
+        f"Split: {args.split}"
+    )
+
+    print(
+        f"Questions: {len(selected)}"
+    )
+
+    # Evaluate every question
+
+    for number, row in enumerate(selected, start=1):
+
+        qid = row["question_id"]
+
+        question = row["question"]
+
+        print(
+            f"[{number}/{len(selected)}] "
+            f"{qid}: {question[:70]}",
+            flush=True
+        )
+
+        try:
+
+            history = None
+
+            first_turn = (
+                row.get("turn1") or ""
+            ).strip()
+
+            first_turn_result = None
+
+            # Handle follow-up questions
+
+            if first_turn:
+
+                first = answer(
+                    first_turn,
+                    cfg=cfg
+                )
+
+                first_turn_result = make_jsonable(
+                    first
+                )
+
+                history = [
+                    {
+                        "role": "user",
+                        "content": first_turn
+                    },
+                    {
+                        "role": "assistant",
+                        "content": first.answer_text
+                    }
+                ]
+
+            # Generate the main answer
+
+            result = answer(
+                question,
+                history=history,
+                cfg=cfg
+            )
+
+            # Save evaluation information
+
+            payload = {
+                "question_id": qid,
+                "split": args.split,
+                "type": row["type"],
+                "author": row["author"],
+                "question": question,
+                "turn1": first_turn,
+                "gold_ids": row.get(
+                    "gold_ids", ""
+                ),
+                "reference_answer": row.get(
+                    "reference_answer", ""
+                ),
+                "key_facts": row.get(
+                    "key_facts", ""
+                ),
+                "answerable": row.get(
+                    "answerable", ""
+                ),
+                "config": cfg.name,
+                "status": "ok",
+                "first_turn_result": first_turn_result,
+                "result": make_jsonable(result)
+            }
+
+            latency = float(
+                result.timings_ms.get("total", 0)
+            )
+
+            latencies.append(latency)
+
+            successes += 1
+
+        except Exception as exc:
+
+            failures += 1
+
+            payload = {
+                "question_id": qid,
+                "split": args.split,
+                "config": cfg.name,
+                "status": "error",
+                "error_type": type(exc).__name__,
+                "error": str(exc)
+            }
+
+            print(
+                f"ERROR: {type(exc).__name__}: {exc}",
+                flush=True
+            )
+
+        # Write each result immediately
+
+        save_jsonl(
+            results_path,
+            payload
+        )
+
+    # Calculate execution summary
+
+    if latencies:
+
+        mean_latency = round(
+            sum(latencies) / len(latencies),
+            1
+        )
+
+    else:
+
+        mean_latency = None
+
+    summary = {
+        "run_id": run_id,
+        "config": cfg.name,
+        "config_file": args.config,
+        "split": args.split,
+        "kb_sig": cfg.kb_sig,
+        "requested": len(selected),
+        "completed": successes,
+        "failed": failures,
+        "mean_latency_ms": mean_latency,
+        "wall_time_s": round(
+            time.perf_counter() - started,
+            2
+        ),
+        "results_file": str(results_path),
+        "metrics_status": "pending"
+    }
+
+    summary_path = folder / "summary.json"
+
+    summary_path.write_text(
+        json.dumps(
+            summary,
+            ensure_ascii=False,
+            indent=2
+        ) + "\n",
+        encoding="utf-8"
+    )
+
+    print("\n========== EVALUATION SUMMARY ==========")
+
+    print(
+        json.dumps(
+            summary,
+            indent=2
+        )
+    )
+
+    print("========================================")
+
+    if failures:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
