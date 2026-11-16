@@ -356,3 +356,16 @@ def test_dense_only_mode_skips_keyword_search(monkeypatch):
     )
 
     assert answer_module._build_hits("query", cfg, None) == [dense_hit]
+
+
+def test_course_names_match_british_and_american_spelling():
+    from src.retrieval.filters import mentioned_course_codes
+
+    courses = [
+        {"course_code": "ob", "course_name": "Organizational Behaviour"},
+        {"course_code": "ai_ml", "course_name": "AI Machine Learning Foundations"},
+    ]
+    # 1. both courses are found when the question uses the American spelling
+    question = "Which course has a larger final exam weight, Organizational Behavior or AI Machine Learning Foundations?"
+    assert mentioned_course_codes(question, courses) == ["ob", "ai_ml"]
+    assert mentioned_course_codes("Who teaches Organisational Behaviour?", courses) == ["ob"]

@@ -66,6 +66,34 @@ def _build_hits(question: str, cfg: Config, filters: Filters | None) -> list[Hit
     return fusion.rrf([dense_hits, bm25_hits], k=rrf_k)
 
 
+def _course_search_hits(question: str, cfg: Config, table_rows: list[Hit]) -> list[Hit]:
+    """1. Search results added to the course table rows for cross-course questions the table cannot answer.
+
+    2. The course table holds weights, attendance, professor and sessions, but not midterm sessions,
+       textbooks or case details, so "In which session is the midterm in Macroeconomics, Management
+       Control and Time Series?" was refused with only the table rows as sources.
+    3. Each course named in the rows gets its best search results (1 or 2), filtered to that course;
+       with all 7 rows (no course named) the 3 best unfiltered results are added instead.
+    """
+    codes = list(dict.fromkeys(hit.chunk.course_code for hit in table_rows if hit.chunk.course_code))
+    use_rerank = cfg.retrieval.get("rerank", False)
+
+    def best(filters: Filters | None, keep: int) -> list[Hit]:
+        # 4. only the 10 best fused candidates go to the reranker, to keep the extra time low
+        candidates = _build_hits(question, cfg, filters)[:10]
+        if not candidates:
+            return []
+        return rerank.rerank(question, candidates, keep, cfg) if use_rerank else candidates[:keep]
+
+    if not codes or len(codes) >= 7:
+        return best(None, 3)
+    keep = 2 if len(codes) <= 2 else 1
+    found = []
+    for code in codes:
+        found.extend(best(Filters(course_code=code), keep))
+    return found
+
+
 def _prepare_answer(
     question: str,
     history: list[dict] | None,
@@ -122,6 +150,8 @@ def _prepare_answer(
         if route_decision.label == "cross_course":
             hits = table_qa.answer_from_table(rewritten_question, cfg)
             table_hits = bool(hits)
+            if table_hits and hits[0].chunk.chunk_id != "course_ranking":
+                hits = hits + _course_search_hits(rewritten_question, cfg, hits)
         if not hits:
             hits = _build_hits(rewritten_question, cfg, filters)
     retrieve_ms = (time.perf_counter() - retrieval_started) * 1000

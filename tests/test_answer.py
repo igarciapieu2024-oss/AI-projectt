@@ -443,7 +443,7 @@ def test_cross_course_route_uses_course_table(monkeypatch):
     monkeypatch.setattr(
         answer_module,
         "_build_hits",
-        lambda *args: pytest.fail("table evidence should avoid normal retrieval"),
+        lambda *args: [],
     )
     monkeypatch.setattr(
         answer_module,
@@ -529,3 +529,38 @@ def test_management_control_exam_evidence_is_passed_to_the_model(monkeypatch):
     assert "40%" in result.answer_text
     assert result.citations
     assert any("40%" in hit.chunk.text for hit in result.context_hits)
+
+
+def test_cross_course_questions_the_table_cannot_answer_also_get_search_results(monkeypatch):
+    # 1. the table rows come first, then the best search result of each named course
+    rows = [
+        Hit(chunk=_chunk("course_row__macro", "Macroeconomics: final exam none", course_code="macro"), rank=1),
+        Hit(chunk=_chunk("course_row__ts", "Time Series: final exam 30%", course_code="ts"), rank=2),
+    ]
+    found = {
+        "macro": _chunk("macro_syl_sec08", "Macroeconomics midterm exam in session 16", course_code="macro"),
+        "ts": _chunk("ts_syl_sec08", "Time Series midterm exam in session 9", course_code="ts"),
+    }
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="cross_course", prob=0.9, source="classifier"),
+    )
+    monkeypatch.setattr(answer_module.table_qa, "answer_from_table", lambda question, cfg: list(rows))
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda question, cfg, filters: [Hit(chunk=found[filters.course_code], rank=1)] if filters else [],
+    )
+    seen = {}
+
+    def fake_chat(messages, cfg, stream=False, **kwargs):
+        seen["prompt"] = messages[-1]["content"]
+        return "Macroeconomics: session 16 [S3]; Time Series: session 9 [S4]."
+
+    monkeypatch.setattr(answer_module, "chat", fake_chat)
+    result = answer_module.answer("In which session is the midterm in Macroeconomics and Time Series?", cfg=_config())
+
+    assert not result.refused
+    assert "session 16" in seen["prompt"] and "session 9" in seen["prompt"]
+    assert [citation.label for citation in result.citations] == ["S3", "S4"]

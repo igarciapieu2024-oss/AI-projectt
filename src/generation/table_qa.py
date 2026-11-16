@@ -102,6 +102,14 @@ _RANKING = re.compile(
 )
 
 
+# 2. Words that ask for something the ranking line does not hold. "Who teaches the course with the
+#    highest final exam weight?" mentions the ranked field but asks for the professor, so the model
+#    answers it from the course rows instead.
+_OTHER_ASK = re.compile(
+    r"\b(who|whom|professor|lecturer|teach\w*|book|textbook|bibliography|when|where|which session|date)\b",
+    re.I,
+)
+
 # how each compared column is named and printed in the ranking line
 _FIELD_WORDS = {
     "final_exam_weight": ("final exam weight", "%", "no final exam"),
@@ -122,7 +130,7 @@ def _ranking_text(question: str, rows: list[dict[str, str]]) -> str | None:
     first sentence states the top course(s) on its own, ties grouped, and the rest follows in order.
     """
     field = _compared_field(question)
-    if field is None or len(rows) < 2 or not _RANKING.search(question):
+    if field is None or len(rows) < 2 or not _RANKING.search(question) or _OTHER_ASK.search(question):
         return None
     label, unit, missing = _FIELD_WORDS[field]
     lowest = bool(_ASCENDING.search(question))
