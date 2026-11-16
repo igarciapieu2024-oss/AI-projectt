@@ -118,3 +118,15 @@ def test_ranking_line_only_for_questions_that_ask_to_order_courses():
     # 2. these only mention the field, so the model answers them from the course rows
     assert _ranking_text("Which two courses require a minimum of 4.5 on the final exam to pass?", rows) is None
     assert _ranking_text("In Strategies and Operating Systems, what happens if a student falls below the 80% attendance requirement?", rows) is None
+
+
+def test_no_ranking_line_when_the_question_asks_for_another_field():
+    from src.generation.table_qa import _ranking_text
+
+    rows = [
+        {"course_name": "Strategies", "final_exam_weight": "45"},
+        {"course_name": "Operating Systems", "final_exam_weight": "20"},
+    ]
+    # 1. the follow-up "And who teaches it?" is rewritten with the ranked field, but asks for the professor
+    assert _ranking_text("Who teaches the course with the highest final exam weight?", rows) is None
+    assert _ranking_text("Which course has the highest final exam weight?", rows) is not None
