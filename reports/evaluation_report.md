@@ -18,31 +18,55 @@ and zero warnings.
 
 The experiments reported here use only the development set.
 
-Two configurations were compared:
+Three configurations were compared:
 
+- B0: No RAG. The language model answers without retrieving course documents.
 - B1: Dense retrieval with prompt v1 and syllabus-only sources.
 - Final v1.1: The updated RAG configuration with the complete
   retrieval and generation pipeline.
 
-Both configurations were evaluated on the same 40 questions.
+All three configurations were evaluated on the same 40 development questions.
 
 ## 2. Quantitative Results
 
-| Metric | B1 | Final v1.1 |
-|---|---:|---:|
-| Recall@K | 34.29% | 94.29% |
-| MRR@K | 0.2676 | 0.7167 |
-| Refusal accuracy | 20.0% | 85.0% |
-| False refusal rate | 91.43% | 8.57% |
-| Correct unanswerable refusal rate | 100.0% | 40.0% |
-| Citation presence | 7.5% | 87.5% |
-| Citation validity | 100.0% | 100.0% |
-| Exact correctness | 12.5% | 55.0% |
-| Mean correctness score | 13.75% | 57.5% |
-| Mean latency | 1.40 s | 1.97 s |
+| Metric | B0 (No RAG) | B1 | Final v1.1 |
+|---|---:|---:|---:|
+| Recall@K | N/A | 34.29% | 94.29% |
+| MRR@K | N/A | 0.2676 | 0.7167 |
+| Refusal accuracy (automatic) | 87.5% | 20.0% | 85.0% |
+| False refusal rate | 0.0% | 91.43% | 8.57% |
+| Correct unanswerable refusal rate | 0.0% | 100.0% | 40.0% |
+| Citation presence | 0.0% | 7.5% | 87.5% |
+| Citation validity | N/A | 100.0% | 100.0% |
+| Exact correctness (automatic) | 15.0% | 12.5% | 55.0% |
+| Mean correctness score (automatic) | 16.25% | 13.75% | 57.5% |
+| Mean latency | 1.81 s | 1.40 s | 1.97 s |
 
-Both evaluation runs completed all 40 questions without
+All three evaluation runs completed all 40 questions without
 execution failures.
+
+Recall and MRR are not applicable to B0 because no retrieval
+is performed. B0's automatic refusal accuracy of 87.5%
+reflects correct non-refusal decisions on 35 answerable
+questions, while all five unanswerable questions were answered.
+
+### Manual Review of Final v1.1
+
+The automatic judge marked 22 of 40 answers fully correct (55.0%).
+
+Manual review identified five additional correct answers:
+
+- FRA17, IRE17, SER17: valid semantic refusals incorrectly
+  classified as non-refusals.
+- FRA05: correct answer penalized because the reference answer
+  omitted Management Control and Time Series.
+- FRA09: correct explanation of the Bertrand paradox.
+
+After these documented corrections, reviewed exact correctness
+is 27/40 (67.5%).
+
+The automatic and manually reviewed results are reported
+separately. SA13 remains pending manual review.
 
 ## 3. Main Findings
 
@@ -84,6 +108,11 @@ After documenting these three manual corrections:
 - Correct unanswerable refusal rate: 100%
 - False refusal rate: 8.57%
 
+Two additional judge errors were confirmed during manual
+review: FRA05 and FRA09. Together with the three semantic
+refusal corrections, these increase reviewed exact correctness
+to 67.5% (27/40).
+
 The original automatic metrics were preserved separately
 to ensure reproducibility.
 
@@ -118,8 +147,16 @@ with the Cournot example requested in the follow-up.
 
 IRE05 and SA10 were incorrectly refused.
 
-These cases require further investigation of cross-course
-routing, evidence selection, and answer generation.
+Subsequent development debugging identified two causes:
+a mismatch between American and British spelling of
+Organizational Behaviour, and cross-course questions that
+were restricted to the course table without supplementary
+retrieval. The team has implemented fixes, but these changes
+are not reflected in the v1.1 results reported here.
+
+Other remaining errors, including EL02, SA06, SA15, and EL15,
+highlight model limitations in factual accuracy and
+conversational reasoning.
 
 ## 6. Evaluation Limitations
 
@@ -139,9 +176,10 @@ Fourth, the automatic refusal detector relies on an exact
 refusal phrase, potentially misclassifying valid semantic
 refusals.
 
-Finally, the reported experiments compare B1 and Final
-only. Additional ablation configurations have not yet
-been evaluated.
+Finally, the reported experiments compare B0, B1, and
+Final v1.1 on development data only. These comparisons do
+not constitute a complete ablation study. The held-out
+test set remains untouched pending the frozen v1.2 configuration.
 
 ## 7. Conclusion
 
