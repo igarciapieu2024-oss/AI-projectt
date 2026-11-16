@@ -1,0 +1,325 @@
+question_id,type,question,reference_answer,answer,judge_score,judge_reason,refused,recall_at_k,answerable
+FRA03,admin,"How many quizzes are there in the Strategy course, and what happens if I miss one?","There are 5 closed-book individual quizzes, in sessions 5, 11, 16, 20 and 24, worth 25% in total. A missed quiz is graded 0 and cannot be rescheduled, but only the best 4 count, so missing one does not affect the final grade.","I'm not familiar with the specific details of the Strategy course, including the number of quizzes and the consequences of missing one. I don't have any information about the course structure or policies. If you could provide more context or clarify which course you are referring to, I'll do my best to help.",0.0,"The answer does not provide the essential facts about the number of quizzes, their sessions, their weight, or the policy on missed quizzes.",0,0,1
+FRA04,admin,When is the Organizational Behavior midterm and what does it cover?,The midterm is in Session 7 and covers the chapters from Sessions 1 to 6. It is individual and worth 20%. Those chapters are not tested again in the final exam.,"I'm not aware of the specific midterm schedule or course details for Organizational Behavior. I don't have any information about the course or its syllabus. I'm a general knowledge model, and I don't have access to specific course materials or schedules. If you're a student in an Organizational Behavior course, I recommend checking with your instructor or consulting the course syllabus for more information about the midterm schedule and course coverage.",0.0,"The answer does not provide the correct information about the midterm session, covered chapters, or its weight in the final exam.",0,0,1
+FRA06,cross,Which two courses explicitly require a minimum of 4.5 on the final exam to pass?,Strategic Management (Strategies) and Management Control both require at least 4.5 on the final exam to pass.,I'm not aware of any specific courses that you are referring to. Could you please provide more context or information about the courses you are asking about? I'll do my best to help.,0.0,The answer does not provide the correct information about the courses.,0,0,1
+FRA07,cross,In which course is the group project or presentation worth the most?,"Operating Systems & Parallel Computing: the group presentation is worth 30%. It is 20% in AI/ML and in Organizational Behavior, and the case study competition is 15% in Strategy.","I'm not sure which course you are referring to, as I don't have any information about specific courses or their requirements. Could you please provide more context or clarify which course you are asking about? I'll do my best to help.",0.0,The answer does not provide any of the essential key facts about the course with the highest group project or presentation worth.,0,0,1
+FRA10,content,"According to the game theory session, when can firms cooperate on prices without any contract, and when does cooperation fail?",In repeated games the possibility of tit-for-tat makes cooperation a good strategy if the time horizon is long enough. Industries with few firms and stable demand and costs (e.g. electric companies) can cooperate without contracts. Cooperation fails with rapidly shifting demand or cost conditions (e.g. airlines) and near the end of the game (end-game problem).,"I'm not aware of any specific game theory session that was provided. However, I can provide general information on the topic of price cooperation in firms.
+
+In general, firms can cooperate on prices without a contract in situations where the benefits of cooperation outweigh the costs of cooperation. This can occur when:
+
+1. Firms have similar costs and revenue structures, making it easier to coordinate prices.
+2. Firms have a high degree of interdependence, making it difficult for one firm to unilaterally change its price without affecting the other firm's profits.
+3. The market is relatively stable, and firms can rely on each other to maintain prices.
+
+On the other hand, cooperation on prices can fail in situations where:
+
+1. Firms have different costs and revenue structures, making it difficult to coordinate prices.
+2. Firms have a low degree of interdependence, making it easy for one firm to unilaterally change its price without affecting the other firm's profits.
+3. The market is highly competitive, and firms are incentivized to set prices that maximize their own profits, regardless of the impact on other firms.
+
+Some classic examples of price cooperation include the Bertrand competition model and the Nash equilibrium, which describe situations where firms can cooperate on prices without a contract. However, these models assume a certain level of cooperation and do not necessarily imply that firms will cooperate without a contract.",0.0,"The answer does not cover the key points about tit-for-tat, long horizon, few firms with stable demand/costs, electric companies, shifting conditions, airlines, and end-game problem.",0,0,1
+FRA11,content,What is perceived organizational support and when is it higher?,"Perceived organizational support (POS) is the degree to which employees believe the organization values their contribution and cares about their well-being. It is higher when rewards are fair, employees are involved in decision making and supervisors are seen as supportive.","Perceived Organizational Support (POS) refers to an individual's subjective perception of the extent to which their organization provides a supportive environment that fosters their well-being, job satisfaction, and overall success.
+
+POS encompasses various aspects, including:
+
+1. Supervisory support: Feeling valued, trusted, and supported by one's supervisor.
+2. Colleague support: Feeling supported and valued by one's colleagues.
+3. Organizational commitment: Feeling that the organization is committed to its employees' growth and development.
+4. Fairness and justice: Feeling that the organization is fair and just in its treatment of employees.
+
+Research suggests that POS is positively related to employee outcomes, such as:
+
+* Job satisfaction
+* Turnover intentions
+* Performance
+* Well-being
+* Health
+
+POS is higher in organizations that:
+
+* Provide clear communication and transparency
+* Offer opportunities for growth and development
+* Foster a positive work culture
+* Demonstrate a commitment to employee well-being
+* Encourage work-life balance
+* Provide fair and equitable treatment
+
+On the other hand, POS is lower in organizations that:
+
+* Lack clear communication and transparency
+* Offer limited opportunities for growth and development
+* Foster a negative work culture
+* Demonstrate a lack of commitment to employee well-being
+* Encourage long working hours or excessive workload
+
+Overall, POS is an important construct that can impact employee outcomes and organizational success.",0.5,"The candidate answer includes key elements of perceived organizational support but does not directly address the specific factors that make it higher, such as fair rewards, involvement in decisions, and supportive supervisors.",0,0,1
+FRA12,content,"In Python, what has happened after I open a file and call seek() to a position but before I call read()?","Only the file position has changed; no file data has been transferred yet. seek() does not move data or a disk head (Linux implements it with lseek()). read() is what copies bytes into your buffer, from the page cache or storage, which is why random access is cheap.","After you open a file and call `seek()` to a position, the file pointer is moved to that position. However, the file's contents remain unchanged. The file's contents are still stored in the file, but the file pointer is now pointing to a specific location in the file.
+
+When you call `read()` after seeking to a position, you will only read the contents from the current file pointer position until the end of the file is reached. You will not read any characters that are before the current file pointer position.",1.0,All essential facts are accurately stated without contradiction.,0,0,1
+FRA14,image,"According to the chart of average job satisfaction levels by facet in Organizational Behavior, which facet has the lowest satisfaction?",Promotion has the lowest satisfaction (approximately 21%). The highest levels are Overall (77%) and Work Itself (75%); Pay is about 58%.,I'm not familiar with the specific chart of average job satisfaction levels by facet in Organizational Behavior. I don't have any information about such a chart or its contents. Could you please provide more context or clarify which chart you are referring to? I'll do my best to help you find the answer.,0.0,The answer does not provide the correct information about the lowest satisfaction facet.,0,0,1
+FRA16,followup,How do I choose the number of clusters for it?,"Use the elbow method: plot the sum of squared distances (SSE) between points and their cluster centroids for different K, and pick K where the SSE starts to flatten out and forms an elbow.","Choosing the number of clusters (k) for k-means clustering can be challenging, as it depends on the characteristics of the data and the problem you're trying to solve. Here are some common methods to help you choose the number of clusters:
+
+1. **Visual Inspection**: Plot the data points and try to visually identify the natural clusters or patterns. This method is simple, but it can be subjective and may not always work well.
+2. **Elbow Method**: Plot the sum of squared errors (SSE) or the distortion measure against different values of k. The SSE plot should have an ""elbow"" shape, where the rate of decrease in SSE slows down as k increases. Choose the value of k that corresponds to the elbow point.
+3. **Silhouette Analysis**: Calculate the silhouette coefficient for each data point, which measures the separation between clusters and the cohesion within clusters. A higher silhouette coefficient indicates a better fit. Plot the silhouette coefficients against different values of k and choose the value that maximizes the average silhouette coefficient.
+4. **Gap Statistic**: Calculate the gap statistic for each value of k, which measures the ratio of the within-cluster variance to the between-cluster variance. The gap statistic should increase as k increases, and choose the value of k that corresponds to the highest gap statistic.
+5. **Cross-Validation**: Use cross-validation techniques, such as k-fold cross-validation, to evaluate the performance of k-means clustering for different values of k.
+6. **Information Criteria**: Use information criteria, such as the Akaike information criterion (AIC) or the Bayesian information criterion (BIC), to evaluate the fit of different models with varying numbers of clusters.
+7. **Expert Knowledge**: Use domain knowledge and expertise to choose the number of clusters based on the problem and the characteristics of the data.",0.5,"The answer provides multiple methods, but only the elbow method and SSE are directly relevant to the question. The other methods are not essential to the core answer.",0,0,1
+FRA18,unanswerable,How many questions will the final quiz of AI Machine Learning Foundations have?,"Not in the course material: the syllabus describes the quiz (session 30, closed-book, 35%) but not the number of questions.","I'm not aware of the specific details of the final quiz of AI Machine Learning Foundations, as I don't have access to that information. I don't have any knowledge about the course materials, format, or content of the final quiz. If you're taking the course, I recommend checking with the instructor or course materials for the most accurate and up-to-date information about the final quiz.",0.0,Answered a question marked unanswerable,0,,0
+FRA19,unanswerable,Which business case will we get in the Strategy case study competition?,"Not in the course material: the syllabus says each group will be assigned a short business case in sessions 27-28, but does not say which one.","I'm not aware of the specific details of the Strategy case study competition, including the types of business cases that will be presented. I don't have any information about the competition or its format. If you could provide more context or clarify which competition you are referring to, I may be able to help you better.",0.0,Answered a question marked unanswerable,0,,0
+FRA20,unanswerable,What is the exact date of the June/July re-sit exam for Operating Systems & Parallel Computing?,"Not in the course material: the syllabus says re-sits are in June/July, in person at your campus, and that dates and locations will be posted in advance, but gives no date.","I'm not aware of the specific exam schedule for Operating Systems & Parallel Computing, as I don't have access to real-time information or specific course materials. I'm also not aware of any June/July re-sit exam dates without more context. Could you please provide more information or clarify which institution or course you are referring to? I'll do my best to help.",0.0,Answered a question marked unanswerable,0,,0
+EL03,admin,Which session contains the final quiz in AI Machine Learning Foundations?,Session 30; the quiz is held in class and is closed-book.,"I'm not aware of the specific course materials or schedule for AI Machine Learning Foundations. I don't have any information about the course sessions or the final quiz. If you could provide more context or clarify which course you are referring to, I'll do my best to help.",0.0,The candidate answer does not provide the correct session number and lacks the essential facts about the quiz being in class and closed-book.,0,0,1
+EL04,admin,What information does the Operating Systems syllabus give about resit scheduling?,"The resit takes place in June or July, in person at the campus; the exact date and location are announced later.","I'm not aware of the specific details of the Operating Systems syllabus, as I don't have access to any course materials. I'm also not aware of any standard syllabus for Operating Systems that covers resit scheduling. Resit scheduling is a specific topic that may be covered in some courses, but without knowing the specific syllabus, I'm unable to provide information on what it covers.",0.0,The answer does not provide the correct information about resit scheduling as stated in the reference answer.,0,0,1
+EL06,cross,How does the group presentation weight in Operating Systems compare with the group work weight in Organizational Behavior?,Operating Systems & Parallel Computing is worth 30%; Organizational Behavior group work is worth 20%.,"I'm not familiar with the specific grading schemes used in Operating Systems and Organizational Behavior courses. I don't have enough information to provide a direct comparison between the two. The weight of a group presentation in Operating Systems and group work in Organizational Behavior may vary depending on the instructor, course, and institution.
+
+If you could provide more context or information about the specific courses, instructors, or grading schemes you're referring to, I may be able to offer a more informed answer. Alternatively, I can try to provide general information about group work and presentations in academic settings, but I wouldn't be able to make a direct comparison between the two.",0.0,The candidate answer does not provide the essential facts about the weight of the group presentation in Operating Systems and the group work in Organizational Behavior.,0,0,1
+EL07,cross,Compare the final exam weights in Strategies and Operating Systems & Parallel Computing.,Strategies has a 45% final exam; Operating Systems & Parallel Computing has a 20% final exam.,"I don't have information on the final exam weights for Strategies and Operating Systems & Parallel Computing courses. I'm a large language model, I don't have have access to specific course materials or information about individual courses. If you're looking for information on the final exam weights, I recommend checking with the course instructor, course syllabus, or contacting the university's registrar's office for more information.",0.0,The answer does not provide the factual information about the final exam weights.,0,0,1
+EL10,content,Which organizational practices tend to increase perceived organizational support?,"Fair rewards, employee involvement in decisions and supportive supervisors.","Research suggests that several organizational practices can increase perceived organizational support. Some of these practices include:
+
+1. Open communication: Encouraging open and transparent communication among employees, managers, and leaders can help build trust and create a sense of belonging.
+2. Feedback and recognition: Regularly providing constructive feedback and recognizing employees' contributions can help employees feel valued and supported.
+3. Autonomy and flexibility: Offering flexible work arrangements, autonomy in decision-making, and opportunities for growth and development can help employees feel more connected to the organization.
+4. Work-life balance: Supporting employees' work-life balance by offering flexible scheduling, telecommuting options, and employee wellness programs can help reduce stress and increase feelings of support.
+5. Diversity, equity, and inclusion: Fostering a culture of diversity, equity, and inclusion can help create a sense of belonging among employees from diverse backgrounds.
+6. Managerial support: Having supportive and approachable managers who are available to listen and provide guidance can help employees feel more supported.
+7. Employee resource groups: Establishing employee resource groups (ERGs) that provide a sense of community and connection among employees from similar backgrounds or with shared interests can help increase feelings of support.
+8. Wellness programs: Offering wellness programs, such as mental health resources, fitness classes, or employee assistance programs, can help employees feel more supported and cared for.
+9. Recognition and rewards: Regularly recognizing and rewarding employees' contributions and achievements can help create a sense of appreciation and support.
+10. Leadership's emotional intelligence: Leaders who are emotionally intelligent, empathetic, and transparent can help create a positive and supportive work environment.
+
+These practices can help increase perceived organizational support by creating a sense of belonging, trust, and connection among employees.",0.5,"The answer includes some relevant practices but contradicts the reference answer by not mentioning fair rewards, involvement, and supportive supervisors.",0,0,1
+EL11,content,Does calling seek() immediately read bytes from a file in Python?,No. seek() updates the file position; read() transfers bytes into the program buffer.,"No, calling `seek()` immediately does not read bytes from a file in Python. 
+
+When you call `seek()` on a file object, it moves the file pointer to a new position in the file, but it does not read any bytes from the file. The file pointer is essentially a pointer to the current position in the file, and `seek()` updates this pointer.
+
+To read bytes from a file, you need to use the `read()` method, which returns a string containing the bytes at the current file pointer position. If you want to read a specific number of bytes from the file, you can use the `read()` method with an argument specifying the number of bytes to read.
+
+For example:
+
+```python
+with open('file.txt', 'rb') as file:
+    # Move the file pointer to the beginning of the file
+    file.seek(0)
+    # Read 10 bytes from the file
+    bytes_read = file.read(10)
+    # Print the bytes read
+    print(bytes_read)
+```
+
+In this example, `seek(0)` moves the file pointer to the beginning of the file, and `read(10)` reads 10 bytes from the file starting from the current file pointer position.",1.0,All essential facts are correctly stated without contradiction.,0,0,1
+EL12,content,What does a bend in the k-means elbow plot indicate when selecting K?,The elbow marks a point after which adding clusters yields diminishing reductions in within-cluster SSE.,"A bend in the k-means elbow plot typically indicates that the algorithm is converging to a stable solution. This is often referred to as the ""elbow point"" where the rate of decrease in the sum of squared errors (SSE) starts to slow down.
+
+At this point, the algorithm is likely to have found the optimal number of clusters (K) that best fit the data. Selecting K at this point is often considered optimal because it balances the trade-off between model complexity and fit.
+
+In other words, the bend in the elbow plot suggests that the model is becoming over-specialized (i.e., too complex) and that adding more clusters is not significantly improving the fit.",0.0,"The candidate answer incorrectly states that the bend indicates the algorithm is converging to a stable solution and that adding more clusters is not significantly improving the fit, which contradicts the reference answer.",0,0,1
+EL14,image,"In the Organizational Behavior job-satisfaction chart, which two facets have the tallest bars?",The two tallest bars are Overall satisfaction (77%) and Work Itself (75%).,I'm not familiar with the specific Organizational Behavior job-satisfaction chart you're referring to. I don't have enough information to provide an accurate answer. Could you please provide more context or clarify which chart you're talking about? I'll do my best to help.,0.0,The answer does not provide the correct information about the two tallest bars.,0,0,1
+EL16,followup,What three workplace practices can make employees perceive more of it?,"Fair rewards, participation in decision-making and supportive supervision.","Based on research and best practices, here are three workplace practices that can contribute to an increase in perceived organizational support:
+
+1. **Regular and Open Communication**: Encouraging open and transparent communication between employees, managers, and leadership can help build trust and foster a sense of support. This can be achieved through regular town hall meetings, anonymous feedback channels, and one-on-one check-ins. By keeping employees informed about organizational goals, challenges, and changes, managers can demonstrate their commitment to the organization's success and show that they value employees' input and ideas.
+
+2. **Flexible Work Arrangements and Autonomy**: Providing employees with flexible work arrangements, such as telecommuting, flexible hours, or compressed workweeks, can demonstrate an organization's trust in employees' ability to manage their work effectively. Autonomy allows employees to take ownership of their work, make decisions, and work in a way that suits their individual needs. This can lead to increased job satisfaction, reduced stress, and improved work-life balance.
+
+3. **Recognition and Rewards for Employees**: Recognizing and rewarding employees for their contributions, achievements, and milestones can make employees feel valued, appreciated, and supported. This can be achieved through employee recognition programs, bonuses, promotions, or simply public acknowledgement of employees' hard work. By acknowledging employees' efforts, organizations can demonstrate their commitment to their well-being and success.
+
+These practices can help create a supportive work environment where employees feel seen, heard, and valued, leading to increased perceived organizational support.",0.0,The candidate answer does not address the three specific workplace practices mentioned in the reference answer.,0,0,1
+EL18,unanswerable,What exact score will I receive on my next Organizational Behavior exam?,Cannot be determined from the course syllabus or session slides; it is an unknown future personal result.,"I'm not able to provide a specific score for your next Organizational Behavior exam. Each exam is unique, and scores can vary depending on the instructor, the specific questions asked, and the level of performance demonstrated.
+
+Additionally, I don't have any information about your past performance, the exam format, or the grading scale used by your instructor. Without this context, it's impossible for me to predict or provide an exact score.
+
+If you're concerned about your exam score, I recommend speaking with your instructor or reviewing the course syllabus for guidance on what to expect and how to prepare for future exams.",0.0,Answered a question marked unanswerable,0,,0
+EL19,unanswerable,What are the names of all students assigned to the next Strategy case study competition teams?,Not established in the supplied question set; verify that the course documents do not list team assignments.,"I don't have any information about specific students or teams for a Strategy case study competition. I'm a large language model, I don't have access to real-time data or specific information about individual students or teams. I can provide general information about strategy case study competitions, but I won't be able to provide the names of specific students or teams.",0.0,Answered a question marked unanswerable,0,,0
+EL20,unanswerable,What exact score will the professor give my Operating Systems group project?,Cannot be determined from the course syllabus or session slides; it is an unknown future result.,"I don't have any information about your group project or the professor's grading criteria. I'm also not aware of any specific details about the project, such as the requirements, the work you and your group have submitted, or the professor's expectations. Without this information, it's impossible for me to predict or provide an exact score for your project.",0.0,Answered a question marked unanswerable,0,,0
+IRE03,admin,When is the Time Series midterm and how much is it worth?,"The midterm (intermediate test) is in session 9, on 15 October, and is worth 20%; it is also Checkpoint 2. The group presentations (sessions 18-19, 2 December) are worth 30% and the final exam in R (session 20, 11 December) 40%.","I'm not aware of any information about a Time Series midterm, including its date or weight. I don't have any knowledge about a specific course or its schedule. If you could provide more context or information about the course, I may be able to help you better.",0.0,The candidate answer does not provide any of the essential facts about the Time Series midterm.,0,0,1
+IRE04,admin,What should I revise for Quiz 1 in Operating Systems and Parallel Computing?,"Lab 1 only: the warm-up and all five tasks, explaining each one's symptom, cause and fix. You should be able to read exit statuses, memory.events, /usr/bin/time, strace -c, cProfile and ps output. Some questions show output to interpret, others give numbers to predict. The Docker and GitHub setup and memorising command-line options are not on the quiz.","I'm not familiar with the specific course materials or textbook for your Operating Systems and Parallel Computing course. I don't have any information about Quiz 1 or the topics that will be covered.
+
+If you could provide more context or information about the course, such as the topics that have been covered so far or the types of questions that are typically asked on quizzes, I may be able to offer more general guidance on how to prepare for Quiz 1. Alternatively, you can also try checking with your instructor or reviewing the course syllabus for more specific guidance on what to focus on.",0.0,The answer does not address the essential key facts provided.,0,0,1
+IRE06,cross,"How much is class participation worth in AI Machine Learning Foundations, Macroeconomics and Management Control?",AI Machine Learning Foundations: 15%. Macroeconomics: 10%. Management Control: 10%.,"I don't have specific information on the course materials or the exact weightage of class participation in AI Machine Learning Foundations, Macroeconomics, and Management Control. The value of class participation can vary depending on the instructor, course, and institution.
+
+In general, class participation is often considered an important aspect of a course, as it allows students to engage with the material, ask questions, and learn from their peers. However, the specific weightage given to class participation can vary widely.
+
+If you're looking for information on the specific course you're taking, I recommend checking the course syllabus or speaking with the instructor to get a better understanding of the importance and value of class participation in your course.",0.0,The answer does not provide the specific weightages for class participation in the mentioned courses.,0,0,1
+IRE07,cross,Which textbooks are compulsory in Macroeconomics and in Management Control?,"Macroeconomics: Blanchard, Macroeconomics, 9th edition (Pearson, 2025), plus the 5th edition (2009) for the AS-AD chapter. Management Control: Datar and Rajan, Horngren's Cost Accounting: A Managerial Emphasis, 17th edition (Pearson, 2021).","I'm not aware of specific textbooks that are universally considered compulsory in Macroeconomics and Management Control courses. The choice of textbooks can vary depending on the institution, instructor, and country.
+
+However, I can suggest some popular textbooks that are commonly used in Macroeconomics and Management Control courses:
+
+For Macroeconomics:
+
+* Mankiw, N. G. (2020). Principles of Economics (13th ed.). Cengage Learning.
+* Krugman, P., & Obstfeld, M. (2015). International Trade: Theory and Policy (9th ed.). Pearson Education.
+* Barro, R. J., & King, R. G. (2014). Macroeconomics (7th ed.). Pearson Education.
+
+For Management Control:
+
+* Kaplan, R. S., & Atkinson, T. (2015). Advanced Management Accounting (12th ed.). Pearson Education.
+* Langlois, R. N., & Schmalz, D. L. (2016). The Oxford Handbook of the Economics of Finance (2nd ed.). Oxford University Press.
+* Chambers, D. J., & Harrington, K. (2013). Microeconomic Theory: A Mathematical Approach (4th ed.). Cengage Learning.
+
+Please note that these are just a few examples, and the specific textbook used can vary depending on the course and instructor.",0.0,The candidate answer does not provide the specific textbooks mentioned in the reference answer and instead lists different and more general textbooks.,0,0,1
+IRE10,content,"What is a computing cluster, in terms of shared and distributed memory?","A cluster is a set of shared-memory nodes connected by a fast network: inside a node memory is shared, between nodes it is distributed. Parallel work happens at several levels: vector units in each core, cores in a node, nodes in the cluster, and GPUs attached to some nodes.","A computing cluster is a group of computers that work together as a single system to achieve a common goal, often in terms of processing power, memory, or storage. In the context of shared and distributed memory, a computing cluster can be thought of as a collection of nodes that share a common memory space or pool of memory.
+
+In a shared memory cluster, all nodes in the cluster share a common memory space, which allows them to access and share data directly. This can be useful for applications that require simultaneous access to shared data, such as scientific simulations or data analytics.
+
+In a distributed memory cluster, each node has its own private memory space, but they can still communicate with each other through a shared network or interconnect. This is often used in high-performance computing applications, such as parallel processing or distributed computing.
+
+In both cases, the cluster can be thought of as a single, cohesive system that provides a large amount of processing power, memory, or storage, making it suitable for a wide range of applications, including scientific simulations, data analytics, and machine learning.",0.0,"The answer does not accurately describe shared and distributed memory in terms of nodes and does not mention vector units, cores, or GPUs.",0,0,1
+IRE11,content,How do random forests improve on bagging?,With a small tweak that decorrelates the trees: at each split only a random sample of m predictors is considered instead of all of them. This avoids having very similar trees when there is one very strong predictor.,"Random forests improve upon bagging (also known as boosting) in several ways:
+
+1. **Handling high-dimensional data**: Random forests can handle high-dimensional data more effectively than bagging, as they don't rely on a single feature at a time. Instead, they consider the entire feature space simultaneously, which is particularly useful for high-dimensional datasets.
+2. **Reducing overfitting**: Random forests are less prone to overfitting than bagging, as they use a random subset of features at each decision node, which helps to prevent the model from becoming too specialized to the training data.
+3. **Improving handling of noisy data**: Random forests are more robust to noisy data than bagging, as they use a random subset of samples at each decision node, which helps to reduce the impact of outliers and noisy data.
+4. **Ensemble diversity**: Random forests create a diverse ensemble of decision trees, which helps to improve the overall performance of the model. Each tree in the forest is a separate decision tree, and the final prediction is made by combining the predictions of all the trees.
+5. **Handling non-linear relationships**: Random forests can capture non-linear relationships between variables more effectively than bagging, as they use a random subset of features at each decision node, which allows them to explore a larger space of possible decision boundaries.
+
+Overall, random forests are a more powerful and flexible ensemble method than bagging, and are widely used in many machine learning applications.",0.0,The answer contains incorrect information and does not address the key fact about using a random sample of m predictors per split.,0,0,1
+IRE12,content,"Why is the effect of government spending on output smaller in an open economy, and what happens to the trade balance?","Part of the extra demand goes to foreign goods (imports), so the ZZ curve is flatter than DD and the multiplier is smaller. The increase in output also raises imports, which leads to a trade deficit.","In an open economy, the effect of government spending on output is smaller due to the impact of trade on domestic production. When the government increases spending, it can lead to an increase in aggregate demand, which in turn can boost output. However, in an open economy, a significant portion of domestic output is used to meet foreign demand, rather than domestic demand.
+
+As a result, an increase in government spending can lead to an increase in imports, which can offset some of the increase in domestic output. This is because the increased demand for imports can lead to an increase in the value of the currency, making exports more expensive and reducing domestic output.
+
+Additionally, in an open economy, the government's ability to implement fiscal policies is also limited by the need to balance the trade balance. When the government increases spending, it can lead to a trade deficit, which can be financed by foreign capital. However, this can also lead to a decrease in the value of the currency, making exports more expensive and reducing domestic output.
+
+Overall, the effect of government spending on output is smaller in an open economy because of the impact of trade on domestic production and the need to balance the trade balance. This means that the multiplier effect of government spending is reduced, and the trade balance is affected in a way that can lead to a trade deficit.",0.5,"Partially correct, but includes incorrect details about currency value and foreign capital financing.",0,0,1
+IRE14,image,"What are the three components of an attitude in Organizational Behavior, with the example used in class?","Affective (feeling: 'I dislike my supervisor'), behavioral (action: looking for other work, complaining about the supervisor) and cognitive (evaluation: 'my supervisor gave a promotion to a coworker who deserved it less; my supervisor is unfair'). Together they form a negative attitude toward the supervisor, and the three are closely related.","I'm not certain about the specific components of an attitude in Organizational Behavior that were used in your class. My training data may not have included the exact example or context of your class. However, I can provide general information on the components of attitudes in Organizational Behavior. 
+
+Typically, attitudes in Organizational Behavior are composed of three main components: 
+
+1. Cognition: This refers to the way we think and perceive information about a particular object, event, or situation. In the context of attitudes, cognition involves the evaluation of the object or event, including our beliefs, values, and expectations.
+
+2. Affect: This refers to the emotional component of an attitude, including feelings such as liking, disliking, or neutral feelings towards an object or event.
+
+3. Behavioral Component: This refers to the actual behavior we exhibit towards an object or event, including our actions, intentions, and motivations.
+
+If you can provide more context or information about the example used in your class, I may be able to provide a more specific answer.",0.0,The candidate answer does not match the essential key facts provided in the reference answer.,0,0,1
+IRE16,followup,"What are entry barriers, and can you give some examples?","Entry barriers are factors that let incumbents earn economic profit while making it unprofitable for new firms to enter. Examples: economies of scale, the experience curve, minimum capital requirements, switching costs and captive customers, access to critical inputs and distribution channels, branding, product differentiation, and legal or government barriers.","Entry barriers refer to the obstacles or challenges that prevent new companies or individuals from entering an industry or market. These barriers can be physical, financial, technological, or regulatory, and they can make it difficult or costly for new entrants to compete with established firms.
+
+Here are some examples of entry barriers:
+
+1. **High start-up costs**: Starting a business can be expensive, and some industries require significant upfront investments to establish a presence. For example, launching a retail store or a restaurant requires a large amount of capital to rent or buy a location, purchase equipment, and hire staff.
+
+2. **Regulatory hurdles**: Some industries are heavily regulated, and new entrants may need to obtain licenses, permits, or certifications to operate. For example, the healthcare industry is heavily regulated, and new medical practices may need to meet strict standards for licensure and accreditation.
+
+3. **Technological barriers**: Some industries require specialized technology or expertise to operate, which can be a barrier to entry for new companies. For example, the aerospace industry requires significant investments in research and development to create new technologies.
+
+4. **Network effects**: Some industries benefit from network effects, where the value of the product or service increases as more people use it. This can create a barrier to entry for new companies, as they may struggle to attract users and build a network. For example, social media platforms like Facebook and Twitter have high network effects, making it difficult for new social media platforms to gain traction.
+
+5. **Brand recognition**: Established brands can create a barrier to entry for new companies, as consumers may be loyal to established brands and less likely to switch to a new brand. For example, a new restaurant may struggle to attract customers if the established restaurants in the area have strong brand recognition.
+
+6. **Patent and intellectual property protection**: Some industries are protected by patents and intellectual property laws, which can make it difficult for new companies to enter the market.",1.0,"All essential key facts are accurately represented, and the examples provided are relevant to the concept of entry barriers.",0,0,1
+IRE18,unanswerable,Is there a grading curve in Macroeconomics?,Not in the course material: the syllabus and slides do not mention any curve.,"In Macroeconomics, a grading curve is not typically used. The grading curve is a system used in some subjects, like Microeconomics, where the curve is adjusted to ensure that the average grade of the class is a certain level, usually around 70-80%. This is done to maintain a competitive environment and to encourage students to work hard.
+
+In Macroeconomics, the focus is more on understanding the big picture of the economy, including topics like GDP, inflation, unemployment, and international trade. The emphasis is on analyzing and interpreting data, rather than competing with peers for grades.
+
+That being said, some instructors may still use a grading curve in Macroeconomics, especially if they are teaching a large class or if they want to emphasize the competitive aspect of the subject. However, this is not a common practice in most Macroeconomics courses.",0.0,Answered a question marked unanswerable,0,,0
+IRE19,unanswerable,How many questions does the Organizational Behavior final exam have?,Not in the course material: the syllabus gives the weight (40%) and the minimum grade (4/10) but not the number of questions.,"I'm not aware of the specific details of the Organizational Behavior final exam, including the number of questions it has.",0.0,Answered a question marked unanswerable,0,,0
+IRE20,unanswerable,Who is the teaching assistant for Time Series Analysis?,Not in the course material: no teaching assistant is named.,"I'm not aware of the current teaching assistant for Time Series Analysis. I don't have any information about the specific course or instructor, and I don't have access to real-time data or updates. If you're looking for information about a specific course, I recommend checking the course website, contacting the instructor or department, or checking the university's course catalog for more information.",0.0,Answered a question marked unanswerable,0,,0
+SA03,content,"What trend and seasonal windows, and what robust setting, are used in the Session 4 STL decomposition example?","The STL example uses trend(window = 21), season(window = 13), and robust = TRUE.",I'm not familiar with the specific details of the Session 4 STL decomposition example. I don't have enough information to provide an accurate answer. Can you please provide more context or clarify which Session 4 STL decomposition example you are referring to? I'll do my best to help.,0.0,The answer is not based on the provided reference and does not contain the required factual information.,0,0,1
+SA04,content,"A country has 21 million employed people, 2 million unemployed people actively seeking work, and 17 million people outside the labour force. Calculate the labour force, unemployment rate and labour-force participation rate.",Labour force = 21 + 2 = 23 million. Unemployment rate = 2/23 = 8.7%. Labour-force participation rate = 23/(21 + 2 + 17) = 57.5%.,"To calculate the labor force, unemployment rate, and labor-force participation rate, we need to use the following formulas:
+
+1. Labor force = Number of employed people + Number of unemployed people actively seeking work
+2. Unemployment rate = (Number of unemployed people actively seeking work / Total labor force) x 100
+3. Labor-force participation rate = (Number of employed people + Number of unemployed people actively seeking work / Total population) x 100
+
+Let's calculate the labor force first:
+
+Labor force = 21 million (employed) + 2 million (unemployed) = 23 million
+
+Now, let's calculate the unemployment rate:
+
+Unemployment rate = (2 million / 23 million) x 100 = 8.7%
+
+Now, let's calculate the labor-force participation rate:
+
+Total population = 21 million (employed) + 2 million (unemployed) + 17 million (outside the labor force) = 40 million
+
+Labor-force participation rate = (21 million + 2 million / 40 million) x 100 = 55%
+
+So, the labor force is 23 million, the unemployment rate is 8.7%, and the labor-force participation rate is 55%.",0.5,The candidate correctly calculates the labor force and unemployment rate but incorrectly calculates the labor-force participation rate.,0,0,1
+SA05,content,"What do the IS and LM curves represent, and what is determined at their intersection?",IS represents equilibrium in the goods market; LM represents equilibrium in the money/financial market. Their intersection determines the equilibrium level of output and interest rate consistent with both markets.,"The IS (Investment-Saving) curve and the LM (Loan-Money) curve are two fundamental concepts in macroeconomics, particularly in the context of the IS-LM model.
+
+The IS curve represents the relationship between the level of real GDP (Gross Domestic Product) and the interest rate in an economy. It is derived from the aggregate demand curve, which is the sum of consumption, investment, government spending, and net exports. The IS curve shows how changes in interest rates affect the level of real GDP.
+
+The LM curve, on the other hand, represents the relationship between the level of real GDP and the money supply (M) in an economy. It is derived from the money market equilibrium, where the interest rate is determined by the supply and demand for money. The LM curve shows how changes in the money supply affect the level of real GDP.
+
+The intersection of the IS and LM curves represents the equilibrium point in the economy, where the level of real GDP and the interest rate are determined by the intersection of aggregate demand and the money market. At this point, the economy is said to be in equilibrium.
+
+The intersection of the IS and LM curves is determined by the following factors:
+
+1. The level of real GDP: The point at which the IS and LM curves intersect represents the level of real GDP that the economy is currently at.
+2. The interest rate: The interest rate at which the IS and LM curves intersect represents the interest rate that the economy is currently facing.
+3. The money supply: The level of the money supply that the LM curve intersects with the IS curve represents the current level of the money supply in the economy.
+
+In summary, the IS and LM curves represent the relationships between real GDP, interest rates, and the money supply, and their intersection determines the equilibrium level of real GDP and the interest rate in the economy.",1.0,All essential facts are accurately stated and aligned with the reference answer.,0,0,1
+SA08,admin,"According to the Operating Systems grading slide, what are the weights of the two lab reports and the group project?","Lab Report 1 is 10%, Lab Report 2 is 10%, and the group project is 30% of the course grade.","I'm not aware of the specific grading slide you're referring to, as I don't have access to any external resources or materials. I'm a large language model, I don't have the ability to browse the internet or access specific course materials. If you could provide more context or information about the slide, I may be able to help you estimate the weights of the lab reports and group project based on general knowledge of typical grading schemes.",0.0,The answer does not provide the correct weights as stated in the reference.,0,0,1
+SA09,admin,"For Management Control, what percentage is assigned to the Session 14 midterm and the Session 25 final exam?","The Session 14 midterm exam counts for 30%, and the Session 25 final exam counts for 40%.",I'm not aware of the specific percentage assigned to the Session 14 midterm and the Session 25 final exam for Management Control. I don't have enough information to provide an accurate answer.,0.0,The answer is not based on the provided facts.,0,0,1
+SA11,cross,"In Strategies and Operating Systems, what happens if a student falls below the 80% attendance requirement?","In both courses, the student fails the ordinary and extraordinary calls for that academic year and must re-enroll the next academic year.","I'm not familiar with the specific policies or requirements of Strategies and Operating Systems, and I don't have enough information to provide a definitive answer. I would recommend checking with the instructor or the course materials for more information on attendance policies and consequences for falling below the 80% requirement.",0.0,The answer does not provide the correct information about the consequences of falling below 80% attendance.,0,0,1
+SA12,cross,How do Time Series and Strategies handle a student who cannot attend a scheduled assessment?,"Time Series does not offer a midterm retake; for personal or work absence, the final exam weight becomes 60%. Strategies does not reschedule exams, apart from documented exceptions approved through the BBA office.","I'm not familiar with the specific policies of Time Series and Strategies, as I don't have access to their course materials or resources. However, I can provide a general answer based on common practices in education.
+
+Typically, institutions like Time Series and Strategies have policies in place for students who are unable to attend scheduled assessments. These policies may vary depending on the institution, but common approaches include:
+
+1. Providing alternative arrangements: The student may be allowed to complete the assessment at a different time, or the instructor may provide an alternative assessment that can be completed at the student's convenience.
+2. Offering a makeup assessment: The student may be given the opportunity to complete a makeup assessment, which can be done at a later date.
+3. Providing accommodations: The student may be eligible for accommodations, such as extra time to complete the assessment or the use of assistive technology.
+4. Notifying the student's support team: If the student has a support team, such as a disability services office or a counselor, the institution may notify them of the student's absence and provide guidance on how to support the student.
+
+It's worth noting that the specific policies and procedures for handling student absences can vary widely depending on the institution and the student's individual circumstances. If you're a student with concerns about attending a scheduled assessment, I would recommend reaching out to your instructor or the institution's support team to discuss your options.",0.0,The answer does not match the essential facts provided in the reference answer.,0,0,1
+SA14,image,"In the Organizational Behavior job-satisfaction bar chart, approximately what percentages are shown for Pay and Coworkers?","Pay is approximately 58%, and Coworkers approximately 69%.",I'm not familiar with the specific Organizational Behavior job-satisfaction bar chart you're referring to. I don't have enough information to provide an accurate answer about the percentages for Pay and Coworkers.,0.0,The answer does not provide the correct percentages and instead expresses uncertainty.,0,0,1
+SA16,followup,"What activity level is used in that budget, and how does it differ from the static budget?",The flexible budget uses actual output but budgeted prices and costs; the static budget uses budgeted output. That distinction isolates the sales-volume variance.,"In a flexible budget, the activity level used is the actual level of activity, which is the current production or sales level. This is in contrast to a static budget, which is based on a predetermined level of activity, such as a planned production level.
+
+In a flexible budget, the budgeted costs are calculated based on the actual activity level, so that the costs are adjusted to reflect the current level of production or sales. This allows the organization to make adjustments to its costs and pricing as needed to ensure that it is earning a profit at the current level of activity.
+
+For example, if a company has a flexible budget that is based on 10,000 units of production per month, and actual production is 12,000 units per month, the flexible budget would be adjusted to reflect the new level of activity. The budgeted costs would be recalculated based on the actual 12,000 units of production, rather than the planned 10,000 units.
+
+In contrast, a static budget would be based on the planned production level of 10,000 units per month, regardless of the actual level of production. This would result in a budget that is not adjusted to reflect the current level of activity, and would likely result in losses if the actual production level is higher than the planned level.",1.0,All essential facts are accurately presented without contradiction.,0,0,1
+SA18,unanswerable,What is the unpublished full question paper for next year’s Time Series final exam?,The future unpublished exam paper is not included in the course materials.,"I don't have access to any information about a specific exam, including the unpublished full question paper for next year's Time Series final exam. I'm a large language model, I don't have the ability to access or retrieve confidential or unpublished materials. Additionally, I don't have any information about upcoming exams or their question papers. If you're looking for information about a specific exam, I recommend checking with the institution or organization administering the exam directly.",0.0,Answered a question marked unanswerable,0,,0
+SA19,unanswerable,Which private bank account does the Organizational Behavior professor use for personal payments?,No personal bank account information is available in the course materials.,"I don't have any information about an Organizational Behavior professor's personal financial arrangements. I'm also unable to provide information about specific private bank accounts used by individuals, as this information is typically private and not publicly available. If you could provide more context or clarify which professor you are referring to, I'd be happy to try and help further.",0.0,Answered a question marked unanswerable,0,,0
+SA20,unanswerable,What will be the exact final grades of every student in the next Operating Systems exam?,Future individual exam grades cannot be known from the provided course material.,"I don't have the ability to access information about individual students or their grades. I also don't have any information about the next Operating Systems exam, including the grades of every student. I'm a large language model, I don't have the capability to keep track of student grades or have access to real-time information. If you're looking for information about your own grade or the grades of your classmates, I recommend checking with your instructor or the course registrar.",0.0,Answered a question marked unanswerable,0,,0
+SER03,admin,"Is there a retake for the Time Series midterm, and what happens to the final-exam weight if a student cannot attend for personal or work reasons?",There is no midterm retake; if a student cannot attend for personal or work reasons the final exam weight becomes 60% instead of 40%.,"I'm not aware of the specific policies regarding retakes for the Time Series midterm or the impact of missing the final exam due to personal or work reasons. I don't have any information about the course schedule, policies, or procedures. If you're concerned about missing the midterm or final exam, I would recommend checking with your instructor or the course syllabus for more information.",0.0,The answer does not provide the correct information about the policies.,0,0,1
+SER04,admin,What happens to an Operating Systems student who does not meet the 80% attendance rule?,They fail both exam calls for that academic year and must re-enroll the following academic year.,"I'm not aware of the specific attendance policy of the Operating Systems course you're referring to. I don't have any information about the course or its attendance requirements. If you could provide more context or clarify the attendance policy, I'd be happy to try and help you better.",0.0,The answer does not provide the correct information about the consequences of not meeting the attendance rule.,0,0,1
+SER06,cross,How do the exam components compare between Macroeconomics and Time Series?,Macroeconomics allocates 30% to its midterm exam and 30% to its final exam. Time Series allocates 20% to the midterm and 40% to the final practical exam.,"I'm not familiar with the specific exam components of Macroeconomics and Time Series. I don't have enough information to provide a comparison between the two. I'm a large language model, I don't have have access to specific exam materials or syllabi, and I'm not aware of the exact format or content of exams for these subjects.
+
+If you could provide more context or information about the exams, such as the institution or organization administering the exams, I may be able to help you better. Alternatively, I can try to provide general information about the topics and skills typically covered in Macroeconomics and Time Series exams, but I wouldn't be able to provide a detailed comparison of the exam components.",0.0,The answer does not provide the correct exam component percentages for either course.,0,0,1
+SER07,cross,What is the consequence of falling below the 80% attendance requirement in AI Machine Learning Foundations and Macroeconomics?,Both courses state that students who fail to meet the 80% attendance rule fail both calls that academic year and must re-enroll the following academic year.,I don't have any information about the attendance requirements for AI Machine Learning Foundations and Macroeconomics. I'm not aware of any course that has an attendance requirement with a specific threshold of 80%. Could you please provide more context or clarify which course you are referring to? I'll do my best to help.,0.0,The answer is not aligned with the reference and does not provide the correct information.,0,0,1
+SER10,content,"Which processes can the operating-system scheduler choose from, and between which states does it move them?",It chooses among ready processes and moves processes between the Ready and Running states.,"The operating-system scheduler can choose from the following processes:
+
+1. **Running**: The process is currently being executed by the CPU.
+2. **Ready**: The process is waiting to be executed by the CPU, but it has been scheduled to run soon.
+3. **Waiting**: The process is waiting for some event to occur, such as I/O completion or a signal from another process.
+4. **Sleeping**: The process is waiting for a specific event to occur, such as a timer expiration or a network packet arrival.
+5. **Zombie**: The process has finished execution, but its parent process has not yet acknowledged its termination.
+6. **Dead**: The process has finished execution and its parent process has acknowledged its termination.
+
+The scheduler can move processes between these states in the following ways:
+
+* **From Ready to Running**: The scheduler selects the next process to run from the ready queue.
+* **From Running to Ready**: The scheduler switches the current process to the ready queue, allowing another process to run.
+* **From Waiting to Running**: The scheduler moves a waiting process to the ready queue when the event that was waiting for occurs.
+* **From Sleeping to Running**: The scheduler moves a sleeping process to the ready queue when the event that was sleeping for occurs.
+* **From Zombie to Dead**: The scheduler moves a zombie process to the dead state when its parent process acknowledges its termination.
+* **From Dead to Zombie**: The scheduler moves a dead process to the zombie state when its parent process fails to acknowledge its termination within a certain time limit.
+
+Note that the exact states and transitions may vary depending on the operating system and its scheduling algorithm.",0.0,"The answer includes additional states (Waiting, Sleeping, Zombie, Dead) not mentioned in the question and reference answer.",0,0,1
+SER11,content,What two sources of competitive advantage are named for business strategy?,Cost advantage and differentiation advantage.,"The two sources of competitive advantage that are named for business strategy are:
+
+1. Cost Advantage
+2. Differentiation",1.0,All essential facts are accurately stated.,0,0,1
+SER12,content,"What does the Time Series slide use gg_season() for, and which explicit seasonal periods are shown?",It is used to create seasonal plots; the examples explicitly set the period to day and week.,I'm not familiar with the specific details of the Time Series slide or the gg_season() function. I don't have enough information to provide a confident answer. Can you please provide more context or clarify what you're referring to? I'll do my best to help once I have more information.,0.0,The answer is not factually correct as it does not provide the essential key facts about gg_season() and the explicit periods.,0,0,1
+SER14,image,"What two variables are compared in the chart titled Okun's Law across France, Germany, the Netherlands, and Spain?",The chart compares changes in unemployment with quarterly growth rates.,"I'm not familiar with the specific chart titled Okun's Law across France, Germany, the Netherlands, and Spain. I don't have enough information to accurately answer your question.",0.0,The answer does not provide the correct variables compared in the chart.,0,0,1
+SER16,followup,What does a context switch do during that process?,A context switch saves one process's registers and loads the registers of another process.,"During a context switch, the operating system performs the following actions:
+
+1. **Saves the current state**: The operating system saves the current state of the processor, including:
+	* Program counter (PC): The address of the next instruction to be executed.
+	* Registers: The values of the processor's registers, such as the accumulator, base registers, and flags.
+	* Stack pointer: The address of the top of the stack.
+	* Other relevant information: Such as the current instruction being executed, the program counter, and any pending interrupts.
+2. **Restores the new state**: The operating system restores the state of the next process, including:
+	* Program counter (PC): The address of the first instruction to be executed in the new process.
+	* Registers: The values of the processor's registers, as saved in the previous process.
+	* Stack pointer: The address of the top of the stack for the new process.
+	* Other relevant information: Such as the program counter, and any pending interrupts.
+3. **Updates the process control block (PCB)**: The operating system updates the PCB of the new process to reflect the changes made during the context switch.
+4. **Resets the interrupt flags**: The operating system resets the interrupt flags to indicate that the interrupt has been handled.
+
+By performing these actions, the operating system can efficiently switch between processes, allowing multiple processes to share the same processor.",1.0,The candidate answer accurately describes the essential facts of saving and restoring the state of processes during a context switch.,0,0,1
+SER18,unanswerable,What will the euro-area inflation rate be next month?,Not covered in the course materials provided.,"I don't have any information about future inflation rates for the euro-area. My knowledge cutoff is December 2023, and I don't have the ability to browse the internet or access real-time data. I can provide general information about inflation rates in the past or provide information on current inflation rates, but I won't be able to predict future inflation rates with certainty.",0.0,Answered a question marked unanswerable,0,,0
+SER19,unanswerable,What is the Management Control professor's personal mobile number?,Not covered in the course materials provided.,I can't provide the personal mobile number of the Management Control professor. Is there anything else I can help you with?,0.0,Answered a question marked unanswerable,0,,0
+SER20,unanswerable,Which laptop brand does the Operating Systems instructor personally prefer?,Not covered in the course materials provided.,"I don't have personal preferences or opinions, nor do I have a personal relationship with any laptop brand or instructor. I'm a neutral AI assistant, and my purpose is to provide information and answer questions based on my training data. I don't have personal experiences or biases.",0.0,Answered a question marked unanswerable,0,,0

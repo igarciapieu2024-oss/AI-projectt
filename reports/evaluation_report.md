@@ -16,7 +16,13 @@ The questions were divided into:
 All 100 questions passed validation with zero errors
 and zero warnings.
 
-The experiments reported here use only the development set.
+Development experiments were used to compare configurations,
+identify errors, and guide system improvements.
+
+After freezing the system at v1.2-eval, B0, B1, and Final
+were each evaluated once on the 60 held-out test questions.
+
+Development and test results are reported separately.
 
 Three configurations were compared:
 
@@ -181,16 +187,126 @@ Final v1.1 on development data only. These comparisons do
 not constitute a complete ablation study. The held-out
 test set remains untouched pending the frozen v1.2 configuration.
 
-## 7. Conclusion
+## 7. Final Held-Out Test Evaluation
 
-The final RAG configuration shows substantial improvements
-over the B1 baseline in retrieval performance, citation
-presence, refusal behavior, and answer correctness.
+### 7.1 Evaluation Protocol
 
-Nevertheless, qualitative analysis identifies remaining
-limitations in evidence selection, answer completeness,
-cross-course questions, and conversational context handling.
+After development evaluation and configuration tuning, the
+team froze the system at v1.2-eval.
 
-The evaluation also demonstrates the importance of manually
-auditing automated metrics, especially refusal detection
-and LLM-judge decisions.
+The three configurations (B0, B1, and Final v1.2) were each
+executed once on the same 60 held-out test questions.
+
+Each execution completed all 60 questions without technical
+failures.
+
+Factual correctness was evaluated using the qwen2.5:7b judge
+with scores of 0, 0.5, or 1.
+
+The results below are automatic evaluation results without
+manual corrections to the test set.
+
+### 7.2 Test Results
+
+| Metric | B0 (No RAG) | B1 (Basic RAG) | Final v1.2 |
+|---|---:|---:|---:|
+| Questions evaluated | 60 | 60 | 60 |
+| Exact correctness | 11.67% | 26.67% | 55.00% |
+| Mean correctness score | 15.83% | 26.67% | 58.33% |
+| Recall@K | N/A | 28.89% | 88.89% |
+| MRR@K | N/A | 0.2000 | 0.7444 |
+| Refusal accuracy | 75.00% | 38.33% | 80.00% |
+| False refusal rate | 0.00% | 80.00% | 6.67% |
+| Correct unanswerable refusal rate | 0.00% | 93.33% | 40.00% |
+| Citation presence | 0.00% | 16.67% | 85.00% |
+| Citation validity | N/A | 100.00% | 100.00% |
+| Mean latency | 3.04 s | 1.56 s | 2.16 s |
+
+Recall@K and MRR@K are not applicable to B0 because it
+does not retrieve documents. Citation validity is also
+not applicable because B0 generates no citations.
+
+B0 never refused a question. Its 75% refusal accuracy
+reflects 45 correct non-refusal decisions on answerable
+questions, while all 15 unanswerable questions were answered.
+
+### 7.3 Correctness Comparison
+
+The exact numbers of fully correct answers were:
+
+- B0: 7/60 (11.67%).
+- B1: 16/60 (26.67%).
+- Final v1.2: 33/60 (55.00%).
+
+Final v1.2 improved exact correctness by 43.33 percentage
+points compared with B0 and 28.33 percentage points
+compared with B1.
+
+Its Recall@K also increased from 28.89% in B1 to 88.89%,
+indicating substantially better retrieval performance.
+
+However, retrieval success did not always translate into
+factually correct answers.
+
+### 7.4 Development vs. Test Performance
+
+| Metric | Final v1.2 Dev (40) | Final v1.2 Test (60) |
+|---|---:|---:|
+| Exact correctness | 67.50% | 55.00% |
+| Mean correctness | 68.75% | 58.33% |
+| Recall@K | 97.14% | 88.89% |
+| MRR@K | 0.7452 | 0.7444 |
+| Refusal accuracy | 95.00% | 80.00% |
+| Citation presence | 92.50% | 85.00% |
+| Mean latency | 1.94 s | 2.16 s |
+
+Final v1.2 performed less accurately on the held-out test
+set than on development questions.
+
+This difference highlights the importance of evaluating
+the frozen system on previously unseen questions.
+
+### 7.5 Remaining Limitations
+
+The final system still has limitations.
+
+First, its 88.89% test Recall@K is higher than its 55%
+exact correctness, showing that retrieving relevant
+evidence does not guarantee a correct generated answer.
+
+Second, the automatic correct unanswerable refusal rate
+is 40%. Handling questions without available evidence
+remains an important area for improvement.
+
+Third, citation validity measures whether citations point
+to valid retrieved sources. It does not establish whether
+each cited source supports the associated factual claim.
+
+Finally, response latency depends on the hardware and
+execution environment. The measurements reported here
+were obtained from the local evaluation runs.
+
+## 8. Conclusion
+
+The evaluation demonstrates that the final RAG system
+substantially outperforms both baselines on held-out questions.
+
+Final v1.2 achieved 55.00% exact correctness on test,
+compared with 26.67% for B1 and 11.67% for B0.
+
+Retrieval performance also improved substantially:
+Recall@K increased from 28.89% in B1 to 88.89% in Final.
+
+These improvements demonstrate the value of the enhanced
+retrieval and generation pipeline.
+
+Nevertheless, the system still exhibits limitations in
+factual answer generation and refusal decisions.
+
+In particular, high retrieval recall does not guarantee
+correct answers, and the automatic correct unanswerable
+refusal rate remains at 40%.
+
+The evaluation therefore supports the effectiveness of
+the final system while identifying clear opportunities
+for future improvement.
