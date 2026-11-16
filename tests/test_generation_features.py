@@ -264,3 +264,19 @@ def test_answer_rewrites_before_retrieval_and_refuses_weak_evidence(monkeypatch)
     assert len(result.context_hits) == 1
     assert result.context_hits[0].chunk.chunk_id == hit.chunk.chunk_id
     assert result.context_hits[0].label == "S1"
+
+
+def test_rewrite_keeps_a_standalone_question_even_with_history(monkeypatch):
+    from src.generation import rewrite as rewrite_module
+
+    # 1. a question that stands on its own is not rewritten, so the previous course is not added to it
+    monkeypatch.setattr(rewrite_module, "chat", lambda *args, **kwargs: pytest.fail("the model should not be called"))
+    history = [
+        {"role": "user", "content": "What is the final exam worth in Management Control?"},
+        {"role": "assistant", "content": "40% [S1]"},
+    ]
+    question = "Which courses have the highest final exam weight?"
+    assert rewrite_module.rewrite(question, history, SimpleNamespace(generation={})) == question
+    # 2. a question that points back to the conversation is still rewritten
+    assert rewrite_module.looks_like_follow_up("And who teaches it?")
+    assert rewrite_module.looks_like_follow_up("¿Y la asistencia mínima?")

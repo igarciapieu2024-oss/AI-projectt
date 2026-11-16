@@ -4,6 +4,7 @@ Owner: Sergio.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from src.generation.llm import chat
@@ -48,6 +49,22 @@ def translate_to_english(question: str, cfg) -> str:
     return translated
 
 
+# 1. Words that point back to the conversation. A question without any of them is read on its own:
+#    rewriting it with the history added the previous course to new questions
+#    ("Which courses have the highest final exam weight?" became a Management Control question).
+_FOLLOW_UP = re.compile(
+    r"\b(it|its|that|this|these|those|they|them|their|he|she|him|her|his|there|same|previous|above|"
+    r"former|latter|eso|esa|ese|esto|ello|ella|ellos|ellas|anterior|mismo|misma)\b"
+    r"|^\s*[¿¡]?\s*(and|what about|how about|y|también)\b",
+    re.IGNORECASE,
+)
+
+
+def looks_like_follow_up(question: str) -> bool:
+    """True when the question refers to the conversation or is too short to stand alone."""
+    return bool(_FOLLOW_UP.search(question)) or len(question.split()) <= 3
+
+
 def rewrite(
     question: str,
     history: list[dict[str, Any]],
@@ -59,7 +76,7 @@ def rewrite(
     question = question.strip()
     if not question:
         raise ValueError("question must not be empty")
-    if not history:
+    if not history or not looks_like_follow_up(question):
         return translate_to_english_query(question, cfg) if translate_to_english else question
 
     instruction = (

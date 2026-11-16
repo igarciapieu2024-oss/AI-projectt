@@ -10,10 +10,16 @@ import unicodedata
 from src.schemas import Filters
 
 
+_SPELLING = {"behaviour": "behavior", "organisational": "organizational"}
+
+
 def _normalized(value: str) -> str:
     decomposed = unicodedata.normalize("NFKD", value.casefold())
     ascii_text = "".join(char for char in decomposed if not unicodedata.combining(char))
-    return " ".join(re.findall(r"[a-z0-9]+", ascii_text))
+    words = re.findall(r"[a-z0-9]+", ascii_text)
+    # 1. British and American spellings of the course names count as the same word, so
+    #    "Organizational Behavior" finds the course stored as "Organizational Behaviour"
+    return " ".join(_SPELLING.get(word, word) for word in words)
 
 
 def extract_filters(question: str, courses: list[dict]) -> Filters:
