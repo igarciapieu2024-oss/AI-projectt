@@ -3,8 +3,7 @@ Evaluate RAG answer correctness against reference facts.
 
 The production CLI uses deterministic refusal checks and an Ollama judge
 with scores 0 / 0.5 / 1. A separate 1-5 claim-level helper interface is
-retained for compatibility with unit tests; its scale must not be mixed
-with the scores reported by ``python -m eval.judge``.
+retained for compatibility with unit tests.
 
 Owner: Elena.
 """

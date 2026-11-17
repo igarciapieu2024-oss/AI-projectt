@@ -32,7 +32,7 @@ def classify_error(judge: dict, metrics: dict) -> tuple[str, str]:
     """Assign one primary error category using available automatic signals.
 
     The ordering matters: refusal mistakes take precedence over retrieval,
-    missing citations, and generation errors. A generation-error label only
+    missing citations, and generation errors. A generation error label only
     means gold evidence was available; it is not proof of a model mistake.
     All such cases should be checked against the original answer manually.
     """

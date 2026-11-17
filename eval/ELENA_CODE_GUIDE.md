@@ -1,6 +1,6 @@
 # Elena — Evaluation code walkthrough
 
-These Python files contain **documentation-only edits**. Function logic, parameters,
+These Python files contain documentation-only edits. Function logic, parameters,
 imports, and evaluation outputs are unchanged.
 
 ## What to be able to explain

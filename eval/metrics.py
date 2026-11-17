@@ -63,7 +63,7 @@ def score_question(row: dict, k: int) -> dict:
     """Compute retrieval, refusal, citation, and latency metrics for a question.
 
     Gold source IDs are semicolon-separated. A retrieval counts as a hit if
-    any top-k chunk covers at least one gold ID. This does *not* assess
+    any top-k chunk covers at least one gold ID. This does not assess
     whether the generated answer used that evidence correctly.
     """
 
@@ -86,7 +86,7 @@ def score_question(row: dict, k: int) -> dict:
     )
 
     # This is the engine's explicit refusal flag, not a semantic reading of
-    # the answer text. Alternate refusal wording may require manual review.
+    # the answer text.
     refused = bool(
         result.get("refused")
     )
@@ -111,7 +111,7 @@ def score_question(row: dict, k: int) -> dict:
                 break
 
     # A citation is structurally valid when its label resolves to the same
-    # retrieved chunk ID. This does not establish claim-level support.
+    #retrieved chunk ID.
 
     labels = {
         hit.get("label"): (
@@ -199,7 +199,7 @@ def _source_sets(retrieved):
 def recall_at_k(retrieved, gold, k=5):
     """Fraction of gold IDs retrieved within k, for the helper interface.
 
-    Unlike ``score_question`` (binary hit/miss per answerable question),
+    Unlike score_question (binary hit/miss per answerable question),
     this helper can return partial credit for recovering some gold IDs.
     """
     if k < 1:

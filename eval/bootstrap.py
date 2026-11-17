@@ -2,7 +2,7 @@
 """Bootstrap confidence intervals for evaluation metrics.
 
 Resampling estimates uncertainty without assuming a particular score
-distribution. Paired comparisons resample question-level *differences* so
+distribution. Paired comparisons resample question-level differences so
 the same questions remain aligned across the two systems.
 
 Owner: Elena.
