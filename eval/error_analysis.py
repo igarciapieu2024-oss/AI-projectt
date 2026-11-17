@@ -29,7 +29,13 @@ def to_bool(value) -> bool:
 
 
 def classify_error(judge: dict, metrics: dict) -> tuple[str, str]:
-    """Classify an incorrect answer using available evaluation evidence."""
+    """Assign one primary error category using available automatic signals.
+
+    The ordering matters: refusal mistakes take precedence over retrieval,
+    missing citations, and generation errors. A generation-error label only
+    means gold evidence was available; it is not proof of a model mistake.
+    All such cases should be checked against the original answer manually.
+    """
 
     answerable = to_bool(metrics.get("answerable"))
     refused = to_bool(metrics.get("refused"))
@@ -73,6 +79,7 @@ def classify_error(judge: dict, metrics: dict) -> tuple[str, str]:
 
 
 def main() -> None:
+    """Join per-question judge and metric files into a reviewable error CSV."""
 
     parser = argparse.ArgumentParser(
         description="Analyze RAG evaluation errors."

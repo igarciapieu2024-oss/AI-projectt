@@ -1,4 +1,8 @@
-"""Generate evaluation figures comparing B1 and Final.
+"""Generate held-out test figures for B0, B1, and Final v1.2.
+
+All values come from saved summary files; this module never reruns the
+generator or judge. B0 is omitted from the retrieval chart because a
+no-RAG model has no retrieval step (N/A, rather than zero recall).
 
 Usage:
     python -m eval.figures
@@ -23,6 +27,7 @@ OUTPUT = Path("reports/figures/test")
 
 
 def load_json(path: Path) -> dict:
+    """Load the stored metric or judge summary for a fixed evaluation run."""
     with path.open(encoding="utf-8") as f:
         return json.load(f)
 
@@ -38,11 +43,17 @@ def grouped_chart(
     percentage: bool = True,
     higher_is_better: bool = True,
 ) -> None:
+    """Draw comparable bars for two or three systems and label their values.
+
+    B0 is optional so retrieval metrics can compare only RAG systems.
+    Fractions are formatted as percentages; latency uses seconds instead.
+    """
 
     x = np.arange(len(labels))
     fig, ax = plt.subplots(figsize=(9, 5))
 
     if b0_values is None:
+        # No-RAG has no meaningful Recall@K or MRR, so do not plot a zero.
         width = 0.33
         positions = [
             (x - width / 2, b1_values, "B1 Baseline", "#A9B8CC"),
@@ -123,6 +134,7 @@ def grouped_chart(
 
 
 def main() -> None:
+    """Build retrieval, correctness, refusal, and latency figures from test."""
     b0_metrics = load_json(B0_RUN / "metrics_summary.json")
     b0_judge = load_json(B0_RUN / "judge_summary.json")
     b1_metrics = load_json(B1_RUN / "metrics_summary.json")

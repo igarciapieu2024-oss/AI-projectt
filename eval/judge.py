@@ -1,5 +1,10 @@
 """
-Evaluate RAG answer correctness using an LLM judge.
+Evaluate RAG answer correctness against reference facts.
+
+The production CLI uses deterministic refusal checks and an Ollama judge
+with scores 0 / 0.5 / 1. A separate 1-5 claim-level helper interface is
+retained for compatibility with unit tests; its scale must not be mixed
+with the scores reported by ``python -m eval.judge``.
 
 Owner: Elena.
 """
@@ -27,12 +32,17 @@ SYSTEM = (
     "0.5 if partly correct without a major contradiction; "
     "0 if wrong, misleading, or unsupported."
 )
+
+
 def build_judge_messages(
     answer_text: str,
     reference_answer: str,
     sources: list[dict],
 ) -> list[dict[str, str]]:
-    """Build messages for claim-level factual correctness evaluation."""
+    """Build the auxiliary 1-5 claim-level evaluation prompt.
+
+    This is not the 0 / 0.5 / 1 prompt used by the production run judge.
+    """
 
     system = (
         "You are an impartial evaluator of a university course Q&A system. "
@@ -72,7 +82,7 @@ def check_citations(
     answer_text: str,
     sources: list[dict],
 ) -> dict:
-    """Check whether citation labels refer to retrieved sources."""
+    """Check citation label existence, not evidential support of claims."""
 
     valid_labels = {
         str(source.get("label", "")).upper()
@@ -108,7 +118,11 @@ def judge_answer(
     cfg,
     chat_fn=None,
 ) -> dict:
-    """Evaluate factual claims using the 1-5 judge interface."""
+    """Evaluate factual claims using the auxiliary 1-5 judge interface.
+
+    The source-level unsupported-claim rate is distinct from the main
+    per-question correctness scores written by the CLI.
+    """
 
     from dataclasses import replace
 
@@ -199,6 +213,7 @@ def judge_answer(
     }
 
 def parse_json_response(raw: str) -> dict:
+    """Extract and validate the production judge's 0 / 0.5 / 1 JSON."""
 
     text = raw.strip()
 
@@ -265,6 +280,12 @@ def parse_json_response(raw: str) -> dict:
 
 
 def judge_one(row: dict, model: str) -> dict:
+    """Score one production answer via deterministic checks or Ollama.
+
+    Refusals and empty answers use explicit answerability labels, while
+    substantive answers are compared with reference facts by the LLM.
+    The production correctness scale is 0, 0.5, or 1.
+    """
 
     result = row.get("result") or {}
 
@@ -280,7 +301,9 @@ def judge_one(row: dict, model: str) -> dict:
         result.get("answer_text") or ""
     ).strip()
 
-    # Evaluate refusals automatically
+    # Refusal correctness follows the gold answerability label. Using a
+    # deterministic rule here avoids spending judge-model calls on a case
+    # with an unambiguous expected decision.
 
     if refused:
 
@@ -297,7 +320,9 @@ def judge_one(row: dict, model: str) -> dict:
             "judge_method": "deterministic"
         }
 
-    # Incorrect acceptance of unanswerable questions
+    # A non-refusal to an unanswerable question is penalized even if the
+    # response text actually says the information is missing. This known
+    # limitation of the engine's boolean flag motivated manual review.
 
     if not answerable:
 
@@ -319,7 +344,9 @@ def judge_one(row: dict, model: str) -> dict:
             "judge_method": "deterministic"
         }
 
-    # Evaluate substantive answers using Ollama
+    # Fix temperature to zero to reduce variation across judge runs. The
+    # reference answer and key facts define the required factual content;
+    # the judge intentionally does not evaluate retrieval or citation syntax.
 
     import ollama
 
@@ -366,6 +393,7 @@ def judge_one(row: dict, model: str) -> dict:
 
 
 def main():
+    """Judge a saved run and write individual scores plus aggregate metrics."""
 
     parser = argparse.ArgumentParser()
 

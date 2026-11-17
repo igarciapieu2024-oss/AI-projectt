@@ -24,6 +24,7 @@ from statistics import mean
 
 
 def load_run(path: Path) -> list[dict]:
+    """Load one JSON object per evaluated question; fail clearly if absent."""
 
     if not path.is_file():
         raise FileNotFoundError(
@@ -59,6 +60,12 @@ def source_ids(hit: dict) -> set[str]:
 
 
 def score_question(row: dict, k: int) -> dict:
+    """Compute retrieval, refusal, citation, and latency metrics for a question.
+
+    Gold source IDs are semicolon-separated. A retrieval counts as a hit if
+    any top-k chunk covers at least one gold ID. This does *not* assess
+    whether the generated answer used that evidence correctly.
+    """
 
     result = row["result"]
 
@@ -78,6 +85,8 @@ def score_question(row: dict, k: int) -> dict:
         str(row.get("answerable", "")).strip() == "1"
     )
 
+    # This is the engine's explicit refusal flag, not a semantic reading of
+    # the answer text. Alternate refusal wording may require manual review.
     refused = bool(
         result.get("refused")
     )
@@ -101,7 +110,8 @@ def score_question(row: dict, k: int) -> dict:
 
                 break
 
-    # Citation validation
+    # A citation is structurally valid when its label resolves to the same
+    # retrieved chunk ID. This does not establish claim-level support.
 
     labels = {
         hit.get("label"): (
@@ -169,6 +179,7 @@ def score_question(row: dict, k: int) -> dict:
 
 
 def average(values: list[float]):
+    """Return a rounded mean, or None for an empty denominator."""
 
     if not values:
         return None
@@ -178,7 +189,7 @@ def average(values: list[float]):
         4
     )
 def _source_sets(retrieved):
-    """Represent each retrieved source as a set of covered IDs."""
+    """Normalize strings or ID collections for metric helper tests."""
     return [
         {source} if isinstance(source, str) else set(source)
         for source in retrieved
@@ -186,7 +197,11 @@ def _source_sets(retrieved):
 
 
 def recall_at_k(retrieved, gold, k=5):
-    """Fraction of gold source IDs retrieved within the first k sources."""
+    """Fraction of gold IDs retrieved within k, for the helper interface.
+
+    Unlike ``score_question`` (binary hit/miss per answerable question),
+    this helper can return partial credit for recovering some gold IDs.
+    """
     if k < 1:
         return 0.0
 
@@ -218,7 +233,7 @@ def reciprocal_rank(retrieved, gold):
 
 
 def ndcg_at_k(retrieved, gold, k=5):
-    """Normalized discounted cumulative gain with binary relevance."""
+    """Normalized discounted gain: relevant sources rank higher when early."""
     from math import log2
 
     if k < 1:
@@ -248,7 +263,7 @@ def ndcg_at_k(retrieved, gold, k=5):
 
 
 def refusal_metrics(expected, predicted):
-    """Calculate refusal precision, recall, and accuracy."""
+    """Compare expected vs predicted refusal decisions with zero-safe ratios."""
     if len(expected) != len(predicted):
         raise ValueError("Expected and predicted lengths must match")
 
@@ -291,6 +306,7 @@ def average_latency(latencies):
     return sum(latencies) / len(latencies) if latencies else 0.0
 
 def main():
+    """Aggregate question-level metrics and write per-run CSV/JSON reports."""
 
     parser = argparse.ArgumentParser()
 

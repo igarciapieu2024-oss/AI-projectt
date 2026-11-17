@@ -57,8 +57,12 @@ QUOTA = {
     "unanswerable": 4,
 }
 
+# Per-author category targets keep the question bank balanced, so a model
+# cannot appear strong simply because one easy question type dominates.
+
 
 def load_ids(path: Path, key: str) -> set[str]:
+    """Collect valid source identifiers from a JSONL knowledge-base file."""
 
     ids = set()
 
@@ -90,6 +94,7 @@ def load_ids(path: Path, key: str) -> set[str]:
 
 
 def normalized(value: str) -> str:
+    """Canonicalize question text for duplicate and similarity checks."""
 
     value = value.lower()
 
@@ -104,6 +109,11 @@ def validate(
     syllabus: Path,
     strict: bool = False,
 ) -> int:
+    """Check schema, ground-truth IDs, duplicates, quotas, and split rules.
+
+    Returns the validation status used by the command-line entry point;
+    warnings and errors are tracked separately.
+    """
 
     errors = []
     warnings = []
@@ -123,6 +133,8 @@ def validate(
     if not rows:
         errors.append("No questions found")
 
+    # Validate annotations against actual parsed source IDs, rather than
+    # accepting plausible-looking but nonexistent slide or section labels.
     source_ids = (
         load_ids(slides, "slide_id")
         | load_ids(syllabus, "section_id")
@@ -322,6 +334,7 @@ def validate(
 
 
 def main() -> None:
+    """Run question-bank validation from command-line path arguments."""
 
     parser = argparse.ArgumentParser()
 

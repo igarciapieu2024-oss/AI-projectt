@@ -1,7 +1,9 @@
 
 """Bootstrap confidence intervals for evaluation metrics.
 
-Supports single-system confidence intervals and paired comparisons.
+Resampling estimates uncertainty without assuming a particular score
+distribution. Paired comparisons resample question-level *differences* so
+the same questions remain aligned across the two systems.
 
 Owner: Elena.
 """
@@ -41,7 +43,11 @@ def bootstrap_ci(
     confidence: float = 0.95,
     seed: int = 42,
 ) -> dict:
-    """Estimate a confidence interval for a sample mean."""
+    """Estimate a confidence interval by resampling observations.
+
+    A fixed random seed makes repeated reports reproducible. Percentile
+    bounds summarize sampling variability, not systematic judge bias.
+    """
     if not values:
         raise ValueError("Values cannot be empty.")
 
@@ -86,7 +92,8 @@ def paired_bootstrap(
 ) -> dict:
     """Compare configurations using matched question IDs.
 
-    Difference = system B minus system A.
+    Difference = system B minus system A; matching IDs is essential because
+    unpaired resampling would ignore the common question difficulty.
     """
     a = {row["question_id"]: row for row in results_a}
     b = {row["question_id"]: row for row in results_b}
@@ -142,7 +149,7 @@ def paired_bootstrap(
 
 
 def load_results(path: str | Path) -> list[dict]:
-    """Load individual evaluation results from JSON."""
+    """Load question-level metric records from a JSON list for bootstrap analysis."""
     data = json.loads(
         Path(path).read_text(encoding="utf-8")
     )
@@ -156,6 +163,7 @@ def load_results(path: str | Path) -> list[dict]:
 
 
 def main() -> None:
+    """Parse bootstrap options and report uncertainty estimates."""
     parser = argparse.ArgumentParser(
         description="Bootstrap evaluation metrics."
     )

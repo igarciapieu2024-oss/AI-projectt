@@ -1,5 +1,10 @@
 """
-Run RAG evaluation on dev or test questions.
+Run reproducible RAG evaluation on dev or the held-out test split.
+
+Each run records answers and evidence in JSONL plus a summary JSON. The CLI
+requires explicit ``--allow-test`` for held-out questions and saves each
+question immediately so partial failures can be diagnosed. The separate
+``evaluate`` function supports isolated fake-engine unit tests.
 
 Usage:
 python -m eval.run_eval --config configs/b1_v1.yaml --split dev --limit 2
@@ -24,7 +29,11 @@ from src.generation.answer import answer
 
 
 def make_jsonable(value):
-    """Convert dataclass results into JSON-compatible data."""
+    """Convert nested engine results to safe JSON-compatible structures.
+
+    Non-finite floating-point values become null because standard JSON
+    cannot represent NaN or infinity reliably.
+    """
 
     if hasattr(value, "__dataclass_fields__"):
         return make_jsonable(asdict(value))
@@ -48,6 +57,10 @@ def make_jsonable(value):
 
 
 def read_questions(path: Path, split: str):
+    """Select only the requested split from the question bank CSV.
+
+    ``utf-8-sig`` accepts files exported with a UTF-8 byte-order mark.
+    """
 
     with path.open(
         encoding="utf-8-sig",
@@ -71,6 +84,7 @@ def read_questions(path: Path, split: str):
 
 
 def save_jsonl(path: Path, record: dict):
+    """Append one result immediately to preserve progress if a run fails."""
 
     with path.open("a", encoding="utf-8") as file:
 
@@ -91,7 +105,8 @@ def evaluate(
 ):
     """Evaluation interface supporting deterministic fake-mode tests.
 
-    This interface is separate from the production CLI runner.
+    This interface is separate from the production CLI runner and always
+    blocks the test split. Production's authorized test runs use ``main``.
     """
 
     if split == "test":
@@ -314,6 +329,12 @@ def evaluate(
     return output_path
 
 def main():
+    """Run the selected config and split, persisting each question result.
+
+    The protected test split requires an explicit command-line opt-in.
+    Follow-up questions first run their initial turn and pass its answer as
+    conversation history to the evaluated second turn.
+    """
 
     parser = argparse.ArgumentParser()
 
