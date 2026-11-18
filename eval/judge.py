@@ -53,6 +53,62 @@ SYSTEM_V2 = (
 )
 
 
+# 2. Rubric v3: like v2, but the judge also reads the gold source (the slide or syllabus section the question
+#    was written from). Checked against 80 dev answers graded by hand against the sources, v1 marked 9 correct
+#    answers as wrong and none the other way: it asked for reference details the question did not ask for
+#    (EL01, FRA05, EL02), and it could not accept an answer that differed from the reference but matched the
+#    slide ("Session 7-8" in SA06, "RBI and Putouts" in EL13).
+SYSTEM_V3 = (
+    "You are an impartial evaluator of a university course Q&A system. "
+    "You get the question, a reference answer, the gold source text the question was written from, "
+    "and a candidate answer. Ignore writing style and citation format. "
+    'Return JSON with keys "correct" (true or false), '
+    '"score" (0, 0.5, or 1), and "reason" (one short sentence). '
+    "Judge only what the QUESTION asks; details of the reference that the question does not ask for "
+    "are not required. An answer that differs from the reference is correct if the gold source supports it. "
+    "Extra information is not penalized unless it contradicts the gold source. "
+    "Score 1 if everything the question asks is answered correctly and nothing contradicts the gold source. "
+    "Score 0.5 if part of what the question asks is missing or wrong. "
+    "Score 0 if the main thing asked for is wrong or missing, or the answer contradicts the gold source."
+)
+
+_GOLD_TEXTS: dict[str, str] | None = None
+
+
+def gold_texts() -> dict[str, str]:
+    """3. Text of every slide and syllabus section by id, with the text read from the slide's images."""
+    global _GOLD_TEXTS
+    if _GOLD_TEXTS is None:
+        texts: dict[str, str] = {}
+        interim = Path("data/interim")
+        for name, key in (("slides.jsonl", "slide_id"), ("syllabus_sections.jsonl", "section_id")):
+            path = interim / name
+            if path.exists():
+                for line in path.open(encoding="utf-8"):
+                    item = json.loads(line)
+                    texts[item[key]] = item.get("text", "")
+        images = Path("data/image_texts.jsonl")
+        if images.exists():
+            for line in images.open(encoding="utf-8"):
+                item = json.loads(line)
+                extra = " ".join(x for x in (item.get("ocr_text"), item.get("description")) if x)
+                if extra and item.get("slide_id") in texts:
+                    texts[item["slide_id"]] += "\n[Image] " + extra
+        _GOLD_TEXTS = texts
+    return _GOLD_TEXTS
+
+
+def gold_source_text(gold_ids: str, per_source: int = 4000) -> str:
+    """4. The gold sources of one question, each cut to 4,000 characters (the longest evaluation section is 3,979)."""
+    texts = gold_texts()
+    parts = [
+        f"[{gid.strip()}] {texts.get(gid.strip(), '(not found)')[:per_source]}"
+        for gid in re.split(r"[;,]", gold_ids or "")
+        if gid.strip()
+    ]
+    return "\n\n".join(parts)
+
+
 def build_judge_messages(
     answer_text: str,
     reference_answer: str,
@@ -404,13 +460,24 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
         f"Candidate answer:\n{answer}\n\n"
         "Return only the requested JSON object."
     )
+    if rubric == "v3":
+        # 5. v3 reads the gold source and drops the key-fact list, which made the judge ask for every fact
+        prompt = (
+            f"Question:\n{row.get('question', '')}\n\n"
+            + (f"Previous question in the conversation:\n{row.get('turn1')}\n\n" if row.get("turn1") else "")
+            + f"Reference answer:\n{row.get('reference_answer', '')}\n\n"
+            f"Gold source text:\n{gold_source_text(str(row.get('gold_ids', '')))}\n\n"
+            f"Candidate answer:\n{answer}\n\n"
+            "Return only the requested JSON object."
+        )
+    system = {"v2": SYSTEM_V2, "v3": SYSTEM_V3}.get(rubric, SYSTEM)
 
     response = ollama.chat(
         model=model,
         messages=[
             {
                 "role": "system",
-                "content": SYSTEM_V2 if rubric == "v2" else SYSTEM
+                "content": system
             },
             {
                 "role": "user",
@@ -420,7 +487,9 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
         format="json",
         options={
             "temperature": 0,
-            "num_predict": 350
+            "num_predict": 350,
+            # 6. room for up to four gold sources in the v3 prompt; v1 and v2 keep the default window
+            **({"num_ctx": 8192} if rubric == "v3" else {})
         }
     )
 
@@ -468,7 +537,7 @@ def main():
 
     parser.add_argument(
         "--rubric",
-        choices=["v1", "v2"],
+        choices=["v1", "v2", "v3"],
         default="v1"
     )
 
@@ -619,7 +688,7 @@ def main():
     # Save individual judgments
 
     csv_path = (
-        args.run_dir / ("judge_questions.csv" if args.rubric == "v1" else "judge_questions_v2.csv")
+        args.run_dir / ("judge_questions.csv" if args.rubric == "v1" else f"judge_questions_{args.rubric}.csv")
     )
 
     with csv_path.open(
@@ -647,7 +716,7 @@ def main():
     # Save summary
 
     json_path = (
-        args.run_dir / ("judge_summary.json" if args.rubric == "v1" else "judge_summary_v2.json")
+        args.run_dir / ("judge_summary.json" if args.rubric == "v1" else f"judge_summary_{args.rubric}.json")
     )
 
     json_path.write_text(

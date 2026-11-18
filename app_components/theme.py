@@ -58,6 +58,10 @@ _ICON_PATHS = {
     "check": '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     # a page with lines: a syllabus or a slide
     "page": '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/>',
+    # a building with columns: the university
+    "campus": '<path d="M3 9l9-5 9 5"/><path d="M5 9v9M9.5 9v9M14.5 9v9M19 9v9"/><path d="M3 20h18"/>',
+    # two people: the users
+    "users": '<circle cx="9" cy="8" r="3"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.3"/><path d="M15.5 14.2c2.4.2 4.2 1.9 4.8 4.8"/>',
 }
 
 

@@ -662,3 +662,62 @@ def test_out_of_scope_search_lets_the_self_check_decide(monkeypatch):
     cfg.routing = {"out_of_scope_search": True}
     result = answer_module.answer("Who teaches Operating Systems?", cfg=cfg)
     assert searched and not result.refused
+
+
+def test_prompt_v4_shows_only_the_answer_part(monkeypatch):
+    # 1. the model writes the copied evidence first; only what follows "Answer:" is kept and validated
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="course_admin", prob=0.9, source="classifier"),
+    )
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda question, cfg, filters: [Hit(chunk=_chunk("ob_s01_p019", "minimal passing grade of 4", course_code="ob"), rank=1)],
+    )
+    monkeypatch.setattr(
+        answer_module,
+        "chat",
+        lambda *args, **kwargs: 'Evidence: "there is a minimal passing grade of 4" [S1]\nAnswer: Yes, at least 4 out of 10 [S1].',
+    )
+    cfg = _config()
+    cfg.generation = {**cfg.generation, "prompt_version": "v4"}
+    result = answer_module.answer("Is there a minimum final exam grade?", cfg=cfg)
+    assert result.answer_text == "Yes, at least 4 out of 10 [S1]."
+    assert [c.label for c in result.citations] == ["S1"]
+
+
+def test_named_course_is_never_out_of_scope(monkeypatch):
+    # 1. the router said out_of_scope, but the question names Strategy, so it is searched and answered
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="out_of_scope", prob=0.6, source="classifier"),
+    )
+    searched = []
+
+    def fake_hits(question, cfg, filters):
+        searched.append(question)
+        return [Hit(chunk=_chunk("strategies_s12_p053", "2,000 digital surveys. Source: DataCentric", course_code="strategies"), rank=1)]
+
+    monkeypatch.setattr(answer_module, "_build_hits", fake_hits)
+    monkeypatch.setattr(answer_module, "chat", lambda *args, **kwargs: "On 2,000 surveys; source DataCentric [S1].")
+    cfg = _config()
+    cfg.routing = {"named_course_in_scope": True}
+    result = answer_module.answer("In the beer market example in Strategy, how many surveys is the map based on?", cfg=cfg)
+    assert searched and not result.refused
+
+
+def test_named_course_rule_keeps_refusing_questions_without_a_course(monkeypatch):
+    # 2. no course named: the out_of_scope label still refuses without a search
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="out_of_scope", prob=0.9, source="classifier"),
+    )
+    monkeypatch.setattr(answer_module, "_build_hits", lambda *a, **k: pytest.fail("must not search"))
+    cfg = _config()
+    cfg.routing = {"named_course_in_scope": True}
+    result = answer_module.answer("What is the weather in Madrid tomorrow?", cfg=cfg)
+    assert result.refused

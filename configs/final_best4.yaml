@@ -1,0 +1,16 @@
+# Experiment after the second holdout, measured on dev first.
+# 1. Like final_best2, plus two fixes found in the holdout 2 errors:
+#    rewrite_guard: a follow-up rewrite that is not a question is replaced by the previous question plus the new one.
+#    named_course_in_scope: a question that names a course is never refused by the router without a search.
+extends: base.yaml
+
+retrieval:
+  auto_course_filter: true
+
+generation:
+  llm_model: llama3.1:8b
+  course_split: true
+  rewrite_guard: true
+
+routing:
+  named_course_in_scope: true

@@ -1,0 +1,18 @@
+# Experiment after the second holdout, measured on dev first.
+# 1. final_best2 plus rewrite_guard: a follow-up rewrite that is not a question (the model answered it, once
+#    with an invented price) is replaced by the previous question plus the new one. EL15 was fixed on dev.
+# 2. Without routing.named_course_in_scope (final_best4): it made the system answer "What private feedback did
+#    the AI Machine Learning Foundations professor send me?" with the professor's e-mail instead of refusing.
+# 3. temperature 0 and a fixed seed, so a rerun gives the same answers and two configurations differ only by
+#    their settings.
+extends: base.yaml
+
+retrieval:
+  auto_course_filter: true
+
+generation:
+  llm_model: llama3.1:8b
+  course_split: true
+  rewrite_guard: true
+  temperature: 0
+  seed: 42

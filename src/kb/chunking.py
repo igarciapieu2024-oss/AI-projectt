@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from pathlib import Path
 
 from src.config import PATHS, chunks_path, parents_path
 from src.kb.syllabus_text import (  # readable tables, one summary per course, course names, real headings
@@ -71,6 +72,15 @@ def _load_image_text(use_ocr: bool, use_captions: bool) -> dict:
     return result
 
 
+def _load_slide_tables() -> dict[str, list[str]]:
+    """2. slide_id -> its tables, one line per row; empty when the table step has not run."""
+    path = Path(PATHS["interim"]) / "slide_tables.jsonl"
+    if not path.exists():
+        print("Slide tables not found: run the slide_tables step first.")
+        return {}
+    return {row["slide_id"]: row["tables"] for row in read_jsonl(path)}
+
+
 def build_chunks(cfg) -> int:
     """Build Chunk and Parent records; return the number of chunks."""
 
@@ -88,6 +98,9 @@ def build_chunks(cfg) -> int:
     overlap = max(0, min(overlap, chunk_size - 1))
 
     image_text = _load_image_text(use_ocr, use_captions)
+    # 1. With kb.slide_tables, the tables of a slide are added row by row (src/kb/slide_tables.py), so that
+    #    every value keeps its column: "Net LT Assets: ... New Orleans Hotel 1.500.000" instead of three numbers
+    table_text = _load_slide_tables() if settings.get("slide_tables", False) else {}
     names = course_names()  # "mgmt_control" -> "Management Control", added to the searched text of every chunk
 
     chunks = []
@@ -158,6 +171,8 @@ def build_chunks(cfg) -> int:
             has_image_text = bool(image_parts)
 
             text = original_text
+            if record_id in table_text:
+                text += "\n\nTable, row by row:\n" + "\n".join(table_text[record_id])
             if image_parts:
                 text += "\n\n" + "\n\n".join(image_parts)
 

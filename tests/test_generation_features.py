@@ -280,3 +280,39 @@ def test_rewrite_keeps_a_standalone_question_even_with_history(monkeypatch):
     # 2. a question that points back to the conversation is still rewritten
     assert rewrite_module.looks_like_follow_up("And who teaches it?")
     assert rewrite_module.looks_like_follow_up("¿Y la asistencia mínima?")
+
+
+def test_rewrite_guard_replaces_an_answer_with_the_previous_question(monkeypatch):
+    # 1. the model answered the follow-up (and invented the price); with the guard the two questions are joined
+    monkeypatch.setattr(
+        rewrite_module,
+        "chat",
+        lambda messages, cfg, **kwargs: "The chefs bought the material at 10 dollars per kilogram [S3].",
+    )
+    history = [
+        {"role": "user", "content": "In the Singadeli example, what is the standard cost of the material?"},
+        {"role": "assistant", "content": "11.8 dollars per kilogram [S1]."},
+    ]
+    cfg = SimpleNamespace(generation={"rewrite_guard": True})
+    result = rewrite_module.rewrite("And at what price did they buy it?", history, cfg)
+    assert result == (
+        "In the Singadeli example, what is the standard cost of the material? And at what price did they buy it?"
+    )
+
+
+def test_rewrite_guard_keeps_a_real_question_and_is_off_by_default(monkeypatch):
+    # 2. a proper rewrite passes the guard; without the option an answer-like rewrite is kept as before
+    history = [{"role": "user", "content": "Who teaches Strategy?"}]
+    monkeypatch.setattr(rewrite_module, "chat", lambda *a, **k: "Who teaches the Strategy course this term?")
+    cfg = SimpleNamespace(generation={"rewrite_guard": True})
+    assert rewrite_module.rewrite("And this term?", history, cfg) == "Who teaches the Strategy course this term?"
+    monkeypatch.setattr(rewrite_module, "chat", lambda *a, **k: "The professor is X [S1].")
+    assert rewrite_module.rewrite("And this term?", history, SimpleNamespace(generation={})) == "The professor is X [S1]."
+
+
+def test_looks_like_question():
+    # 3. one line, a question mark at the end and no source labels
+    assert rewrite_module.looks_like_question("What is the passing grade in OB?")
+    assert not rewrite_module.looks_like_question("The passing grade is 5.")
+    assert not rewrite_module.looks_like_question("What is it [S1]?")
+    assert not rewrite_module.looks_like_question("What is it?\nIt is 5.")

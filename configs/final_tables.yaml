@@ -1,0 +1,9 @@
+# Experiment after the second holdout, measured on dev first.
+# 1. final_best5 plus kb.slide_tables: slide tables are added to their chunks row by row, each value with its
+#    column header. Three holdout 2 errors came from tables read with their columns mixed (the New Orleans
+#    hotel got Chicago's 2,340,000; "strong oral communication" listed as most important; thread and process
+#    times swapped). This changes the knowledge base, so it gets its own kb_sig and its own index.
+extends: final_best5.yaml
+
+kb:
+  slide_tables: true

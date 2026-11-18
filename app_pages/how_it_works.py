@@ -59,12 +59,12 @@ for i, (title, when, nodes) in enumerate(LANES):
 if Path(content.ARCHITECTURE_IMAGE).exists():
     st.image(content.ARCHITECTURE_IMAGE)
 
-#5 the key results: LLM alone vs our system (Elena's final numbers; "XX" until Sun 15)
+#5 the key results: LLM alone vs our system, on the last held-out set
 rows = "".join(f'<tr><td>{esc(m)}</td><td class="num">{esc(a)}</td><td class="num ours">{esc(b)}</td></tr>'
                for m, a, b in content.RESULTS)
 html(f"""
-    <h2 class="section-title">Results on 60 test questions</h2>
+    <h2 class="section-title">{esc(content.RESULTS_TITLE)}</h2>
     <table class="results"><thead><tr><th>Measure</th><th>The model alone</th><th class="ours">{esc(content.COMPANY_NAME)}</th></tr></thead>
     <tbody>{rows}</tbody></table>
 """)
-st.caption("Measured once on a locked test set, with 95% confidence intervals in the technical documentation.")
+st.caption(content.RESULTS_NOTE)

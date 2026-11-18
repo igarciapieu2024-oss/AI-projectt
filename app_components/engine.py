@@ -17,6 +17,9 @@ from src.config import PATHS, load_config  # the shared folder paths and the set
 # USE_FAKE=1 -> the fake answer (works today); otherwise the real engine (from Wed 11).
 # both have exactly the same inputs and outputs, so the pages don't need to know which one is running
 USING_FAKE = os.environ.get("USE_FAKE") == "1"
+# APP_CONFIG picks the system the assistant runs: final (3B, ~14 s an answer) by default,
+# final_tables for the evaluated 8B system (~30 s an answer on a laptop CPU)
+MAIN_CONFIG = os.environ.get("APP_CONFIG", "final")
 if USING_FAKE:
     from src.generation.fake import answer_stream  # noqa: F401  (pages import it from here)
 else:
@@ -30,7 +33,7 @@ def config(name: str):
 
 
 @st.cache_resource(show_spinner="Loading local retrieval models...")
-def warm_up_models(name: str = "final") -> str:
+def warm_up_models(name: str = MAIN_CONFIG) -> str:
     """Load this configuration's retrieval models once when the app starts."""
     from src.warmup import warm_up
 

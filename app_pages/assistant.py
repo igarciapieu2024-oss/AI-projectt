@@ -6,7 +6,7 @@ import streamlit as st  # the library that builds the page
 import app_content as content  # the example questions and the logo
 from app_components.answer_view import refusal_notice, show_answer, stream_answer  # how answers are drawn (and errors)
 from app_components.behind import render_behind  # the "behind the scenes" panel
-from app_components.engine import config, courses  # the settings and the course list
+from app_components.engine import MAIN_CONFIG, config, courses  # the settings, the system the app runs and the course list
 from app_components.sources import render_sources  # the source cards
 from app_components.theme import html, image_data_uri  # our HTML helper and the logo loader
 from src.schemas import AnswerResult, Filters  # the agreed answer format and the filters format
@@ -94,7 +94,7 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                for m in st.session_state.messages[:-1] if not m.get("error")]  # failed turns are left out
     filters = Filters(course_code=course_code)  # the course chosen in the toolbar
     with st.container(key="chatlog_new"), st.chat_message("assistant", avatar=content.LOGO_MARK):
-        result = stream_answer(question, cfg=config("final"), history=history, filters=filters)  # word by word, with chips
+        result = stream_answer(question, cfg=config(MAIN_CONFIG), history=history, filters=filters)  # word by word, with chips
         if result is not None:  # None = the engine failed; stream_answer already showed what to fix
             show_result(result)
     if result is None:  # saved as a failed turn, so the page doesn't retry on every click; asking again retries

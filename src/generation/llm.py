@@ -80,6 +80,11 @@ def chat(
     temperature = cfg.generation.get("temperature")
     if temperature is not None:
         options["temperature"] = temperature
+    # 1. generation.seed makes two runs of the same configuration give the same answers; with temperature 0.1
+    #    and no seed, EL02 and EL17 changed between two runs of an unchanged path, which blurred comparisons
+    seed = cfg.generation.get("seed")
+    if seed is not None:
+        options["seed"] = seed
     configured_limit = cfg.generation.get("num_predict")
     token_limit = num_predict if num_predict is not None else configured_limit
     if token_limit is not None:
