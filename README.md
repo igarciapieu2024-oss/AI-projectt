@@ -16,15 +16,49 @@ pip install -r requirements.txt
 3. Download the local models (names are in `configs/base.yaml`):
 
 ```bash
-ollama pull llama3.1:8b
-ollama pull qwen2.5:7b
+ollama pull llama3.2:3b      # answers, translation and follow-up rewriting (needed for the app)
+ollama pull llama3.1:8b      # answers of the final 8B system (final_tables)
+ollama pull qwen2.5:7b       # evaluation judge (only to run eval/)
+ollama pull qwen2.5vl:7b     # image classification and descriptions (only to regenerate data/image_texts.jsonl)
 ```
+
+The embedding model and the reranker are downloaded from Hugging Face the first time the knowledge base is built.
 
 4. Check everything:
 
 ```bash
 python -m src.check_env
 ```
+
+## Run the evaluated version
+
+The version evaluated on the 60 held-out test questions is the tag `v1.2-eval`. `main` contains the same system plus the evaluation code.
+
+```bash
+python -m src.pipeline build --config configs/final.yaml    # ~5 min, ends with kb_sig=ec71346e
+python -m pytest -q                                          # all tests pass (2 skipped without a built index)
+streamlit run app.py                                         # the app; the first answer takes ~30 s while models load
+```
+
+Results: `reports/evaluation_report.md` (test set: B0 11.7%, B1 26.7%, final 55.0% fully correct answers).
+
+## Final system (18 Nov): final_tables
+
+After v1.2, 11 configurations were compared on dev and the best was measured once on three new held-out sets of 30 questions (`eval/questions_holdout*.csv`). The final system, `configs/final_tables.yaml`, answers with `llama3.1:8b`, answers each named course separately, checks follow-up rewrites, reads slide tables row by row and uses a fixed seed.
+
+```bash
+python -m src.pipeline build --config configs/final_tables.yaml   # ends with kb_sig=586a05db
+$env:APP_CONFIG="final_tables"; streamlit run app.py               # PowerShell; ~30 s an answer on a laptop CPU
+```
+
+| Unseen questions | Fully correct |
+| --- | --- |
+| final_tables, holdout 3 | 73.3% |
+| 8B configuration (final_best2), holdouts 1–3 | 70.0% (63 of 90) |
+| v1.2 (3B), holdout 3 | 56.7% |
+| LLM alone, holdout 3 | 20.0% |
+
+Grades checked against the gold sources are in `eval/reference_labels_*.csv`; `python -m eval.judge_agreement` compares them with the automatic judge. Only one Ollama model should be loaded at a time on a 16 GB laptop (`ollama stop <model>` between runs). Without `APP_CONFIG` the app runs `final` (3B, ~14 s an answer).
 
 ## Commands (run from the repo root)
 
@@ -37,6 +71,8 @@ python -m src.check_env
 | Compare local LLM speed | `python -m eval.benchmark_llm --runs 3` | Sergio |
 | Start the app (fake engine) | `USE_FAKE=1 streamlit run app.py` (PowerShell: `$env:USE_FAKE=1; streamlit run app.py`) | Irene |
 | Start the app (real engine) | `streamlit run app.py` | Irene |
+| Retrieval benchmark (44 questions) | `python bench_retrieval.py --config configs/final.yaml` | Irene |
+| Full answers for 8 fixed questions | `python diag_cite.py` | Irene |
 | Fast tests | `pytest -m "not slow"` | everyone |
 
 The LLM benchmark tests `llama3.1:8b`, `qwen2.5:7b` and `llama3.2:3b` with the same cited-answer prompt. Pull the models first with `ollama pull <model>`. It prints each response and elapsed time; judge answer quality and citation behavior as well as whether every run meets the 10-second target. The first run may include model loading time.
@@ -75,4 +111,4 @@ Generated folders (`chroma_db/`, `data/interim/`, `data/processed/`, `eval/runs/
 | `check_env` says Ollama is not running | Open the Ollama app, then run it again |
 | A model is missing | `ollama pull <name>` (names in `configs/base.yaml`) |
 | `answer()` says the index doesn't exist | `python -m src.pipeline build --config <the same config>` |
-| Answers are slow | Set a smaller `llm_model` in the config (e.g. `llama3.2:3b`) |
+| Answers are slow | The first answer loads the models (~30 s); later ones take 10–16 s on a laptop CPU |

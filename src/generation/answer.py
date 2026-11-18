@@ -150,6 +150,18 @@ def _prepare_answer(
     ):
         route_decision = RouteDecision(label="cross_course", prob=1.0, source="course_split")
 
+    # 8. With routing.named_course_in_scope, a question that names a course of the programme is never sent out
+    #    of scope by the router: "In the beer market example in Strategy, how many surveys..." got 0.60 for
+    #    out_of_scope and was refused without a search. It is searched, and the self-check and the model still
+    #    refuse it when the material does not have the answer.
+    if (
+        rag_enabled
+        and route_decision.label == "out_of_scope"
+        and getattr(cfg, "routing", {}).get("named_course_in_scope", False)
+        and _named_courses(rewritten_question)
+    ):
+        route_decision = RouteDecision(label="course_content", prob=route_decision.prob, source="named_course")
+
     # 7. With routing.out_of_scope_search, an "out of scope" label no longer refuses without searching: the
     #    question is searched and the self-check refuses it only if no source scores well. The router sent two
     #    answerable questions there ("Who teaches Operating Systems ... where did he work before IE?" and a
@@ -214,6 +226,17 @@ def _prepare_answer(
         question, rewritten_question, cfg, hits, messages, route_decision, started,
         rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled, filters,
     )
+
+
+def _answer_part(answer_text: str, cfg: Config) -> str:
+    """8. With prompt v4 the model writes "Evidence: ... Answer: ..."; the student only sees the answer part.
+
+    If the model forgets the "Answer:" line, the whole text is kept, so a correct answer is never lost.
+    """
+    if cfg.generation.get("prompt_version") != "v4":
+        return answer_text
+    match = re.search(r"answer\s*:\s*", answer_text, flags=re.IGNORECASE)
+    return answer_text[match.end():].strip() if match else answer_text
 
 
 def _ranking_answer(hits: list[Hit]) -> str | None:
@@ -398,6 +421,7 @@ def answer(
     if not answer_text.strip() and getattr(response, "done_reason", None) != "length":
         raise ValueError("chat() returned empty answer text")
     generate_ms = (time.perf_counter() - generation_started) * 1000
+    answer_text = _answer_part(answer_text, cfg)
     return _make_result(
         question, rewritten_question, route_decision, filters, cfg, hits, answer_text, started,
         rewrite_ms, route_ms, retrieve_ms, rerank_ms, generate_ms, rag_enabled,
@@ -415,6 +439,11 @@ def answer_stream(
     if split is not None:
         yield split.answer_text
         yield split
+        return
+    if (cfg or load_config("configs/final.yaml")).generation.get("prompt_version") == "v4":
+        result = answer(question, history, filters, cfg)
+        yield result.answer_text
+        yield result
         return
     (
         question, rewritten_question, cfg, hits, messages, route_decision, started,

@@ -77,17 +77,31 @@ html(f"""
     <div class="trust">{trust}</div>
 """)
 
-#3 the problem, with the survey numbers ("XX" until Francesca sends them)
+#3 the problem, with the numbers of the business plan and their sources
 problem = "".join(f'<div class="stat"><div class="stat-n">{esc(n)}</div><div class="stat-l">{esc(t)}</div></div>'
                   for n, t in content.PROBLEM_STATS)
-html(f'<h2 class="section-title">Course information is hard to find</h2><div class="stats">{problem}</div>')
+html(f'<h2 class="section-title">{esc(content.PROBLEM_TITLE)}</h2><div class="stats">{problem}</div>'
+     f'<div class="source-note">{esc(content.PROBLEM_SOURCE)}</div>')
 
 #4 how it works, in 4 numbered steps (they are a real sequence, so the numbers mean something)
 steps = "".join(f'<div class="step"><div class="step-n">{i}</div><b>{esc(t)}</b><span>{esc(d)}</span></div>'
                 for i, (t, d) in enumerate(content.STEPS, start=1))
 html(f'<h2 class="section-title">From question to cited answer</h2><div class="steps">{steps}</div>')
 
-#5 the closing band: a second button, for whoever scrolled to the end
+#5 who it is for (students, professors, programme office) and the mission, vision and licence of the business plan
+audience = "".join(f'<div class="feature"><div class="feature-icon">{icon(ic, 26)}</div><b>{esc(t)}</b><span>{esc(d)}</span></div>'
+                   for ic, t, d in content.AUDIENCE)
+html(f"""
+    <h2 class="section-title">{esc(content.AUDIENCE_TITLE)}</h2>
+    <div class="features three">{audience}</div>
+    <div class="mission">
+      <div><span>Mission</span><b>{esc(content.MISSION)}</b></div>
+      <div><span>Vision</span><b>{esc(content.VISION)}</b></div>
+      <div><span>For universities</span><p>{esc(content.FOR_UNIVERSITIES)}</p></div>
+    </div>
+""")
+
+#6 the closing band: a second button, for whoever scrolled to the end
 with st.container(key="closing"):
     text_col, button_col = st.columns([3, 1], vertical_alignment="center")
     with text_col:
@@ -96,6 +110,6 @@ with st.container(key="closing"):
         if st.button("Ask a question", type="primary", key="cta_bottom"):
             st.switch_page("app_pages/assistant.py")
 
-#6 footer
+#7 footer
 note = " Demo mode: answers come from the fake engine." if USING_FAKE else ""  # so nobody thinks the fake answers are real
 html(f'<div class="footer">{esc(content.FOOTER)}{note}</div>')

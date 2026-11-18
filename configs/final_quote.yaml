@@ -1,0 +1,13 @@
+# Experiment B (dev only): final_best3 with prompt v4, "quote the evidence first, then answer".
+extends: base.yaml
+
+retrieval:
+  auto_course_filter: true
+
+routing:
+  out_of_scope_search: true
+
+generation:
+  llm_model: llama3.1:8b
+  course_split: true
+  prompt_version: v4

@@ -26,11 +26,13 @@ def _step(name: str, fn, *args) -> None:
 
 
 def build(cfg) -> None:
-    from src.kb import build_indexes, chunking, course_table, dedup, parse_slides, parse_syllabi
+    from src.kb import build_indexes, chunking, course_table, dedup, parse_slides, parse_syllabi, slide_tables
 
     print(f"Building knowledge base for {cfg.name} (kb_sig={cfg.kb_sig})")
     _step("parse_syllabi", parse_syllabi.parse_syllabi, cfg)
     _step("parse_slides", parse_slides.parse_slides, cfg)
+    if cfg.kb.get("slide_tables", False):
+        _step("slide_tables", slide_tables.build_slide_tables, cfg)
     # the course table is built before the chunks, because each course also gets a summary chunk made from it
     _step("course_table", course_table.build_course_table, cfg)
     _step("chunking", chunking.build_chunks, cfg)

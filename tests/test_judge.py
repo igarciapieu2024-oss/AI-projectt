@@ -200,3 +200,24 @@ def test_rubric_v2_judges_what_the_question_asks(monkeypatch):
     assert "what the QUESTION asks" in sent["system"]
     judge.judge_one(row, "m")
     assert sent["system"] == judge.SYSTEM
+
+
+def test_judge_agreement_counts_strict_and_lenient_decisions():
+    # 1. one answer the judge failed although it was right, one it passed although it was half right
+    from eval.judge_agreement import agreement
+
+    reference = {("r", "Q1"): 1.0, ("r", "Q2"): 0.5, ("r", "Q3"): 0.0}
+    judged = {("r", "Q1"): 0.0, ("r", "Q2"): 1.0, ("r", "Q3"): 0.0}
+    result = agreement(reference, judged)
+    assert result["compared"] == 3
+    assert result["judge_too_strict"] == 1 and result["judge_too_lenient"] == 1
+    assert result["same_correct_decision"] == round(1 / 3, 4)
+
+
+def test_gold_source_text_joins_several_sources(monkeypatch):
+    # 2. a cross-course question has two gold sections; both reach the v3 judge
+    import eval.judge as judge_module
+
+    monkeypatch.setattr(judge_module, "_GOLD_TEXTS", {"a_syl_sec08": "Final exam 30%", "b_syl_sec08": "Final exam 20%"})
+    text = judge_module.gold_source_text("a_syl_sec08;b_syl_sec08")
+    assert "Final exam 30%" in text and "Final exam 20%" in text

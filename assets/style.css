@@ -312,3 +312,15 @@ h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; color: var(--
 .scores th { text-align: left; color: var(--slate); font-weight: 600; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); }
 .scores td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); }
 .scores td.n, .scores th:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }  /* numbers aligned on the right */
+
+/*21 HOME: who it is for, mission and vision (from the business plan) */
+.features.three { grid-template-columns: repeat(3, 1fr); }
+.source-note { color: var(--slate); font-size: 0.8rem; margin-top: 0.8rem; }
+.mission {
+  display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 1.2rem; margin-top: 1.6rem;
+  background: linear-gradient(90deg, #EEF2FF, #F4F0FF); border: 1px solid var(--line); border-radius: 18px; padding: 1.4rem 1.6rem;
+}
+.mission span { display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--blue); margin-bottom: 0.4rem; }
+.mission b { font-family: var(--display); font-size: 1.15rem; line-height: 1.35; color: var(--ink); }
+.mission p { margin: 0; color: var(--slate); font-size: 0.95rem; line-height: 1.5; }
+@media (max-width: 900px) { .features.three, .mission { grid-template-columns: 1fr; } }

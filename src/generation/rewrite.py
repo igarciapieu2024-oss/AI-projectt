@@ -110,7 +110,29 @@ def rewrite(
     rewritten = result.strip().strip("\"'")
     if not rewritten:
         raise ValueError("chat() returned an empty rewritten question")
+    # 1. With generation.rewrite_guard, a rewrite that is not a question is thrown away. The model sometimes
+    #    answered the follow-up instead of rewriting it, and once invented the answer ("10 dollars per kilogram"),
+    #    which the router then sent out of scope. The previous user question plus the new one is used instead.
+    if getattr(cfg, "generation", {}).get("rewrite_guard", False) and not looks_like_question(rewritten):
+        return _join_with_previous(question, history)
     return rewritten
+
+
+_CITATION = re.compile(r"\[S\d+\]")
+
+
+def looks_like_question(text: str) -> bool:
+    """2. A usable rewrite is one line, ends with a question mark and carries no source labels."""
+    text = text.strip()
+    return bool(text) and "\n" not in text and text.endswith("?") and not _CITATION.search(text)
+
+
+def _join_with_previous(question: str, history: list[dict[str, Any]]) -> str:
+    """3. The last user question and the follow-up together, so the search still sees the topic."""
+    previous = [item["content"].strip() for item in history if item.get("role") == "user"]
+    if not previous:
+        return question
+    return f"{previous[-1]} {question}"
 
 
 def translate_to_english_query(question: str, cfg) -> str:

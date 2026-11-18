@@ -194,3 +194,22 @@ def test_chat_rejects_malformed_ollama_response(monkeypatch):
 
     with pytest.raises(ValueError, match="without message content"):
         chat([{"role": "user", "content": "Hi"}], _config())
+
+
+def test_chat_passes_the_configured_seed(monkeypatch):
+    # 1. a fixed seed reaches Ollama next to the temperature, so reruns give the same answers
+    calls = []
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def chat(self, **kwargs):
+            calls.append(kwargs)
+            return {"message": {"content": "Same answer"}}
+
+    monkeypatch.setitem(sys.modules, "ollama", SimpleNamespace(Client=FakeClient))
+    cfg = _config()
+    cfg.generation["seed"] = 42
+    chat([{"role": "user", "content": "Question"}], cfg)
+    assert calls[0]["options"] == {"temperature": 0.25, "seed": 42}
