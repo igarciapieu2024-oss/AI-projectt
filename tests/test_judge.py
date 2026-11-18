@@ -163,3 +163,40 @@ def test_judge_messages(sources):
     assert messages[0]["role"] == "system"
     assert "The final exam is worth 40%" in messages[1]["content"]
     assert "c01_syl_sec04" in messages[1]["content"]
+
+
+def test_semantic_refusal_counts_only_for_unanswerable_questions():
+    from eval.judge import judge_one, says_not_in_material
+
+    answer = "There is no information provided about the teaching assistant for Time Series Analysis. [S1]"
+    # 1. an unanswerable question answered "not in the material" is a correct refusal, without the judge model
+    unanswerable = {"answerable": "0", "result": {"refused": False, "answer_text": answer}}
+    assert judge_one(unanswerable, model="unused")["score"] == 1.0
+    # 2. an unanswerable question answered with a made-up fact is still wrong
+    invented = {"answerable": "0", "result": {"refused": False, "answer_text": "The final quiz is worth 35%. [S4]"}}
+    assert judge_one(invented, model="unused")["score"] == 0.0
+    assert says_not_in_material("The exact date is not specified in the provided sources.")
+    assert says_not_in_material("The complete list of questions is not explicitly provided in the sources.")
+    assert not says_not_in_material("The final exam is worth 40% of the final grade. [S1]")
+
+
+def test_rubric_v2_judges_what_the_question_asks(monkeypatch):
+    import sys
+    import types
+
+    from eval import judge
+
+    # 1. v2 sends the question-focused rubric to the judge model; v1 stays the default
+    sent = {}
+
+    def fake_chat(model, messages, format, options):
+        sent["system"] = messages[0]["content"]
+        return {"message": {"content": '{"correct": true, "score": 1, "reason": "ok"}'}}
+
+    monkeypatch.setitem(sys.modules, "ollama", types.SimpleNamespace(chat=fake_chat))
+    row = {"answerable": "1", "question": "What share are quizzes?", "reference_answer": "25%; best four count",
+           "key_facts": "25%", "result": {"refused": False, "answer_text": "25% [S1]"}}
+    assert judge.judge_one(row, "m", "v2")["score"] == 1.0
+    assert "what the QUESTION asks" in sent["system"]
+    judge.judge_one(row, "m")
+    assert sent["system"] == judge.SYSTEM

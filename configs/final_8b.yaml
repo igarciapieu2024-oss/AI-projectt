@@ -1,0 +1,6 @@
+# Experiment after the test evaluation, measured on dev only.
+# 1. Same as final, with a larger model writing the answers (and the translations and follow-up rewrites).
+extends: base.yaml
+
+generation:
+  llm_model: llama3.1:8b

@@ -24,3 +24,22 @@ def test_v1_prompt_is_unchanged():
     cfg = load_config("configs/b1_v1.yaml")
     content = build_messages("What is the final exam worth?", [_hit()], cfg)[-1]["content"]
     assert "in square brackets" not in content  # the baseline keeps its original prompt
+
+
+def test_v3_prompt_names_the_course_of_each_source_and_has_the_rules():
+    # 1. the source header starts with the course name, taken from the searched text
+    hit = Hit(
+        chunk=Chunk(chunk_id="slide__macro_s01_p016__00", kb_sig="t", strategy="slide", doc_type="slide",
+                    course_code="macro", sessions=[1], source_id="macro_s01", covers=["macro_s01_p016"],
+                    parent_id="macro_s01_p016", outline_path="Session 1 › Midterm",
+                    text="Midterm Exam: Session 16", embed_text="Macroeconomics › Session 1 › Midterm\nMidterm Exam: Session 16"),
+        rank=1, label="S1",
+    )
+    cfg = load_config("configs/final_rules.yaml")
+    messages = build_messages("When is the midterm?", [hit], cfg)
+    assert "[S1] Macroeconomics › Session 1 › Midterm" in messages[-1]["content"]
+    assert "answer for each course separately" in messages[0]["content"]
+    assert messages[-1]["content"].rstrip().endswith("with only what the question asks.")
+    # 2. v2 keeps the old header, so the evaluated version does not change
+    v2 = build_messages("When is the midterm?", [hit], load_config("configs/final.yaml"))
+    assert "[S1] Session 1 › Midterm" in v2[-1]["content"]
