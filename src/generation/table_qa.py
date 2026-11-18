@@ -240,6 +240,17 @@ def answer_from_table(question: str, cfg) -> list[Hit]:
     return hits
 
 
+def course_rows() -> list[dict[str, str]]:
+    """The course table rows (course_code, course_name...), or [] when the table is not built."""
+    path = PATHS["course_table"]
+    return list(_load_rows(*_file_key(path))) if path.is_file() else []
+
+
+def asks_for_ranking(question: str) -> bool:
+    """True when the question is answered by the ranking line (order or compare a field the table holds)."""
+    return bool(_compared_field(question) and _RANKING.search(question) and not _OTHER_ASK.search(question))
+
+
 def clear_table_cache() -> None:
     """Clear cached course rows after rebuilding the course table."""
     _load_rows.cache_clear()

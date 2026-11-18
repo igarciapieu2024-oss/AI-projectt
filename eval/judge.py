@@ -32,6 +32,26 @@ SYSTEM = (
     "0 if wrong, misleading, or unsupported."
 )
 
+# 1. Rubric v2: the answer is judged on what the QUESTION asks. The v1 rubric scored 0 for answers that
+#    were right but did not repeat details of the reference that the question never asked for
+#    ("25% of the grade" without "only the four best quizzes count"). v1 stays the default so earlier
+#    results can be reproduced; v2 is applied to every configuration alike and reported next to v1.
+SYSTEM_V2 = (
+    "You are an impartial evaluator of a university course Q&A system. "
+    "Assess ONLY factual correctness against the supplied reference answer. "
+    "Do not reward confident guesses. "
+    "Ignore writing style and citation format; those are measured separately. "
+    "The candidate may paraphrase correctly. "
+    'Return JSON with keys "correct" (true or false), '
+    '"score" (0, 0.5, or 1), and "reason" (one short sentence). '
+    "Judge the answer on what the QUESTION asks. "
+    "Score 1 if the candidate gets right everything the question asks and states nothing that "
+    "contradicts the reference; details in the reference that the question does not ask for are not required, "
+    "and extra correct information is not penalized. "
+    "Score 0.5 if part of what the question asks is missing or wrong. "
+    "Score 0 if the main fact asked for is wrong, missing, or contradicts the reference."
+)
+
 
 def build_judge_messages(
     answer_text: str,
@@ -278,7 +298,22 @@ def parse_json_response(raw: str) -> dict:
     }
 
 
-def judge_one(row: dict, model: str) -> dict:
+# Phrases the model uses to say the sources do not contain the answer.
+_NOT_IN_MATERIAL = re.compile(
+    r"\b(not (explicitly |directly |specifically )?(covered|specified|mentioned|provided|included|stated|available|found)"
+    r"|no (information|mention|data|details?)"
+    r"|(does|do) not (provide|mention|specify|include|contain|state|cover)"
+    r"|cannot be determined|isn't covered|is not in the (course )?material)\b",
+    re.IGNORECASE,
+)
+
+
+def says_not_in_material(answer: str) -> bool:
+    """True when an answer states that the sources do not contain what was asked."""
+    return bool(_NOT_IN_MATERIAL.search(answer or ""))
+
+
+def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
     """Score one production answer via deterministic checks or Ollama.
 
     Refusals and empty answers use explicit answerability labels, while
@@ -319,9 +354,22 @@ def judge_one(row: dict, model: str) -> dict:
             "judge_method": "deterministic"
         }
 
-    # A non-refusal to an unanswerable question is penalized even if the
-    # response text actually says the information is missing. This known
-    # limitation of the engine's boolean flag motivated manual review.
+    # 1. An unanswerable question answered in the model's own words that the
+    #    material does not contain it ("is not specified in the provided
+    #    sources") is a correct refusal. The engine's flag only marks the exact
+    #    refusal sentence, so manual review found these by hand on dev and test.
+    #    Answerable questions are never scored this way.
+
+    if not answerable and says_not_in_material(answer):
+
+        return {
+            "score": 1.0,
+            "correct": True,
+            "reason": "Semantic refusal: the answer says the material does not contain it",
+            "judge_method": "semantic_refusal"
+        }
+
+    # 2. Any other answer to an unanswerable question is penalized.
 
     if not answerable:
 
@@ -362,7 +410,7 @@ def judge_one(row: dict, model: str) -> dict:
         messages=[
             {
                 "role": "system",
-                "content": SYSTEM
+                "content": SYSTEM_V2 if rubric == "v2" else SYSTEM
             },
             {
                 "role": "user",
@@ -416,6 +464,12 @@ def main():
     parser.add_argument(
         "--allow-test",
         action="store_true"
+    )
+
+    parser.add_argument(
+        "--rubric",
+        choices=["v1", "v2"],
+        default="v1"
     )
 
     args = parser.parse_args()
@@ -483,7 +537,8 @@ def main():
 
             verdict = judge_one(
                 row,
-                args.model
+                args.model,
+                args.rubric
             )
 
             output.append({
@@ -522,6 +577,7 @@ def main():
         "run_dir": str(args.run_dir),
 
         "judge_model": args.model,
+        "rubric": args.rubric,
 
         "evaluated": len(scores),
 
@@ -563,7 +619,7 @@ def main():
     # Save individual judgments
 
     csv_path = (
-        args.run_dir / "judge_questions.csv"
+        args.run_dir / ("judge_questions.csv" if args.rubric == "v1" else "judge_questions_v2.csv")
     )
 
     with csv_path.open(
@@ -591,7 +647,7 @@ def main():
     # Save summary
 
     json_path = (
-        args.run_dir / "judge_summary.json"
+        args.run_dir / ("judge_summary.json" if args.rubric == "v1" else "judge_summary_v2.json")
     )
 
     json_path.write_text(

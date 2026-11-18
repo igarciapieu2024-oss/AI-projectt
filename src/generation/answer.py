@@ -6,6 +6,7 @@ Retrieves evidence from ChromaDB and BM25, then generates a cited answer locally
 """
 from __future__ import annotations
 
+import copy
 import re
 import time
 from dataclasses import replace
@@ -16,6 +17,7 @@ from src.generation import rewrite, selfcheck, table_qa
 from src.generation.llm import chat
 from src.generation.prompts import build_messages
 from src.retrieval import bm25, dense, fusion, rerank
+from src.retrieval.filters import mentioned_course_codes
 from src.retrieval.router import route as route_question
 from src.schemas import AnswerResult, Citation, Filters, Hit, REFUSAL, RouteDecision
 
@@ -101,7 +103,7 @@ def _prepare_answer(
     cfg: Config | None,
 ) -> tuple[
     str, str, Config, list[Hit], list[dict[str, str]] | None, RouteDecision,
-    float, float, float, float, float, bool,
+    float, float, float, float, float, bool, Filters | None,
 ]:
     question = question.strip()
     if not question:
@@ -137,17 +139,49 @@ def _prepare_answer(
         route_decision = route_question(rewritten_question, cfg)
         route_ms = (time.perf_counter() - route_started) * 1000
 
-    if rag_enabled and route_decision.label == "out_of_scope":
+    # 6. With course_split, a comparison of two or more named courses on a field the table holds goes to the
+    #    course table even if the router said course_admin (SA10 was searched and its two weights mixed up).
+    if (
+        rag_enabled
+        and cfg.generation.get("course_split", False)
+        and route_decision.label not in ("cross_course", "out_of_scope")
+        and len(_named_courses(rewritten_question)) >= 2
+        and table_qa.asks_for_ranking(rewritten_question)
+    ):
+        route_decision = RouteDecision(label="cross_course", prob=1.0, source="course_split")
+
+    # 7. With routing.out_of_scope_search, an "out of scope" label no longer refuses without searching: the
+    #    question is searched and the self-check refuses it only if no source scores well. The router sent two
+    #    answerable questions there ("Who teaches Operating Systems ... where did he work before IE?" and a
+    #    question about the Linux directory tree in the slides), and nothing could correct it.
+    if (
+        rag_enabled
+        and route_decision.label == "out_of_scope"
+        and not getattr(cfg, "routing", {}).get("out_of_scope_search", False)
+    ):
         return (
             question, rewritten_question, cfg, [], None, route_decision, started,
-            rewrite_ms, route_ms, 0.0, 0.0, rag_enabled,
+            rewrite_ms, route_ms, 0.0, 0.0, rag_enabled, filters,
         )
+
+    # 1. With retrieval.auto_course_filter, a question that names exactly one course searches only that course,
+    #    so slides of other courses (Macroeconomics and OB slides in a Strategies question) never reach the model.
+    if (
+        rag_enabled
+        and cfg.retrieval.get("auto_course_filter", False)
+        and not (filters and filters.course_code)
+        and route_decision.label != "cross_course"
+    ):
+        named = _named_courses(rewritten_question)
+        if len(named) == 1:
+            filters = Filters(course_code=named[0], sessions=list(filters.sessions) if filters else [])
 
     retrieval_started = time.perf_counter()
     table_hits = False
     hits = []
     if rag_enabled:
-        if route_decision.label == "cross_course":
+        # 2. a cross-course question already split into one course (course_split) is answered from that course's search
+        if route_decision.label == "cross_course" and not (filters and filters.course_code):
             hits = table_qa.answer_from_table(rewritten_question, cfg)
             table_hits = bool(hits)
             if table_hits and hits[0].chunk.chunk_id != "course_ranking":
@@ -178,7 +212,7 @@ def _prepare_answer(
     )
     return (
         question, rewritten_question, cfg, hits, messages, route_decision, started,
-        rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled,
+        rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled, filters,
     )
 
 
@@ -261,6 +295,68 @@ def _make_result(
     )
 
 
+# 5. Short names students use for two courses ("the Strategy course", "Machine Learning Foundations"), added only
+#    for course_split and auto_course_filter so the evaluated matching of the frozen version stays as it was.
+_COURSE_ALIASES = [
+    {"course_code": "strategies", "course_name": "Strategy"},
+    {"course_code": "ai_ml", "course_name": "Machine Learning Foundations"},
+]
+
+
+def _named_courses(question: str) -> list[str]:
+    """Course codes named in the question, in order, each once (course table names plus the short names)."""
+    return list(dict.fromkeys(mentioned_course_codes(question, table_qa.course_rows() + _COURSE_ALIASES)))
+
+
+def _split_by_course(
+    question: str,
+    history: list[dict] | None,
+    filters: Filters | None,
+    cfg: Config,
+) -> AnswerResult | None:
+    """3. With generation.course_split, a question that names two or more courses is answered course by course.
+
+    4. With the sources of several courses together, the model gave one course's midterm session for all three
+       and called 35% and 40% "the same weight". Each course is now searched and answered on its own, with only
+       its own sources, and the parts are joined with their labels renumbered (the second part's [S1] becomes [S6]).
+       Ranking questions keep the exact ranking line from the course table.
+    """
+    if not cfg.generation.get("course_split", False) or not cfg.generation.get("rag", True):
+        return None
+    if filters and filters.course_code:
+        return None
+    rows = table_qa.course_rows()
+    codes = _named_courses(question)
+    if len(codes) < 2 or table_qa.asks_for_ranking(question):
+        return None
+    names = {row["course_code"]: row["course_name"] for row in rows}
+    started = time.perf_counter()
+    single = copy.copy(cfg)
+    single.generation = {**cfg.generation, "course_split": False}
+    parts, hits, timings = [], [], {}
+    for code in codes:
+        sub = answer(
+            f"{question} Answer only for {names.get(code, code)}.",
+            history,
+            Filters(course_code=code, sessions=list(filters.sessions) if filters else []),
+            single,
+        )
+        offset = len(hits)
+        hits.extend(replace(hit, rank=offset + hit.rank, label=f"S{offset + hit.rank}") for hit in sub.context_hits)
+        if sub.refused:
+            parts.append(f"{names.get(code, code)}: the material does not cover it.")
+        else:
+            parts.append(re.sub(r"\[S(\d+)\]", lambda m: f"[S{int(m.group(1)) + offset}]", sub.answer_text))
+        for step, ms in sub.timings_ms.items():
+            timings[step] = timings.get(step, 0.0) + ms
+    route = RouteDecision(label="cross_course", prob=1.0, source="course_split")
+    return _make_result(
+        question, question, route, filters, cfg, hits, " ".join(parts), started,
+        timings.get("rewrite", 0.0), timings.get("route", 0.0), timings.get("retrieve", 0.0),
+        timings.get("rerank", 0.0), timings.get("generate", 0.0), True,
+    )
+
+
 def answer(
     question: str,
     history: list[dict] | None = None,
@@ -268,9 +364,12 @@ def answer(
     cfg: Config | None = None,
 ) -> AnswerResult:
     """Generate an answer from retrieved evidence, or run the no-RAG baseline."""
+    split = _split_by_course(question, history, filters, cfg or load_config("configs/final.yaml"))
+    if split is not None:
+        return split
     (
         question, rewritten_question, cfg, hits, messages, route_decision, started,
-        rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled,
+        rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled, filters,
     ) = _prepare_answer(
         question, history, filters, cfg
     )
@@ -312,9 +411,14 @@ def answer_stream(
     cfg: Config | None = None,
 ) -> Iterator[str | AnswerResult]:
     """Yield generated text pieces and then the validated final result."""
+    split = _split_by_course(question, history, filters, cfg or load_config("configs/final.yaml"))
+    if split is not None:
+        yield split.answer_text
+        yield split
+        return
     (
         question, rewritten_question, cfg, hits, messages, route_decision, started,
-        rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled,
+        rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled, filters,
     ) = _prepare_answer(
         question, history, filters, cfg
     )

@@ -1,0 +1,11 @@
+# Experiment after the test evaluation, measured on dev only.
+# 1. Like final_best, but with the v2 prompt: with v3 the 8B model added "the material does not cover..."
+#    sentences to correct answers (SA07, FRA15) and per-course wording to single-course questions.
+extends: base.yaml
+
+retrieval:
+  auto_course_filter: true
+
+generation:
+  llm_model: llama3.1:8b
+  course_split: true

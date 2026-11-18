@@ -564,3 +564,101 @@ def test_cross_course_questions_the_table_cannot_answer_also_get_search_results(
     assert not result.refused
     assert "session 16" in seen["prompt"] and "session 9" in seen["prompt"]
     assert [citation.label for citation in result.citations] == ["S3", "S4"]
+
+
+def _split_config(**generation):
+    cfg = _config()
+    cfg.generation = {**cfg.generation, **generation}
+    return cfg
+
+
+def test_course_split_answers_each_named_course_with_its_own_sources(monkeypatch):
+    # 1. two courses named, not a ranking: one search per course, and the second part's labels are renumbered
+    monkeypatch.setattr(answer_module.table_qa, "course_rows", lambda: [
+        {"course_code": "macro", "course_name": "Macroeconomics"},
+        {"course_code": "ts", "course_name": "Time Series"},
+    ])
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="course_admin", prob=0.9, source="classifier"),
+    )
+    found = {
+        "macro": _chunk("macro_s01_p017", "Macroeconomics midterm: session 16", course_code="macro"),
+        "ts": _chunk("ts_syl_sec07", "Time Series midterm: session 9", course_code="ts"),
+    }
+    monkeypatch.setattr(
+        answer_module,
+        "_build_hits",
+        lambda question, cfg, filters: [Hit(chunk=found[filters.course_code], rank=1)],
+    )
+    seen = []
+
+    def fake_chat(messages, cfg, stream=False, **kwargs):
+        content = messages[-1]["content"]
+        seen.append(content)
+        return "Session 16 [S1]." if "session 16" in content else "Session 9 [S1]."
+
+    monkeypatch.setattr(answer_module, "chat", fake_chat)
+    question = "In which session is the midterm in Macroeconomics and Time Series?"
+    result = answer_module.answer(question, cfg=_split_config(course_split=True))
+
+    assert len(seen) == 2 and all(("session 16" in c) != ("session 9" in c) for c in seen)
+    assert result.answer_text == "Session 16 [S1]. Session 9 [S2]."
+    assert [c.label for c in result.citations] == ["S1", "S2"]
+    assert not result.refused
+
+
+def test_course_split_is_off_by_default(monkeypatch):
+    monkeypatch.setattr(answer_module.table_qa, "course_rows", lambda: [
+        {"course_code": "macro", "course_name": "Macroeconomics"},
+        {"course_code": "ts", "course_name": "Time Series"},
+    ])
+    assert answer_module._split_by_course("Midterm in Macroeconomics and Time Series?", None, None, _config()) is None
+
+
+def test_auto_course_filter_searches_only_the_one_course_named(monkeypatch):
+    # 1. one course named and the option on: the search gets that course as filter
+    monkeypatch.setattr(answer_module.table_qa, "course_rows", lambda: [
+        {"course_code": "strategies", "course_name": "Strategies"},
+        {"course_code": "macro", "course_name": "Macroeconomics"},
+    ])
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="course_admin", prob=0.9, source="classifier"),
+    )
+    used = {}
+
+    def fake_hits(question, cfg, filters):
+        used["filters"] = filters
+        return [Hit(chunk=_chunk("strategies_syl_sec08", "Quizzes: 25%", course_code="strategies"), rank=1)]
+
+    monkeypatch.setattr(answer_module, "_build_hits", fake_hits)
+    monkeypatch.setattr(answer_module, "chat", lambda *args, **kwargs: "25% [S1].")
+    cfg = _config()
+    cfg.retrieval = {**cfg.retrieval, "auto_course_filter": True}
+    result = answer_module.answer("What percentage of the Strategy grade comes from quizzes?", cfg=cfg)
+    assert used["filters"].course_code == "strategies"
+    assert result.filters_used.course_code == "strategies"
+
+
+def test_out_of_scope_search_lets_the_self_check_decide(monkeypatch):
+    # 1. with the option on, an "out of scope" label still searches; a strong source gets an answer
+    monkeypatch.setattr(
+        answer_module,
+        "route_question",
+        lambda question, cfg: RouteDecision(label="out_of_scope", prob=0.79, source="classifier"),
+    )
+    searched = []
+
+    def fake_hits(question, cfg, filters):
+        searched.append(question)
+        return [Hit(chunk=_chunk("os_syl_sec02", "Professor: Matteo Turilli", course_code="os"), rank=1)]
+
+    monkeypatch.setattr(answer_module, "_build_hits", fake_hits)
+    monkeypatch.setattr(answer_module, "chat", lambda *args, **kwargs: "Matteo Turilli [S1].")
+    cfg = _config()
+    cfg.routing = {"out_of_scope_search": True}
+    result = answer_module.answer("Who teaches Operating Systems?", cfg=cfg)
+    assert searched and not result.refused

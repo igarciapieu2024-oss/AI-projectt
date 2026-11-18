@@ -1,0 +1,7 @@
+# Experiment after the test evaluation, measured on dev only.
+# 1. Same as final, with prompt v3: course name on every source and explicit rules for several courses,
+#    two-part questions and facts that are not in the material.
+extends: base.yaml
+
+generation:
+  prompt_version: v3
