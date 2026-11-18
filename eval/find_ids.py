@@ -16,7 +16,12 @@ from src.config import PATHS
 
 
 def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
-    """Search syllabus sections, slides and image text for query words."""
+    """Locate candidate gold IDs across syllabus, slide, and OCR records.
+
+    This is a literal all-words search for annotation assistance, not the
+    production semantic retriever. Image matches use their parent slide ID
+    because that is the source cited by the RAG knowledge base.
+    """
     words = query.casefold().split()
     if not words:
         return []
@@ -84,6 +89,7 @@ def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
 
 
 def main() -> None:
+    """Expose the annotation helper as a command-line search."""
     parser = argparse.ArgumentParser(
         description="Find syllabus section and slide IDs."
     )

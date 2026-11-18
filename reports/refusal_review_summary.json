@@ -1,0 +1,9 @@
+{
+  "run_dir": "eval/runs/20261114T190438Z_final_dev",
+  "evaluated": 40,
+  "reviewed_refusals": 3,
+  "semantic_refusal_accuracy": 0.925,
+  "semantic_false_refusal_rate": 0.0857,
+  "semantic_unanswerable_refusal_rate": 1.0,
+  "note": "Metrics incorporate documented manual review. Original evaluation results remain unchanged."
+}

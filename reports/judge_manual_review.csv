@@ -1,0 +1,7 @@
+question_id,original_score,reviewed_score,status,reason
+FRA17,0,1,corrected,Valid semantic refusal. The answer states that the requested information is unavailable.
+IRE17,0,1,corrected,Valid semantic refusal. The answer states that the assignment length is not specified.
+SER17,0,1,corrected,Valid semantic refusal. Personal grades are not available in the course materials.
+SA13,0,,needs_review,The answer contains the essential correct VRIO facts but includes irrelevant information from other diagrams.
+FRA05,0,1,corrected,Confirmed by Irene. The answer is correct; the reference omits Management Control and Time Series.
+FRA09,0,1,corrected,Confirmed by Irene. Correct explanation of the Bertrand paradox: price equals marginal cost and profit is zero.

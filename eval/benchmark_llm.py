@@ -38,7 +38,11 @@ class BenchmarkRun:
 
 
 def benchmark_model(model: str, runs: int) -> list[BenchmarkRun]:
-    """Run the same prompt repeatedly and return elapsed times and responses."""
+    """Run a fixed cited-answer prompt repeatedly for one Ollama model.
+
+    Keeping the prompt constant makes timings easier to compare, though
+    latency alone says nothing about answer accuracy or citation quality.
+    """
     config = load_config("configs/final.yaml")
     config.generation["llm_model"] = model
     results = []
@@ -55,6 +59,7 @@ def benchmark_model(model: str, runs: int) -> list[BenchmarkRun]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Print per-model latency and the pass/fail time-target comparison."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS, help="Ollama model tags to test")
     parser.add_argument("--runs", type=int, default=1, help="Runs per model (default: 1)")
