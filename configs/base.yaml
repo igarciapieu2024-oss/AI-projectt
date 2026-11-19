@@ -1,45 +1,52 @@
-# Shared defaults (tell the group before changing this file).
-# Every other config starts with `extends: base.yaml` and changes only what differs.
+# Default settings shared by every version of the system.
+# Other configs start with `extends: base.yaml` and only list the settings they change,
+# so two versions can be compared knowing exactly what is different between them.
 
+# kb: how the knowledge base is built (src/kb/). Changing anything here changes kb_sig,
+# so the variant gets its own chunks and indexes instead of overwriting the current ones.
 kb:
   sources: [syllabi, slides]
-  use_ocr: true
-  use_captions: true
-  chunk_strategy: slide        # section | slide
-  chunk_size: 800
-  chunk_overlap: 120
-  embed_model: sentence-transformers/all-MiniLM-L6-v2
-  dedup: true
-  course_rows: true            # one clean summary chunk per course from the course table
+  use_ocr: true                # add the text read inside slide images (EasyOCR)
+  use_captions: true           # add the vision model's description of each useful image
+  chunk_strategy: slide        # not read by the current code; left from the first design
+  chunk_size: 800              # max characters per chunk, cut at sentence ends
+  chunk_overlap: 120           # last sentences repeated in the next chunk so no idea is split in half
+  embed_model: sentence-transformers/all-MiniLM-L6-v2   # small embedding model (384 dimensions) that runs on a CPU
+  dedup: true                  # remove near-duplicate slides repeated across decks
+  course_rows: true            # one clean summary chunk per course, built from the course table
 
+# retrieval: how the chunks are searched (src/retrieval/)
 retrieval:
-  mode: hybrid                 # dense | hybrid
-  k_dense: 20
-  k_bm25: 20
-  rrf_k: 60
-  rerank: true
+  mode: hybrid                 # dense = vector search only; hybrid = vector search + BM25 keyword search
+  k_dense: 20                  # candidates from the vector search
+  k_bm25: 20                   # candidates from the keyword search
+  rrf_k: 60                    # constant of Reciprocal Rank Fusion; 60 is the usual value
+  rerank: true                 # reorder the candidates with a cross-encoder
   reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
-  top_k: 5
-  filters: true
-  small_to_big: true
+  top_k: 5                     # sources given to the LLM
+  filters: true                # not read by the current code: course filters are always applied when there is a course
+  small_to_big: true           # not read by the current code; left from the first design
 
+# routing: the question classifier (src/retrieval/router.py)
 routing:
-  router: classifier           # none | classifier | llm
-  min_prob: 0.6
+  router: classifier           # decides who classifies the questions: none (not classified) | classifier (trained SVM) | llm (ask language model, which is slower)
+  min_prob: 0.6                # below this probability the LLM decides the class instead
 
+# generation: how the answer is written and checked (src/generation/)
 generation:
-  rag: true
-  llm_model: llama3.2:3b       # selected after local latency benchmark
-  vision_model: qwen2.5vl:7b   # classifies + describes slide images; use qwen2.5vl:3b if the laptop runs out of memory
+  rag: true                    # false = the LLM answers alone, without sources (baseline B0)
+  llm_model: llama3.2:3b       # chosen for speed after the local latency benchmark; final_best5 switches to llama3.1:8b
+  vision_model: qwen2.5vl:7b   # classifies and describes slide images; qwen2.5vl:3b if the laptop runs out of memory
   prompt_version: v2
-  temperature: 0.1
-  num_predict: 400
-  query_num_predict: 96
-  translate_query: true
-  rewrite: true
-  selfcheck: true
-  selfcheck_threshold: 0.2     # tuned on dev by Elena (Sat 14)
+  temperature: 0.1             # low, so answers stay close to the sources
+  num_predict: 400             # max tokens per answer
+  query_num_predict: 96        # max tokens when rewriting or translating a question
+  translate_query: true        # non-English questions are translated to English before searching
+  rewrite: true                # follow-up questions are rewritten as standalone questions
+  selfcheck: true              # refuse when the best source is too weak
+  selfcheck_threshold: 0.2     # minimum reranker score of the best source, tuned on the dev questions
 
+# eval: evaluation settings
 eval:
-  judge_model: qwen2.5:7b
-  split: dev
+  judge_model: qwen2.5:7b      # LLM that grades the answers (only used in eval/)
+  split: dev                   # not read by
