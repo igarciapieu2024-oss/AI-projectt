@@ -1,9 +1,13 @@
-# Experiment after the second holdout, measured on dev first.
-# 1. final_best5 plus kb.slide_tables: slide tables are added to their chunks row by row, each value with its
-#    column header. Three holdout 2 errors came from tables read with their columns mixed (the New Orleans
-#    hotel got Chicago's 2,340,000; "strong oral communication" listed as most important; thread and process
-#    times swapped). This changes the knowledge base, so it gets its own kb_sig and its own index.
+# FINAL SYSTEM, part 2 of 2: the configuration we present (73.3% on holdout 3, 30 unseen questions).
+# Run it with:  python -m src.pipeline build --config configs/final_tables.yaml
+# Main change versus final_best5.yaml (which holds the other changes vs base.yaml):
+# - slide tables are added to their chunks row by row, each value next to its column header.
+#   Three holdout 2 errors came from tables whose columns were read mixed up such as a New Orleans hotel got
+#   Chicago's 2,340,000, a survey ranking came out in the wrong order, and thread and process times were swapped.
+#
+# This setting is in the kb group, so it changes the knowledge base: this config gets its own kb_sig
+#  and its own chunks and indexes, and the indexes of final_best5 are left untouched.
 extends: final_best5.yaml
 
 kb:
-  slide_tables: true
+  slide_tables: true           # read slide tables row by row (src/kb/slide_tables.py)
