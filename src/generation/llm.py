@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from typing import Any
 
+# calls the answer-generating model
 
 class ChatText(str):
     """Text response that retains Ollama's completion reason."""

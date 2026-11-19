@@ -10,8 +10,7 @@ from typing import Any
 from src.generation.llm import chat
 
 
-def detect_language(question: str) -> str:
-    """Return the ISO language code most likely used by a short question."""
+def detect_language(question: str) -> str: # Return the ISO language code most likely used by a short question
     if not isinstance(question, str) or not question.strip():
         raise ValueError("question must not be empty")
     from langid import classify
@@ -20,8 +19,7 @@ def detect_language(question: str) -> str:
     return language
 
 
-def translate_to_english(question: str, cfg) -> str:
-    """Translate a non-English search query to English without answering it."""
+def translate_to_english(question: str, cfg) -> str: # Translate a non-English search query to English without answering it.
     question = question.strip()
     if not question:
         raise ValueError("question must not be empty")
@@ -60,19 +58,18 @@ _FOLLOW_UP = re.compile(
 )
 
 
-def looks_like_follow_up(question: str) -> bool:
-    """True when the question refers to the conversation or is too short to stand alone."""
+def looks_like_follow_up(question: str) -> bool: # true when the question refers to the conversation or is too short to stand alone
     return bool(_FOLLOW_UP.search(question)) or len(question.split()) <= 3
 
 
-def rewrite(
+def rewrite( # rewrite a follow-up as a standalone question without answering it
     question: str,
     history: list[dict[str, Any]],
     cfg,
     *,
     translate_to_english: bool = False,
 ) -> str:
-    """Rewrite a follow-up as a standalone question without answering it."""
+    
     question = question.strip()
     if not question:
         raise ValueError("question must not be empty")
@@ -121,27 +118,23 @@ def rewrite(
 _CITATION = re.compile(r"\[S\d+\]")
 
 
-def looks_like_question(text: str) -> bool:
-    """2. A usable rewrite is one line, ends with a question mark and carries no source labels."""
+def looks_like_question(text: str) -> bool: # usable rewrite is one line, ends with a question mark and carries no source labels
     text = text.strip()
     return bool(text) and "\n" not in text and text.endswith("?") and not _CITATION.search(text)
 
 
-def _join_with_previous(question: str, history: list[dict[str, Any]]) -> str:
-    """3. The last user question and the follow-up together, so the search still sees the topic."""
+def _join_with_previous(question: str, history: list[dict[str, Any]]) -> str: # the last user question and the follow-up together, so the search still sees the topic
     previous = [item["content"].strip() for item in history if item.get("role") == "user"]
     if not previous:
         return question
     return f"{previous[-1]} {question}"
 
 
-def translate_to_english_query(question: str, cfg) -> str:
-    """Translate only non-English text, preserving English queries unchanged."""
+def translate_to_english_query(question: str, cfg) -> str: # translate only non-English text, preserving English queries unchanged
     if detect_language(question) == "en":
         return question
     return translate_to_english(question, cfg)
 
 
-def _query_token_limit(cfg) -> int:
-    """Keep short query transformations on their own small generation budget."""
+def _query_token_limit(cfg) -> int: # keep short query transformations on their own small generation budget
     return getattr(cfg, "generation", {}).get("query_num_predict", 96)

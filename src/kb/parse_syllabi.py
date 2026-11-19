@@ -4,6 +4,9 @@ Output: data/interim/syllabus_sections.jsonl
 One record is written per detected syllabus section. Tables are stored as Markdown.
 """
 
+# Syllabus PDF reader in preparation pipeline
+# Organizes syllabus content for later steps
+
 from __future__ import annotations
 
 import re

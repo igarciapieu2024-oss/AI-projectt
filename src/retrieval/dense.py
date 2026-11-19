@@ -9,6 +9,8 @@ from src.retrieval.embed import embed
 from src.retrieval.index_cache import get_chroma_collection, load_chunks
 from src.schemas import Filters, Hit
 
+# for converting to an embedding
+# uses ChromaDB: an open-source database for storing vector embeddings, documents, and metadata for semantic, keyword, and hybrid search
 
 def _validate_k(k: int) -> None:
     if not isinstance(k, int) or isinstance(k, bool) or k < 1:

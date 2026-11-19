@@ -9,6 +9,7 @@ from src.kb.build_indexes import tokenize
 from src.retrieval.index_cache import load_bm25, load_chunks
 from src.schemas import Filters, Hit
 
+# searches by keywords
 
 def _validate_k(k: int) -> None:
     if not isinstance(k, int) or isinstance(k, bool) or k < 1:

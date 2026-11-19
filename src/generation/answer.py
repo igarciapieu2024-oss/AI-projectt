@@ -1,15 +1,12 @@
-"""Question-answering API used by the app and evaluation.
 
-Owner: Sergio.
+# Retrieves evidence from ChromaDB and BM25, then generates a cited answer locally.
 
-Retrieves evidence from ChromaDB and BM25, then generates a cited answer locally.
-"""
 from __future__ import annotations
 
-import copy
-import re
-import time
-from dataclasses import replace
+import copy                      # allows for creating true duplicates for mutable objects
+import re                        # used for searching, matching, extracting, manipulating text based on pattern in the text in question
+import time                      # for timing
+from dataclasses import replace  # 
 from typing import Iterator
 
 from src.config import Config, load_config
@@ -21,14 +18,20 @@ from src.retrieval.filters import mentioned_course_codes
 from src.retrieval.router import route as route_question
 from src.schemas import AnswerResult, Citation, Filters, Hit, REFUSAL, RouteDecision
 
-_CITATION = re.compile(r"[\[(]S(\d+)[\])]", re.IGNORECASE)
-_COMPLETE_CITED_SENTENCE = re.compile(
+# Rules for recognizing or rewriting text in the answer:
+
+_CITATION = re.compile(r"[\[(]S(\d+)[\])]", re.IGNORECASE) # finds source labels
+
+_COMPLETE_CITED_SENTENCE = re.compile(                     # finds objects before or after a punctuation
     r"(?:\s*\[S\d+\])*[.!?](?:\s*\[S\d+\])*(?=\s|$)",
     re.IGNORECASE,
 )
-_COMPLETE_SENTENCE = re.compile(r"[.!?](?=\s|$)")
+
+_COMPLETE_SENTENCE = re.compile(r"[.!?](?=\s|$)")          # detects the end of standard sentences
 
 
+# Removes the unfinished end of an answer (when the output limit cuts it off mid-sentence)
+  
 def _trim_to_last_complete_sentence(answer_text: str, rag_enabled: bool) -> str:
     """Drop a length-truncated tail that does not end in a complete sentence."""
     sentence_pattern = _COMPLETE_CITED_SENTENCE if rag_enabled else _COMPLETE_SENTENCE
@@ -38,6 +41,8 @@ def _trim_to_last_complete_sentence(answer_text: str, rag_enabled: bool) -> str:
     return answer_text[:completed[-1].end()].rstrip()
 
 
+# Makes sure the value for top_k is a valid number
+  
 def _top_k(cfg: Config) -> int:
     top_k = cfg.retrieval.get("top_k", 5)
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k < 1:
@@ -45,56 +50,68 @@ def _top_k(cfg: Config) -> int:
     return top_k
 
 
+# Performing retrieval
+
 def _build_hits(question: str, cfg: Config, filters: Filters | None) -> list[Hit]:
+    
     top_k = _top_k(cfg)
-    mode = cfg.retrieval.get("mode", "hybrid")
+    
+    mode = cfg.retrieval.get("mode", "hybrid") # validates & saves the kind of search
     if mode not in {"dense", "hybrid"}:
         raise ValueError(f"unsupported retrieval.mode: {mode!r}")
-    dense_k = cfg.retrieval.get("k_dense", top_k)
+    
+    dense_k = cfg.retrieval.get("k_dense", top_k) # validates & saves the number of candidates to retrieve for embedding search
     if not isinstance(dense_k, int) or isinstance(dense_k, bool) or dense_k < 1:
         raise ValueError(f"retrieval.k_dense must be a positive integer; got {dense_k!r}")
 
-    dense_hits = dense.search(question, cfg, filters, dense_k)
+    dense_hits = dense.search(question, cfg, filters, dense_k) # performs the dense search (searches by comparing embeddings/vectors)
     if mode == "dense":
         return dense_hits
 
-    bm25_k = cfg.retrieval.get("k_bm25", top_k)
+    bm25_k = cfg.retrieval.get("k_bm25", top_k) # validates & saves the number of candidates to retrieve for keyword search
     if not isinstance(bm25_k, int) or isinstance(bm25_k, bool) or bm25_k < 1:
         raise ValueError(f"retrieval.k_bm25 must be a positive integer; got {bm25_k!r}")
-    bm25_hits = bm25.search(question, cfg, filters, bm25_k)
-    rrf_k = cfg.retrieval.get("rrf_k", 60)
+    
+    bm25_hits = bm25.search(question, cfg, filters, bm25_k) # performs the keyword search (BM25, searches by keywords )
+    
+    rrf_k = cfg.retrieval.get("rrf_k", 60) # validates & saves the reciprocal-rank-fusion constant
     if not isinstance(rrf_k, int) or isinstance(rrf_k, bool) or rrf_k < 1:
         raise ValueError(f"retrieval.rrf_k must be a positive integer; got {rrf_k!r}")
-    return fusion.rrf([dense_hits, bm25_hits], k=rrf_k)
+    
+    return fusion.rrf([dense_hits, bm25_hits], k=rrf_k) # combines the dense and keyword search into one list
 
+
+# Function adds course-material chunks when course-table answers (summaries of the course) are not enough to answer questions
+# Searches the slides and syllabi for extra supporting chunks limited to the courses.
 
 def _course_search_hits(question: str, cfg: Config, table_rows: list[Hit]) -> list[Hit]:
-    """1. Search results added to the course table rows for cross-course questions the table cannot answer.
 
-    2. The course table holds weights, attendance, professor and sessions, but not midterm sessions,
-       textbooks or case details, so "In which session is the midterm in Macroeconomics, Management
-       Control and Time Series?" was refused with only the table rows as sources.
-    3. Each course named in the rows gets its best search results (1 or 2), filtered to that course;
-       with all 7 rows (no course named) the 3 best unfiltered results are added instead.
-    """
+    # extracts the course codes from course-table (summaries) rows that are relevant to the question
     codes = list(dict.fromkeys(hit.chunk.course_code for hit in table_rows if hit.chunk.course_code))
-    use_rerank = cfg.retrieval.get("rerank", False)
+    use_rerank = cfg.retrieval.get("rerank", False) # checks if reranking is enabled in the configurations
 
+    # a function that can retrieve candidates again (this time with the filter of the course)
     def best(filters: Filters | None, keep: int) -> list[Hit]:
-        # 4. only the 10 best fused candidates go to the reranker, to keep the extra time low
-        candidates = _build_hits(question, cfg, filters)[:10]
+        candidates = _build_hits(question, cfg, filters)[:10] # performs retrieval and keeps 10 highest candidates
         if not candidates:
             return []
         return rerank.rerank(question, candidates, keep, cfg) if use_rerank else candidates[:keep]
 
-    if not codes or len(codes) >= 7:
-        return best(None, 3)
-    keep = 2 if len(codes) <= 2 else 1
-    found = []
+    # decides how many extra chunks to retrieve per course
+    if not codes or len(codes) >= 7: # if no course codes are available / all courses are involved
+        return best(None, 3)         # uses the helper function to find 3 best chunks
+    
+    keep = 2 if len(codes) <= 2 else 1 # "keep" is the number of chunks per course (keeps 1 if there are more than 2 courses)
+    
+    found = [] # "found" will become a list of chunks with matching course codes to the question
+    
     for code in codes:
-        found.extend(best(Filters(course_code=code), keep))
-    return found
+        found.extend(best(Filters(course_code=code), keep)) # runs the "best" function and keeps a limited number per course
+    return found                                            # gives the chunks that are found
 
+
+# Setup and evidence-gathering stage
+# Prepares everything for answering a question
 
 def _prepare_answer(
     question: str,
@@ -105,7 +122,7 @@ def _prepare_answer(
     str, str, Config, list[Hit], list[dict[str, str]] | None, RouteDecision,
     float, float, float, float, float, bool, Filters | None,
 ]:
-    question = question.strip()
+    question = question.strip() # cleans and initializes the question (removes spaces around the question)
     if not question:
         raise ValueError("question must not be empty")
 
@@ -115,6 +132,8 @@ def _prepare_answer(
     rag_enabled = cfg.generation.get("rag", True)
     rewrite_ms = 0.0
     translation_enabled = rag_enabled and cfg.generation.get("translate_query", False)
+    
+    # translates the question (if config enables it)
     if (history and cfg.generation.get("rewrite", False)) or translation_enabled:
         rewrite_started = time.perf_counter()
         translate_to_english = translation_enabled and rewrite.detect_language(question) != "en"
@@ -132,15 +151,14 @@ def _prepare_answer(
             rewritten_question = rewrite.translate_to_english(question, cfg)
         rewrite_ms = (time.perf_counter() - rewrite_started) * 1000
 
+    # classifies the rewritten question
     route_ms = 0.0
     route_decision = RouteDecision(label="none", prob=0.0, source="none")
     if rag_enabled:
         route_started = time.perf_counter()
-        route_decision = route_question(rewritten_question, cfg)
+        route_decision = route_question(rewritten_question, cfg) # routes the question
         route_ms = (time.perf_counter() - route_started) * 1000
 
-    # 6. With course_split, a comparison of two or more named courses on a field the table holds goes to the
-    #    course table even if the router said course_admin (SA10 was searched and its two weights mixed up).
     if (
         rag_enabled
         and cfg.generation.get("course_split", False)
@@ -150,10 +168,6 @@ def _prepare_answer(
     ):
         route_decision = RouteDecision(label="cross_course", prob=1.0, source="course_split")
 
-    # 8. With routing.named_course_in_scope, a question that names a course of the programme is never sent out
-    #    of scope by the router: "In the beer market example in Strategy, how many surveys..." got 0.60 for
-    #    out_of_scope and was refused without a search. It is searched, and the self-check and the model still
-    #    refuse it when the material does not have the answer.
     if (
         rag_enabled
         and route_decision.label == "out_of_scope"
@@ -162,10 +176,6 @@ def _prepare_answer(
     ):
         route_decision = RouteDecision(label="course_content", prob=route_decision.prob, source="named_course")
 
-    # 7. With routing.out_of_scope_search, an "out of scope" label no longer refuses without searching: the
-    #    question is searched and the self-check refuses it only if no source scores well. The router sent two
-    #    answerable questions there ("Who teaches Operating Systems ... where did he work before IE?" and a
-    #    question about the Linux directory tree in the slides), and nothing could correct it.
     if (
         rag_enabled
         and route_decision.label == "out_of_scope"
@@ -176,8 +186,6 @@ def _prepare_answer(
             rewrite_ms, route_ms, 0.0, 0.0, rag_enabled, filters,
         )
 
-    # 1. With retrieval.auto_course_filter, a question that names exactly one course searches only that course,
-    #    so slides of other courses (Macroeconomics and OB slides in a Strategies question) never reach the model.
     if (
         rag_enabled
         and cfg.retrieval.get("auto_course_filter", False)
@@ -192,7 +200,7 @@ def _prepare_answer(
     table_hits = False
     hits = []
     if rag_enabled:
-        # 2. a cross-course question already split into one course (course_split) is answered from that course's search
+
         if route_decision.label == "cross_course" and not (filters and filters.course_code):
             hits = table_qa.answer_from_table(rewritten_question, cfg)
             table_hits = bool(hits)

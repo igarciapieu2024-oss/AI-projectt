@@ -1,5 +1,7 @@
 """Build chunks and parents from parsed documents and optional image text."""
 
+# Creates chunks from prepared text
+
 from __future__ import annotations
 
 import re

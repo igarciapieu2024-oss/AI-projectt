@@ -8,6 +8,8 @@ from typing import Any
 
 from src.schemas import Hit
 
+# formats the question and sources for the LLM
+
 _RAG_SYSTEM = {
     "v1": (
         "Answer the question using only the supplied course sources. Cite factual "

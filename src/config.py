@@ -51,45 +51,45 @@ PATHS = {
     "runs": ROOT / "eval" / "runs",
     "reports": ROOT / "reports",
     "figures": ROOT / "docs" / "figures",
-}
+} # defining file paths
 
 
-def chunks_path(kb_sig: str) -> Path:
+def chunks_path(kb_sig: str) -> Path: # builds path for saved chunk records belonging to KB version
     return PATHS["processed"] / f"chunks__{kb_sig}.jsonl"
 
 
-def parents_path(kb_sig: str) -> Path:
+def parents_path(kb_sig: str) -> Path: # builds path for saved chunk parent records
     return PATHS["processed"] / f"parents__{kb_sig}.jsonl"
 
 
-def bm25_path(kb_sig: str) -> Path:
+def bm25_path(kb_sig: str) -> Path: # builds path for saved chunk BM25 keyword index
     return PATHS["processed"] / f"bm25__{kb_sig}.pkl"
 
 
-GROUPS = ("kb", "retrieval", "routing", "generation", "eval")
+GROUPS = ("kb", "retrieval", "routing", "generation", "eval") # list of YAML sections
 
 
-@dataclass
-class Config:
-    name: str
-    path: Path
-    kb: dict[str, Any] = field(default_factory=dict)
-    retrieval: dict[str, Any] = field(default_factory=dict)
-    routing: dict[str, Any] = field(default_factory=dict)
-    generation: dict[str, Any] = field(default_factory=dict)
-    eval: dict[str, Any] = field(default_factory=dict)
+@dataclass # automatically creates __init__ for fields below
+class Config: # declaring the shape of a "Config" object (instances will hold configurations)
+    name: str                                                   # required field (name will be text)
+    path: Path                                                  # required field (holds the path to the config file)
+    kb: dict[str, Any] = field(default_factory=dict)            # field for kb settings of YAML (creates a new dictionary if none provided)
+    retrieval: dict[str, Any] = field(default_factory=dict)     # same as above but for retrieval  settings
+    routing: dict[str, Any] = field(default_factory=dict)       # same as above but for routing    settings
+    generation: dict[str, Any] = field(default_factory=dict)    # same as above but for generation settings
+    eval: dict[str, Any] = field(default_factory=dict)          # same as above but for eval       settings
 
-    @property
-    def kb_sig(self) -> str:
-        blob = json.dumps(self.kb, sort_keys=True, default=str)
-        return hashlib.sha1(blob.encode("utf-8")).hexdigest()[:8]
+    @property # makes the method below have attribute behavior (ex: cfg.kb_sig , not cgf.kb_sig() )
+    def kb_sig(self) -> str: # result of the config is intended as text
+        blob = json.dumps(self.kb, sort_keys=True, default=str)         # takes kb dictionary of config and converts to a string in JSON format
+        return hashlib.sha1(blob.encode("utf-8")).hexdigest()[:8]       # turns the string into bytes
 
-    @property
+    @property # attribute behavior
     def collection_name(self) -> str:
-        return f"kb_{self.kb_sig}"
+        return f"kb_{self.kb_sig}"     # adds "kb_" to the string output of kb_sig (above) 
 
 
-def _merge(base: dict, override: dict) -> dict:
+def _merge(base: dict, override: dict) -> dict: # combines inherited settings with overrides
     out = dict(base)
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(out.get(key), dict):
@@ -99,7 +99,7 @@ def _merge(base: dict, override: dict) -> dict:
     return out
 
 
-def _load_raw(path: Path) -> dict:
+def _load_raw(path: Path) -> dict: # reads a YAML file
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     parent = data.pop("extends", None)
     if parent:
@@ -107,7 +107,7 @@ def _load_raw(path: Path) -> dict:
     return data
 
 
-def load_config(path: str | Path = "configs/base.yaml") -> Config:
+def load_config(path: str | Path = "configs/base.yaml") -> Config: # callable function for loading a Config object from a YAML file
     path = Path(path)
     if not path.is_absolute():
         path = ROOT / path

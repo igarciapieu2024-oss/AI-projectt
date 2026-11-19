@@ -9,6 +9,9 @@ Why this exists:
 
 Only the text of the chunks changes: section_ids and slide_ids stay the same, so the evaluation's gold_ids still match.
 """
+
+# formats and splits syllabus text; also creates course-summary chunks
+
 from __future__ import annotations  # lets us write types like "list[str] | None" in any Python version
 
 import json  # the course table stores the evaluation components as a JSON list

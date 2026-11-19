@@ -2,6 +2,8 @@
 
 Owner: Santiago.
 """
+# Builds structured course data for cross-course questions
+
 from __future__ import annotations
 
 import json

@@ -2,6 +2,9 @@
 
 Owner: Sergio.
 """
+
+# checks if retrieved chunks are strong enough (meet threshold)
+
 from __future__ import annotations
 
 import math

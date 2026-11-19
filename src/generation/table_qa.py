@@ -14,6 +14,7 @@ from src.retrieval.filters import mentioned_course_codes
 from src.schemas import Chunk, CourseRow, Hit
 from src.utils.io import read_csv
 
+# answers from the structured course table, sometimes supplemented with retrieved chunks
 
 def _file_key(path: Path) -> tuple[str, int, int]:
     stat = path.stat()

@@ -3,6 +3,9 @@
 Every page imports answer_stream and courses from here, so the switch between the fake
 and the real engine happens in one place only.
 """
+
+# connects the app to the answer system
+
 from __future__ import annotations  # lets us write types like "dict[str, str]" in any Python version
 
 import csv  # reads the manifest

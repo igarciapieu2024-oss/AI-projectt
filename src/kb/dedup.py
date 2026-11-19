@@ -1,4 +1,7 @@
 """Mark near-duplicate slide chunks with DBSCAN using cosine distance."""
+
+# identifies duplicate chunks
+
 from __future__ import annotations
 
 import logging

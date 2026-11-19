@@ -11,6 +11,8 @@ from app_components.sources import render_sources  # the source cards
 from app_components.theme import html, image_data_uri  # our HTML helper and the logo loader
 from src.schemas import AnswerResult, Filters  # the agreed answer format and the filters format
 
+# Takes the user's question and course selection.
+
 #1 a narrower page, like a chat app: the conversation in the middle of the screen
 html("""<style>
     [data-testid="stMainBlockContainer"], [data-testid="stBottomBlockContainer"] { max-width: 880px; }

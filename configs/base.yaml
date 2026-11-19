@@ -1,45 +1,51 @@
 # Shared defaults (tell the group before changing this file).
-# Every other config starts with `extends: base.yaml` and changes only what differs.
 
-kb:
-  sources: [syllabi, slides]
-  use_ocr: true
-  use_captions: true
-  chunk_strategy: slide        # section | slide
-  chunk_size: 800
-  chunk_overlap: 120
-  embed_model: sentence-transformers/all-MiniLM-L6-v2
-  dedup: true
-  course_rows: true            # one clean summary chunk per course from the course table
+# Every other config file starts with `extends: base.yaml` (they inherit the settings in base.yaml)
+# Every other config file can specify the settings they want to change.
 
-retrieval:
-  mode: hybrid                 # dense | hybrid
-  k_dense: 20
-  k_bm25: 20
-  rrf_k: 60
-  rerank: true
-  reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
-  top_k: 5
-  filters: true
-  small_to_big: true
+# Configuration (cfg) objects contain the settings loaded from this YAML
 
-routing:
-  router: classifier           # none | classifier | llm
-  min_prob: 0.6
+kb:                            # "kb" = knowledge base, i.e., the vector database
+  sources: [syllabi, slides]      # course materials used as sources
+  use_ocr: true                   # "ocr" = Optical Character Recognition - so slide images are used
+  use_captions: true              # slide descriptions are also included
+  chunk_strategy: slide           # section | slide (no effect on code, not used)
+  chunk_size: 800                 # maximum size in character for chunks
+  chunk_overlap: 120              # overlap of 120 characters between chunks
+  embed_model: sentence-transformers/all-MiniLM-L6-v2 # selected embedding model
+  dedup: true                     # keeps track of chunks with repetitive information
+  course_rows: true               # add an extra searchable summary chunk per course containing course information
 
-generation:
-  rag: true
-  llm_model: llama3.2:3b       # selected after local latency benchmark
-  vision_model: qwen2.5vl:7b   # classifies + describes slide images; use qwen2.5vl:3b if the laptop runs out of memory
-  prompt_version: v2
-  temperature: 0.1
-  num_predict: 400
-  query_num_predict: 96
-  translate_query: true
-  rewrite: true
-  selfcheck: true
-  selfcheck_threshold: 0.2     # tuned on dev by Elena (Sat 14)
+retrieval:                     # how the system searches and ranks chunks
+  mode: hybrid                    # hybrid means it uses both dense search (embedding) and BM25 keyword search
+  k_dense: 20                     # dense search returns at most 20 chunk candidates
+  k_bm25: 20                      # BM25 search returns at most 20 chunk candidates
+  rrf_k: 60                       # 60 is the conventional choice for the parameter that controls the contribution of rank positions (1/(k+60))
+  rerank: true                    # will do a rerank using the cross-encoder
+  reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2 # selected cross-encoder model
+  top_k: 5                        # top 5 chunks will be used for the answer
+  filters: true                   # course filters are applied when searching (no effect on code, not used)
+  small_to_big: true              # a type of retrieval (isnt used in the code)
 
-eval:
-  judge_model: qwen2.5:7b
-  split: dev
+routing:                       # for categorizing the type of question (course-admin, course-content, cross-course, or out-of-scope)
+  router: classifier              # uses the trained classifier of the project
+  min_prob: 0.6                   # if the confidence is below 0.6, will classify as a "fallback"
+
+generation:                    # how the question is prepared and how the answer is produced
+  rag: true                       # rag will be used
+  llm_model: llama3.2:3b          # selected model for writing the answer
+  vision_model: qwen2.5vl:7b      # selected model for analyzing slide images
+  prompt_version: v2              # type of instructions given to the LLM (v2 more strict with sticking to sources than v1)
+  temperature: 0.1                # how much the generated tokens vary (temperature = variation)
+  num_predict: 400                # the output is limited to 400 tokens
+  query_num_predict: 96           # the rewritten translated query is limited to 96 tokens
+  translate_query: true           # will translate non-English questions to English
+  rewrite: true                   # the system can rewrite the prompt using conversation history to be more clear
+  selfcheck: true                 # checks the retrieved chunks before generation
+  selfcheck_threshold: 0.2        # if the best chunk score is below 0.2, the system refuses
+
+# should vision_model be moved from generation to kb?
+
+eval:                          # for evaluating the accuracy of the system
+  judge_model: qwen2.5:7b         # model that compares prediction to the actual answer
+  split: dev                      # will use the development question set to evaluate
