@@ -1,5 +1,6 @@
 # Parse the slide PDFs listed in the manifest into SlideRecord objects.
-# Output: data/interim/slides.jsonl, with one record per PDF page.
+# Output: data/interim/slides.jsonl, with one record per PDF page. The chunking step
+# (src/kb/chunking.py) builds the searchable chunks from these records.
 
 from __future__ import annotations
 
@@ -25,15 +26,17 @@ def _clean_line(text: str) -> str:
 
 
 # Return every text line of a page with its position, font size and bold flag.
-# A PDF does not store sentences, it stores pieces of text ("spans") placed at
-# coordinates on the page. We keep the position and the font of each line so we
-# can rebuild the reading order and detect the title afterwards.
+# A PDF stores pieces of text ("spans") placed at
+# coordinates on the page. The position is needed to rebuild the reading order,
+# and the font size and weight to recognise the title.
 def _extract_lines(page: pymupdf.Page) -> list[dict]:
     result = []
-    page_dict = page.get_text("dict")  # the page content as text blocks, each with lines, each with spans (pieces of text with the same font)
+    # The page content as text blocks, each with lines, each with spans
+    # (pieces of text that share the same font).
+    page_dict = page.get_text("dict")
 
     for block in page_dict.get("blocks", []):
-        if block.get("type") != 0:  # type 0 is text; other blocks (images) are skipped
+        if block.get("type") != 0:  # type 0 is text; image blocks are skipped
             continue
 
         for line in block.get("lines", []):
@@ -46,7 +49,7 @@ def _extract_lines(page: pymupdf.Page) -> list[dict]:
             if not text:  # empty lines carry no information
                 continue
 
-            # A line can mix several font sizes; we keep the largest one,
+            # A line can mix several font sizes; the largest one is kept,
             # ignoring spans that only contain spaces.
             font_sizes = [
                 float(span.get("size", 0))
@@ -70,12 +73,15 @@ def _extract_lines(page: pymupdf.Page) -> list[dict]:
     return sorted(result, key=lambda item: (item["y"], item["x"]))
 
 
-# Join the lines, already in reading order, into the text of the slide.
+# Join the lines, already sorted into reading order, into the text of the slide.
+# Sorting is needed because a PDF does not store text in the order it is read.
 def _extract_text(lines: list[dict]) -> str:
     return "\n".join(item["text"] for item in lines).strip()
 
 
-# Choose the slide title among the lines in the top 40% of the page.
+# Choose the slide title among the lines in the top 40% of the page, where slide
+# titles are placed. The title becomes part of each chunk's position
+# ("Session 9 > title") in the chunking step.
 def _find_title(lines: list[dict], page_height: float) -> str:
     # Candidates: lines near the top, with a reasonable length,
     # that are not just a number (page numbers are never titles).
@@ -103,12 +109,13 @@ def _find_title(lines: list[dict], page_height: float) -> str:
     return candidates[0]["text"]
 
 
-# Return the lines that look like headings inside the slide.
+# Return the lines that look like headings inside the slide. They are stored
+# in the record's outline field.
 def _find_outline(lines: list[dict], title: str) -> list[str]:
     if not lines:
         return []
 
-    # Median font size of the slide, used as the reference for normal text.
+    # Median font size of the slide, used as the reference for normal body text.
     sizes = sorted(
         item["font_size"] for item in lines if item["font_size"] > 0
     )
@@ -123,7 +130,7 @@ def _find_outline(lines: list[dict], title: str) -> list[str]:
         if text == title or len(text) > 150:
             continue
 
-        # Numbered headings such as "1.", "2.3" or "A)" followed by text.
+        # Numbered headings followed by text.
         numbered = bool(
             re.match(
                 r"^(?:\d+(?:\.\d+)*[.)]?|[A-Z][.)])\s+\S",
@@ -162,7 +169,8 @@ def _is_agenda(title: str, text: str) -> bool:
     return any(re.search(pattern, sample) for pattern in patterns)
 
 
-# Flag slides whose text was not extracted correctly.
+# Flag slides whose text was not extracted correctly, which happens when a PDF
+# uses a font that PyMuPDF cannot decode.
 def _is_garbled(text: str) -> bool:
     if not text:
         return False
@@ -184,7 +192,8 @@ def _is_garbled(text: str) -> bool:
     )
 
 
-# Count the images on a page (no OCR is done here).
+# Count the images on a page. Only the count is stored here; the images
+# themselves are extracted and read in the image step (src/vision/).
 def _count_images(page: pymupdf.Page) -> int:
     try:
         return len(page.get_image_info(xrefs=True))
@@ -194,8 +203,7 @@ def _count_images(page: pymupdf.Page) -> int:
 
 
 
-# Parse the sessions column of the manifest
-# into a list of integers.
+# Parse the sessions column of the manifest into a list of integers.
 def _parse_sessions(value: str) -> list[int]:
     if not value or not value.strip():  # a syllabus row has no sessions
         return []
@@ -248,8 +256,9 @@ def _parse_slide_pdf(
 
             records.append(
                 SlideRecord(
-                    # The id depends only on the document and the page number,
-                    # so it stays the same every time the slides are parsed.
+                    # The id depends only on the document and the page number, so it
+                    # stays the same on every rebuild. The evaluation questions use
+                    # these ids to name their correct source.
                     slide_id=slide_id(source_id, page_number),
                     source_id=source_id,
                     course_code=course_code,
@@ -258,8 +267,10 @@ def _parse_slide_pdf(
                     title=title,
                     outline=outline,
                     text=text,
-                    # Quality flags: agenda slides, slides with almost no text
-                    # (under 40 characters) and slides with garbled text.
+                    # Quality flags. Slides with almost no text (under 40 characters)
+                    # or garbled text are rendered as a whole image in the image step
+                    # (src/vision/extract.py), so OCR can read what extraction missed.
+                    # is_agenda marks agenda and contents slides.
                     is_agenda=_is_agenda(title, text),
                     is_low_text=len(text.strip()) < 40,
                     is_garbled=_is_garbled(text),
@@ -275,7 +286,7 @@ def _parse_slide_pdf(
 
 
 # Parse every slide deck in the manifest, write data/interim/slides.jsonl
-# and return the number of records written.
+# and return the number of records written. Called by src/pipeline.py.
 def parse_slides(cfg) -> int:
     del cfg  # not needed: all paths come from src.config.PATHS
 
@@ -285,7 +296,7 @@ def parse_slides(cfg) -> int:
 
     manifest_rows = read_csv(manifest_path)
 
-    # Keep only the slide decks; the syllabi are parsed separately.
+    # Keep only the slide decks; the syllabi are read by parse_syllabi.py.
     slide_rows = [
         row for row in manifest_rows
         if row.get("doc_type", "").strip().lower() == "slides"
@@ -318,8 +329,8 @@ def parse_slides(cfg) -> int:
 
         all_records.extend(records)
 
-    # Footer lines repeated on many slides of the same course such as the  the lecturer's
-    # carry no information about the slide itself, so they are removed
+    # Footer lines repeated on many slides of the same course such as the lecturer's
+    # name carry no information about the slide itself, so they are removed
     # (see clean.py) before saving the records.
     all_records = remove_repeated_footers(all_records)
     return write_jsonl(output_path, all_records)
