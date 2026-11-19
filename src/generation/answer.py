@@ -251,6 +251,37 @@ def _ranking_answer(hits: list[Hit]) -> str | None:
     return None
 
 
+_CITED_PART = re.compile(r"(?P<body>[^\[]*?)(?P<cites>(?:\s*\[S\d+\])+)(?P<end>\s*[.!?]?)")
+
+
+def _merge_repeated_sentences(answer_text: str) -> str:
+    """Write a sentence once when the model repeats it to cite each source that says the same thing.
+
+    When several sources agree (the course summary and two slides all give "Final Exam: 40%"), the model
+    sometimes writes the same sentence once per source: "X [S1]. X [S2]. X [S3]." This keeps the first
+    one with all its citations, "X [S1][S2][S3].", so no fact and no citation is lost. Answers without an
+    exact repeated sentence are returned unchanged.
+    """
+    parts = [m for m in _CITED_PART.finditer(answer_text) if m.group(0)]
+    keys = [" ".join(m.group("body").lower().split()).strip(" .,;:!?") for m in parts]
+    if len({k for k in keys if k}) == len([k for k in keys if k]):
+        return answer_text  # nothing repeated
+    merged: dict[str, list[str]] = {}  # sentence -> its labels, in order of appearance
+    for match, key in zip(parts, keys):
+        if key:
+            labels = merged.setdefault(key, [])
+            labels += [c for c in re.findall(r"\[S\d+\]", match.group("cites")) if c not in labels]
+    pieces, written = [], set()
+    for match, key in zip(parts, keys):
+        if not key:
+            pieces.append(match.group(0))
+        elif key not in written:
+            written.add(key)
+            pieces.append(match.group("body").rstrip() + " " + "".join(merged[key]) + match.group("end"))
+    tail = answer_text[parts[-1].end():] if parts else ""
+    return ("".join(pieces) + tail).strip()
+
+
 def _validated_answer(answer_text: str, hits: list[Hit], rag_enabled: bool) -> tuple[str, list[Hit]]:
     if not rag_enabled:
         return answer_text.strip(), []
@@ -270,6 +301,7 @@ def _validated_answer(answer_text: str, hits: list[Hit], rag_enabled: bool) -> t
         return f"[{label}]"
 
     answer_text = _CITATION.sub(normalize_citation, answer_text).strip()
+    answer_text = _merge_repeated_sentences(answer_text)
     if invalid_citation or not used_labels or not answer_text:
         return REFUSAL, []
     return answer_text, [hits_by_label[label] for label in used_labels]
