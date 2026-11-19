@@ -1,18 +1,23 @@
-# Experiment after the second holdout, measured on dev first.
-# 1. final_best2 plus rewrite_guard: a follow-up rewrite that is not a question (the model answered it, once
-#    with an invented price) is replaced by the previous question plus the new one. EL15 was fixed on dev.
-# 2. Without routing.named_course_in_scope (final_best4): it made the system answer "What private feedback did
-#    the AI Machine Learning Foundations professor send me?" with the professor's e-mail instead of refusing.
-# 3. temperature 0 and a fixed seed, so a rerun gives the same answers and two configurations differ only by
-#    their settings.
+# Final System, part 1 of 2. final_tables.yaml extends this file and adds the slide tables.
+# Last experiment before the tables, built after the errors of holdout 2 and measured on dev first.
+# Main changes vs base.yaml:
+# - llama3.1:8b writes the answers instead of llama3.2:3b (on holdout 3: 73.3% vs 56.7% with the same search)
+# - a question that names one course is searched only in that course
+# - a question about two or more courses is answered course by course
+# - rewrite_guard: if a follow-up rewrite is not a question (the model once answered it with an invented price),
+#   the previous question plus the new one is used instead
+# - temperature 0 and a fixed seed, so a rerun gives the same answers and configs differ only by their settings
+
+# routing.named_course_in_scope (tested in final_best4) is not used: it made the system answer a private
+# question (such as What private feedback did the professor send me?) instead of refusing it.
 extends: base.yaml
 
 retrieval:
-  auto_course_filter: true
+  auto_course_filter: true     # search only the course named in the question
 
 generation:
   llm_model: llama3.1:8b
-  course_split: true
-  rewrite_guard: true
-  temperature: 0
-  seed: 42
+  course_split: true           # one answer per named course, then joined
+  rewrite_guard: true          # keep a follow-up rewrite only if it is still a question
+  temperature: 0               # always pick the most likely next token
+  seed: 42                     # removes the remaining randomness, so results are reproducible
