@@ -318,7 +318,8 @@ def parse_slides(cfg) -> int:
 
         all_records.extend(records)
 
-    # Footer lines repeated across many slides (see clean.py) are removed
-    # before saving, so they do not end up in the searchable text.
+    # Footer lines repeated on many slides of the same course such as the  the lecturer's
+    # carry no information about the slide itself, so they are removed
+    # (see clean.py) before saving the records.
     all_records = remove_repeated_footers(all_records)
     return write_jsonl(output_path, all_records)
