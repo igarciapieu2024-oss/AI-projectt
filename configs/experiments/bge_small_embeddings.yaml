@@ -1,0 +1,6 @@
+# EXPERIMENT (retrieval): version 1.2 with the BAAI/bge-small-en-v1.5 embedding model instead of MiniLM.
+# Same top-1 results and slightly worse top-5, 3 times slower to build. Not kept.
+# Build its own index once:  python -m src.pipeline build --config configs/experiments/bge_small_embeddings.yaml
+extends: ../baselines/v1_2_small_model.yaml
+kb:
+  embed_model: BAAI/bge-small-en-v1.5

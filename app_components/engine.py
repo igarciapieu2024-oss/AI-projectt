@@ -17,9 +17,9 @@ from src.config import PATHS, load_config  # the shared folder paths and the set
 # USE_FAKE=1 -> the fake answer (works today); otherwise the real engine (from Wed 11).
 # both have exactly the same inputs and outputs, so the pages don't need to know which one is running
 USING_FAKE = os.environ.get("USE_FAKE") == "1"
-# APP_CONFIG picks the system the assistant runs: final (3B, ~14 s an answer) by default,
-# final_tables for the evaluated 8B system (~30 s an answer on a laptop CPU)
-MAIN_CONFIG = os.environ.get("APP_CONFIG", "final")
+# APP_CONFIG picks the system the assistant runs: final_system (our final 8B system, ~30 s an answer
+# on a laptop CPU) by default; APP_CONFIG=baselines/v1_2_small_model runs the earlier 3B system (~14 s)
+MAIN_CONFIG = os.environ.get("APP_CONFIG", "final_system")
 if USING_FAKE:
     from src.generation.fake import answer_stream  # noqa: F401  (pages import it from here)
 else:
@@ -28,7 +28,7 @@ else:
 
 @st.cache_resource  # loads each config once and keeps it, instead of reading the file on every click
 def config(name: str):
-    """final = our full system; b0_no_rag = the LLM alone (for the Compare page)."""
+    """Load configs/<name>.yaml, e.g. "final_system" or "baselines/b0_llm_only"."""
     return load_config(f"configs/{name}.yaml")
 
 

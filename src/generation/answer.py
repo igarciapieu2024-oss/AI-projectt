@@ -109,7 +109,7 @@ def _prepare_answer(
     if not question:
         raise ValueError("question must not be empty")
 
-    cfg = cfg or load_config("configs/final.yaml")
+    cfg = cfg or load_config("configs/final_system.yaml")
     started = time.perf_counter()
     rewritten_question = question
     rag_enabled = cfg.generation.get("rag", True)
@@ -387,7 +387,7 @@ def answer(
     cfg: Config | None = None,
 ) -> AnswerResult:
     """Generate an answer from retrieved evidence, or run the no-RAG baseline."""
-    split = _split_by_course(question, history, filters, cfg or load_config("configs/final.yaml"))
+    split = _split_by_course(question, history, filters, cfg or load_config("configs/final_system.yaml"))
     if split is not None:
         return split
     (
@@ -435,12 +435,12 @@ def answer_stream(
     cfg: Config | None = None,
 ) -> Iterator[str | AnswerResult]:
     """Yield generated text pieces and then the validated final result."""
-    split = _split_by_course(question, history, filters, cfg or load_config("configs/final.yaml"))
+    split = _split_by_course(question, history, filters, cfg or load_config("configs/final_system.yaml"))
     if split is not None:
         yield split.answer_text
         yield split
         return
-    if (cfg or load_config("configs/final.yaml")).generation.get("prompt_version") == "v4":
+    if (cfg or load_config("configs/final_system.yaml")).generation.get("prompt_version") == "v4":
         result = answer(question, history, filters, cfg)
         yield result.answer_text
         yield result

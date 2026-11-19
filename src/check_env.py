@@ -34,7 +34,7 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             report(f"import {lib}", False, f"{type(exc).__name__}: run pip install -r requirements.txt")
 
-    cfg = load_config("configs/base.yaml")
+    cfg = load_config("configs/final_system.yaml")
     wanted = {cfg.generation.get("llm_model"), cfg.generation.get("vision_model"), cfg.eval.get("judge_model")} - {None}
     try:
         import ollama

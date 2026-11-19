@@ -1,0 +1,5 @@
+# BASELINE: version 1.2, the system evaluated on 14 November (56.7% on holdout 3).
+# Exactly the defaults of base.yaml: llama3.2:3b, no per-course answers, no course filter, no slide tables.
+# Compared with final_system.yaml it shows what the final changes add. The Compare page of the app uses it
+# next to b0_llm_only.yaml, so both sides run the same 3B model and only retrieval differs.
+extends: ../base.yaml

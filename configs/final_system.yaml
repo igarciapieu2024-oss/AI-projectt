@@ -1,16 +1,23 @@
-# Final System, part 1 of 2. final_tables.yaml extends this file and adds the slide tables.
-# Last experiment before the tables, built after the errors of holdout 2 and measured on dev first.
-# Main changes vs base.yaml:
+# FINAL SYSTEM: the configuration we present (73.3% on holdout 3, 30 unseen questions).
+# Used by default by the app, answer(), the build and the evaluation.
+#   python -m src.pipeline build --config configs/final_system.yaml
+#
+# Main changes vs base.yaml, each one measured first as an experiment (see experiments/):
 # - llama3.1:8b writes the answers instead of llama3.2:3b (on holdout 3: 73.3% vs 56.7% with the same search)
 # - a question that names one course is searched only in that course
 # - a question about two or more courses is answered course by course
 # - rewrite_guard: if a follow-up rewrite is not a question (the model once answered it with an invented price),
 #   the previous question plus the new one is used instead
 # - temperature 0 and a fixed seed, so a rerun gives the same answers and configs differ only by their settings
-
-# routing.named_course_in_scope (tested in final_best4) is not used: it made the system answer a private
-# question (such as What private feedback did the professor send me?) instead of refusing it.
+# - slide tables are added to their chunks row by row, each value next to its column header. Three holdout 2
+#   errors came from tables whose columns were read mixed up (a New Orleans hotel got Chicago's 2,340,000).
+#
+# slide_tables is in the kb group, so it changes the knowledge base: this config has its own kb_sig (586a05db)
+# and its own chunks and indexes.
 extends: base.yaml
+
+kb:
+  slide_tables: true           # read slide tables row by row (src/kb/slide_tables.py)
 
 retrieval:
   auto_course_filter: true     # search only the course named in the question

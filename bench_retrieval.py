@@ -1,7 +1,7 @@
 """Quick retrieval check: does the search find the right source? (not the official evaluation, only to compare changes)
 
-    python bench_retrieval.py --config configs/final.yaml
-    python bench_retrieval.py --config configs/bge_small.yaml
+    python bench_retrieval.py --config configs/final_system.yaml
+    python bench_retrieval.py --config configs/experiments/bge_small_embeddings.yaml
 
 44 questions asked WITHOUT a course filter (the hardest case), in 3 groups:
   main (28): admin + content over the 7 courses, the same set used for all earlier comparisons
@@ -95,7 +95,7 @@ def rank_of_first_hit(hits, gold: set[str]) -> int | None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="configs/final.yaml")
+    parser.add_argument("--config", default="configs/final_system.yaml")
     parser.add_argument("--group", choices=["all", *(name for name, _ in GROUPS)], default="all")
     parser.add_argument("--k-dense", type=int)
     parser.add_argument("--k-bm25", type=int)

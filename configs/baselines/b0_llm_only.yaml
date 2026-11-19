@@ -1,0 +1,10 @@
+# BASELINE B0: the language model alone, with no retrieval (20% on holdout 3).
+# It answers from what it learned in training, with no sources to cite. It shows what RAG adds.
+# Main changes vs base.yaml: no retrieval, no router, no follow-up rewriting, no self-check.
+extends: ../base.yaml
+generation:
+  rag: false
+  rewrite: false
+  selfcheck: false
+routing:
+  router: none

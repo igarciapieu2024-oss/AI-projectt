@@ -1,0 +1,14 @@
+# EXPERIMENT 7 (dev only): experiment 6 with the 3 best sources instead of 5, so the model has fewer
+# similar sources to confuse (it once picked the wrong one of five VRIO slides). Not kept.
+extends: ../base.yaml
+
+retrieval:
+  auto_course_filter: true
+  top_k: 3
+
+routing:
+  out_of_scope_search: true
+
+generation:
+  llm_model: llama3.1:8b
+  course_split: true

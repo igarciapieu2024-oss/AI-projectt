@@ -35,7 +35,7 @@ routing:
 # generation: how the answer is written and checked (src/generation/)
 generation:
   rag: true                    # false = the LLM answers alone, without sources (baseline B0)
-  llm_model: llama3.2:3b       # chosen for speed after the local latency benchmark; final_best5 switches to llama3.1:8b
+  llm_model: llama3.2:3b       # chosen for speed after the local latency benchmark; final_system switches to llama3.1:8b
   vision_model: qwen2.5vl:7b   # classifies and describes slide images; qwen2.5vl:3b if the laptop runs out of memory
   prompt_version: v2
   temperature: 0.1             # low, so answers stay close to the sources
@@ -49,4 +49,4 @@ generation:
 # eval: evaluation settings
 eval:
   judge_model: qwen2.5:7b      # LLM that grades the answers (only used in eval/)
-  split: dev                   # not read by
+  split: dev                   # not read by the code: run_eval takes the split from --split

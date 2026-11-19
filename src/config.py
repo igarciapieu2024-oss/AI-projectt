@@ -4,7 +4,7 @@ Every system variant is one YAML file in configs/ that starts with `extends: bas
 and changes only what differs. Load it with:
 
     from src.config import load_config, PATHS
-    cfg = load_config("configs/final.yaml")
+    cfg = load_config("configs/final_system.yaml")
     cfg.retrieval["top_k"], cfg.kb_sig
 
 `kb_sig` is a short hash of the `kb` group: configs that change only retrieval or

@@ -79,7 +79,7 @@ def explain_error(error: Exception) -> tuple[str, str]:
                 "Run ollama pull with the model configured as generation.llm_model in configs/base.yaml.")
     if isinstance(error, FileNotFoundError) or "does not exist" in message or "collection" in message:
         return ("The knowledge base hasn't been built on this laptop.",
-                "Run: python -m src.pipeline build --config configs/final.yaml")
+                "Run: python -m src.pipeline build --config configs/final_system.yaml")
     return ("Something went wrong while answering.", f"Details for the team: {type(error).__name__}: {error}")
 
 

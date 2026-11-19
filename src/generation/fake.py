@@ -5,7 +5,7 @@ The app and the evaluation use it until the real engine exists:
 It never searches or calls an LLM. It returns made-up answers that cover every case the app must show:
 - a normal answer with 5 sources (a syllabus section, slides, and a slide whose source is an image);
 - a refusal, when the question looks out of scope (it mentions "party", "weather", "football"...);
-- the bare-LLM answer with no sources, when the config has generation.rag = false (b0_no_rag.yaml).
+- the bare-LLM answer with no sources, when the config has generation.rag = false (baselines/b0_llm_only.yaml).
 """
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ _SOURCES = [
 
 def answer(question: str, history: list[dict] | None = None, filters: Filters | None = None, cfg=None) -> AnswerResult:
     start = time.perf_counter()
-    rag = True if cfg is None else bool(cfg.generation.get("rag", True))  # b0_no_rag.yaml sets rag to false
+    rag = True if cfg is None else bool(cfg.generation.get("rag", True))  # baselines/b0_llm_only.yaml sets rag to false
     out_of_scope = any(w in question.lower() for w in _OUT_OF_SCOPE_WORDS)
     rewritten = question if not history else f"{question} (rewritten with the previous question)"
 
