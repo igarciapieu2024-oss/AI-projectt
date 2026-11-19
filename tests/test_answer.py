@@ -721,3 +721,18 @@ def test_named_course_rule_keeps_refusing_questions_without_a_course(monkeypatch
     cfg.routing = {"named_course_in_scope": True}
     result = answer_module.answer("What is the weather in Madrid tomorrow?", cfg=cfg)
     assert result.refused
+
+
+def test_repeated_sentence_is_written_once_with_all_its_citations():
+    """When several sources say the same thing, the model may repeat the sentence once per source."""
+    from src.generation.answer import _merge_repeated_sentences
+
+    repeated = (
+        "The final exam is worth 40% of the final grade [S1]. "
+        "The final exam is worth 40% of the final grade [S2]. "
+        "The final exam is worth 40% of the final grade [S3]."
+    )
+    assert _merge_repeated_sentences(repeated) == "The final exam is worth 40% of the final grade [S1][S2][S3]."
+
+    different = "The final exam is worth 40% [S1]. A minimum grade of 4.5 is required [S2]."
+    assert _merge_repeated_sentences(different) == different
