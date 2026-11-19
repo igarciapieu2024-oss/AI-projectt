@@ -1,0 +1,6 @@
+# EXPERIMENT (images): image text from OCR only, without the vision model's descriptions,
+# to measure what the descriptions add.
+extends: ../base.yaml
+kb:
+  use_ocr: true
+  use_captions: false

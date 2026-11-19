@@ -62,7 +62,7 @@ def test_evaluate_fake_answers(sample_questions, tmp_path, monkeypatch):
     )
 
     output = evaluate(
-        config_path="configs/b1_v1.yaml",
+        config_path="configs/baselines/b1_first_version.yaml",
         split="dev",
         use_fake=True,
         questions_path=sample_questions,
@@ -91,7 +91,7 @@ def test_test_split_is_locked(sample_questions):
     """Prevent accidental evaluation of the locked test set."""
     with pytest.raises(ValueError, match="locked"):
         evaluate(
-            config_path="configs/b1_v1.yaml",
+            config_path="configs/baselines/b1_first_version.yaml",
             split="test",
             use_fake=True,
             questions_path=sample_questions,
@@ -104,7 +104,7 @@ def test_evaluation_exports(sample_questions, tmp_path, monkeypatch):
     monkeypatch.setitem(run_eval.PATHS, "root", tmp_path)
 
     output = run_eval.evaluate(
-        config_path="configs/b1_v1.yaml",
+        config_path="configs/baselines/b1_first_version.yaml",
         split="dev",
         use_fake=True,
         questions_path=sample_questions,
@@ -140,7 +140,7 @@ def test_evaluation_exports(sample_questions, tmp_path, monkeypatch):
         rows = list(csv.DictReader(file))
 
     assert len(rows) == 1
-    assert rows[0]["config"] == "b1_v1"
+    assert rows[0]["config"] == "b1_first_version"
     assert rows[0]["fake_mode"] == "True"
     assert float(rows[0]["recall_at_5"]) == 1.0
 
@@ -181,7 +181,7 @@ def test_judge_integration(sample_questions, tmp_path, monkeypatch):
         }
 
     output = run_eval.evaluate(
-        config_path="configs/b1_v1.yaml",
+        config_path="configs/baselines/b1_first_version.yaml",
         split="dev",
         use_fake=False,
         questions_path=sample_questions,

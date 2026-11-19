@@ -18,7 +18,7 @@ from src.config import load_config
 @pytest.fixture
 def cfg():
     """Load the project's evaluation configuration."""
-    return load_config("configs/b1_v1.yaml")
+    return load_config("configs/baselines/b1_first_version.yaml")
 
 
 @pytest.fixture

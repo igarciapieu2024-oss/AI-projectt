@@ -1,0 +1,14 @@
+# EXPERIMENT 10 (dev first, after the second holdout): experiment 5 plus rewrite_guard, temperature 0 and a
+# fixed seed, without named_course_in_scope. Everything in it went into final_system.yaml, which also adds
+# the slide tables.
+extends: ../base.yaml
+
+retrieval:
+  auto_course_filter: true
+
+generation:
+  llm_model: llama3.1:8b
+  course_split: true
+  rewrite_guard: true
+  temperature: 0
+  seed: 42

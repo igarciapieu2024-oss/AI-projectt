@@ -503,7 +503,7 @@ def test_management_control_exam_evidence_is_passed_to_the_model(monkeypatch):
     pytest.importorskip("sentence_transformers")
     from src.config import PATHS, bm25_path
 
-    cfg = load_config("configs/final.yaml")
+    cfg = load_config("configs/baselines/v1_2_small_model.yaml")
     if not chunks_path(cfg.kb_sig).is_file():
         pytest.skip("the generated chunk index is not available")
     if not bm25_path(cfg.kb_sig).is_file():

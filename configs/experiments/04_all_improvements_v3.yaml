@@ -1,0 +1,15 @@
+# EXPERIMENT 4 (dev only): everything that helped so far, together.
+# Main changes vs base.yaml:
+# - llama3.1:8b writes the answers (65% -> 75% on dev)
+# - prompt v3: course name on each source and rules for missing facts and two-part questions
+# - questions that name two or more courses are answered course by course (course_split)
+# - a question that names one course searches only that course (auto_course_filter)
+extends: ../base.yaml
+
+retrieval:
+  auto_course_filter: true
+
+generation:
+  llm_model: llama3.1:8b
+  prompt_version: v3
+  course_split: true

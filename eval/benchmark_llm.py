@@ -43,7 +43,7 @@ def benchmark_model(model: str, runs: int) -> list[BenchmarkRun]:
     Keeping the prompt constant makes timings easier to compare, though
     latency alone says nothing about answer accuracy or citation quality.
     """
-    config = load_config("configs/final.yaml")
+    config = load_config("configs/final_system.yaml")
     config.generation["llm_model"] = model
     results = []
 

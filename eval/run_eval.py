@@ -7,7 +7,7 @@ question immediately so partial failures can be diagnosed. The separate
 ``evaluate`` function supports isolated fake-engine unit tests.
 
 Usage:
-python -m eval.run_eval --config configs/b1_v1.yaml --split dev --limit 2
+python -m eval.run_eval --config configs/final_system.yaml --split dev --limit 2
 
 Owner: Elena.
 """
@@ -96,7 +96,7 @@ def save_jsonl(path: Path, record: dict):
             ) + "\n"
         )
 def evaluate(
-    config_path="configs/b1_v1.yaml",
+    config_path="configs/final_system.yaml",
     split="dev",
     use_fake=False,
     questions_path=None,
@@ -340,7 +340,7 @@ def main():
 
     parser.add_argument(
         "--config",
-        default="configs/b1_v1.yaml"
+        default="configs/final_system.yaml"
     )
 
     parser.add_argument(

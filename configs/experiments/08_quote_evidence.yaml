@@ -1,5 +1,5 @@
-# Experiment B (dev only): final_best3 with prompt v4, "quote the evidence first, then answer".
-extends: base.yaml
+# EXPERIMENT 8 (dev only): experiment 6 with prompt v4, "quote the evidence first, then answer". Not kept.
+extends: ../base.yaml
 
 retrieval:
   auto_course_filter: true

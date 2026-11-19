@@ -1,0 +1,23 @@
+# BASELINE B1: our first version, vector search over the syllabi only, with prompt v1.
+# It shows what the later retrieval work adds (slides, image text, BM25, reranker, course summaries).
+# Main changes vs base.yaml: syllabi only, no image text, one chunk per section, no deduplication,
+# dense search only, no reranker, no router, prompt v1.
+extends: ../base.yaml
+kb:
+  sources: [syllabi]
+  use_ocr: false
+  use_captions: false
+  chunk_strategy: section
+  dedup: false
+  course_rows: false
+retrieval:
+  mode: dense
+  rerank: false
+  filters: false
+  small_to_big: false
+routing:
+  router: none
+generation:
+  prompt_version: v1
+  rewrite: false
+  selfcheck: false

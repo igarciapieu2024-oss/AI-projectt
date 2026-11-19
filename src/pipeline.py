@@ -1,7 +1,7 @@
 """One command per job.
 
-    python -m src.pipeline build --config configs/final.yaml   # parse -> chunk -> dedup -> indexes
-    python -m src.pipeline all   --config configs/final.yaml   # build + course table + router + evaluation + figures
+    python -m src.pipeline build --config configs/final_system.yaml   # parse -> chunk -> dedup -> indexes
+    python -m src.pipeline all   --config configs/final_system.yaml   # build + course table + router + evaluation + figures
 
 The image step runs separately, once:  python -m src.vision.run_vision
 Owner: Francesca (skeleton); each step belongs to its module's owner.
@@ -52,7 +52,7 @@ def run_all(cfg) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("command", choices=["build", "all"])
-    parser.add_argument("--config", default="configs/base.yaml")
+    parser.add_argument("--config", default="configs/final_system.yaml")
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
     {"build": build, "all": run_all}[args.command](cfg)

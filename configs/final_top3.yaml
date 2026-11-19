@@ -1,6 +1,0 @@
-# Experiment after the test evaluation, measured on dev only.
-# 1. Same as final, but the model reads the 3 best sources instead of 5, to mix fewer courses and facts.
-extends: base.yaml
-
-retrieval:
-  top_k: 3

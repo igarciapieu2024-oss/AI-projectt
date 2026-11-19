@@ -4,7 +4,7 @@ import time
 from src.config import load_config
 from src.generation.answer import answer
 
-cfg = load_config("configs/final.yaml")
+cfg = load_config("configs/final_system.yaml")
 QUESTIONS = [
     "What is the final exam worth in Management Control?",
     "How much is class participation in Operating Systems?",

@@ -22,10 +22,10 @@ with st.container(key="askbar"):  # the controls in one white bar
     go = button_col.button("Compare", type="primary", icon=":material/compare_arrows:")  # starts both answers
 
 #2 the two answers side by side
-# each panel: (key for the CSS, config, title, subtitle); b0_no_rag = no search, no sources
+# each panel: (key for the CSS, config, title, subtitle); baselines/b0_llm_only = no search, no sources
 PANELS = [
-    ("panel_bare", "b0_no_rag", "The model alone", "Answers from what it memorised in training"),
-    ("panel_rag", "final", content.COMPANY_NAME, "Answers only from your syllabi and slides"),
+    ("panel_bare", "baselines/b0_llm_only", "The model alone", "Answers from what it memorised in training"),
+    ("panel_rag", "baselines/v1_2_small_model", content.COMPANY_NAME, "Answers only from your syllabi and slides"),
 ]
 if go and question:
     for col, (key, cfg_name, title, sub) in zip(st.columns(2, gap="medium"), PANELS):
