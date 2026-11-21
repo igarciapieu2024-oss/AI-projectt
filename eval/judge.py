@@ -1,12 +1,13 @@
-"""
-Evaluate RAG answer correctness against reference facts.
-
-The production CLI uses deterministic refusal checks and an Ollama judge
-with scores 0 / 0.5 / 1. A separate 1-5 claim-level helper interface is
-retained for compatibility with unit tests.
-
-Owner: Elena.
-"""
+# Grade whether each answer of an evaluation run is correct, against the reference answer of its question.
+#   python -m eval.judge --run-dir eval/runs/RUN_ID [--rubric v1|v2|v3] [--allow-test]
+# Refusals and answers to unanswerable questions are graded with fixed rules. Every other answer is graded by
+# a local LLM (qwen2.5:7b, at temperature 0) with a score of 1 (correct), 0.5 (partly correct) or 0 (wrong).
+# The search and the citations are not graded here; eval/metrics.py measures them.
+# Writes judge_questions.csv (one verdict per question) and judge_summary.json in the run folder; for the v2
+# and v3 rubrics the rubric name is added to both file names. eval/error_analysis.py and
+# eval/judge_agreement.py read them.
+# build_judge_messages() and judge_answer() are an older grading from 1 to 5, kept because the judge option of
+# evaluate() in eval/run_eval.py and tests/test_judge.py use it.
 
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from pathlib import Path
 from statistics import mean
 
 
+# Rubric v1 (the default): the answer is compared with the reference answer and the key facts of its question.
 SYSTEM = (
     "You are an impartial evaluator of a university course Q&A system. "
     "Assess ONLY factual correctness against the supplied reference answer. "
@@ -32,10 +34,10 @@ SYSTEM = (
     "0 if wrong, misleading, or unsupported."
 )
 
-# 1. Rubric v2: the answer is judged on what the QUESTION asks. The v1 rubric scored 0 for answers that
-#    were right but did not repeat details of the reference that the question never asked for
-#    ("25% of the grade" without "only the four best quizzes count"). v1 stays the default so earlier
-#    results can be reproduced; v2 is applied to every configuration alike and reported next to v1.
+# Rubric v2: the answer is judged on what the QUESTION asks. The v1 rubric scored 0 for answers that were
+# right but did not repeat details of the reference that the question never asked for ("25% of the grade"
+# without "only the four best quizzes count"). v1 stays the default so earlier results can be reproduced;
+# v2 is applied to every configuration alike and reported next to v1.
 SYSTEM_V2 = (
     "You are an impartial evaluator of a university course Q&A system. "
     "Assess ONLY factual correctness against the supplied reference answer. "
@@ -53,11 +55,11 @@ SYSTEM_V2 = (
 )
 
 
-# 2. Rubric v3: like v2, but the judge also reads the gold source (the slide or syllabus section the question
-#    was written from). Checked against 80 dev answers graded by hand against the sources, v1 marked 9 correct
-#    answers as wrong and none the other way: it asked for reference details the question did not ask for
-#    (EL01, FRA05, EL02), and it could not accept an answer that differed from the reference but matched the
-#    slide ("Session 7-8" in SA06, "RBI and Putouts" in EL13).
+# Rubric v3: like v2, but the judge also reads the gold source (the slide or syllabus section the question was
+# written from). Compared with the 80 dev answers graded against their sources (eval/reference_labels_dev.csv,
+# eval/judge_agreement.py), v1 marked 9 correct answers as wrong and none the other way: it asked for
+# reference details the question did not ask for (EL01, FRA05, EL02), and it could not accept an answer that
+# differed from the reference but matched the slide ("Session 7-8" in SA06, "RBI and Putouts" in EL13).
 SYSTEM_V3 = (
     "You are an impartial evaluator of a university course Q&A system. "
     "You get the question, a reference answer, the gold source text the question was written from, "
@@ -72,11 +74,13 @@ SYSTEM_V3 = (
     "Score 0 if the main thing asked for is wrong or missing, or the answer contradicts the gold source."
 )
 
+# The texts of all the sources, loaded the first time v3 needs them and then kept for the rest of the run.
 _GOLD_TEXTS: dict[str, str] | None = None
 
 
+# The text of every slide and syllabus section by id. The text read from each slide's images
+# (data/image_texts.jsonl) is added to its slide, so the answer of an image question is in its gold text too.
 def gold_texts() -> dict[str, str]:
-    """3. Text of every slide and syllabus section by id, with the text read from the slide's images."""
     global _GOLD_TEXTS
     if _GOLD_TEXTS is None:
         texts: dict[str, str] = {}
@@ -98,8 +102,9 @@ def gold_texts() -> dict[str, str]:
     return _GOLD_TEXTS
 
 
+# The gold sources of one question as text for the v3 prompt, each cut to 4,000 characters (the longest gold
+# section of the evaluation questions has 3,979).
 def gold_source_text(gold_ids: str, per_source: int = 4000) -> str:
-    """4. The gold sources of one question, each cut to 4,000 characters (the longest evaluation section is 3,979)."""
     texts = gold_texts()
     parts = [
         f"[{gid.strip()}] {texts.get(gid.strip(), '(not found)')[:per_source]}"
@@ -109,15 +114,14 @@ def gold_source_text(gold_ids: str, per_source: int = 4000) -> str:
     return "\n\n".join(parts)
 
 
+# The prompt of the older grading from 1 to 5 (used by judge_answer below): it asks for a score and for the
+# list of claims of the answer, each marked as supported by the sources or not. It is not the 0 / 0.5 / 1
+# grading of main().
 def build_judge_messages(
     answer_text: str,
     reference_answer: str,
     sources: list[dict],
 ) -> list[dict[str, str]]:
-    """Build the auxiliary 1-5 claim-level evaluation prompt.
-
-    This is not the 0 / 0.5 / 1 prompt used by the production run judge.
-    """
 
     system = (
         "You are an impartial evaluator of a university course Q&A system. "
@@ -153,11 +157,12 @@ def build_judge_messages(
     ]
 
 
+# Check that every label cited in the answer ([S1], [S2]...) is the label of one of the sources given. It does
+# not check whether that source supports the sentence.
 def check_citations(
     answer_text: str,
     sources: list[dict],
 ) -> dict:
-    """Check citation label existence, not evidential support of claims."""
 
     valid_labels = {
         str(source.get("label", "")).upper()
@@ -186,6 +191,9 @@ def check_citations(
     }
 
 
+# The older grading from 1 to 5: qwen2.5:7b gives the score and the claims, the reply is checked, and the share
+# of claims not supported by the sources is computed (hallucination_rate). It is separate from the 0 / 0.5 / 1
+# grades written by main(). chat_fn lets the tests pass a fake model.
 def judge_answer(
     answer_text: str,
     reference_answer: str,
@@ -193,11 +201,6 @@ def judge_answer(
     cfg,
     chat_fn=None,
 ) -> dict:
-    """Evaluate factual claims using the auxiliary 1-5 judge interface.
-
-    The source-level unsupported-claim rate is distinct from the main
-    per-question correctness scores written by the CLI.
-    """
 
     from dataclasses import replace
 
@@ -205,6 +208,7 @@ def judge_answer(
         from src.generation.llm import chat
         chat_fn = chat
 
+    # The same settings, with the judge model instead of the answer model.
     judge_cfg = replace(
         cfg,
         generation={
@@ -225,6 +229,8 @@ def judge_answer(
         json=True,
     )
 
+    # The reply must be a JSON object with an integer score from 1 to 5 and a list of claims; anything else
+    # is an error.
     try:
         response = json.loads(str(raw))
     except (json.JSONDecodeError, TypeError) as exc:
@@ -258,6 +264,7 @@ def judge_answer(
         ):
             raise ValueError("Invalid claim format")
 
+    # The claims marked as not supported, and their share of all the claims (None if there are no claims).
     unsupported = [
         claim["text"]
         for claim in claims
@@ -287,8 +294,10 @@ def judge_answer(
         ),
     }
 
+# Read the judge's reply: a JSON object with a score of 0, 0.5 or 1 and a reason. A model sometimes wraps the
+# JSON in a ``` block or writes text around it, so the block marks are removed and, if the text is still not
+# JSON, the part between the first { and the last } is read.
 def parse_json_response(raw: str) -> dict:
-    """Extract and validate the production judge's 0 / 0.5 / 1 JSON."""
 
     text = raw.strip()
 
@@ -354,7 +363,7 @@ def parse_json_response(raw: str) -> dict:
     }
 
 
-# Phrases the model uses to say the sources do not contain the answer.
+# Phrases the answer model uses to say the sources do not contain what was asked (used by judge_one).
 _NOT_IN_MATERIAL = re.compile(
     r"\b(not (explicitly |directly |specifically )?(covered|specified|mentioned|provided|included|stated|available|found)"
     r"|no (information|mention|data|details?)"
@@ -364,18 +373,15 @@ _NOT_IN_MATERIAL = re.compile(
 )
 
 
+# True when the answer says the sources do not contain what was asked.
 def says_not_in_material(answer: str) -> bool:
-    """True when an answer states that the sources do not contain what was asked."""
     return bool(_NOT_IN_MATERIAL.search(answer or ""))
 
 
+# Grade one answer: a score of 1, 0.5 or 0, a reason, and the method used. Refusals, answers to unanswerable
+# questions and empty answers follow fixed rules based on the answerable label of the question; only real
+# answers to answerable questions are sent to the LLM.
 def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
-    """Score one production answer via deterministic checks or Ollama.
-
-    Refusals and empty answers use explicit answerability labels, while
-    substantive answers are compared with reference facts by the LLM.
-    The production correctness scale is 0, 0.5, or 1.
-    """
 
     result = row.get("result") or {}
 
@@ -391,9 +397,8 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
         result.get("answer_text") or ""
     ).strip()
 
-    # Refusal correctness follows the gold answerability label. Using a
-    # deterministic rule here avoids spending judge-model calls on a case
-    # with an unambiguous expected decision.
+    # A refusal is right when the question is unanswerable and wrong when it is answerable. There is only one
+    # right decision, so a fixed rule is used and no LLM call is spent on it.
 
     if refused:
 
@@ -410,11 +415,10 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
             "judge_method": "deterministic"
         }
 
-    # 1. An unanswerable question answered in the model's own words that the
-    #    material does not contain it ("is not specified in the provided
-    #    sources") is a correct refusal. The engine's flag only marks the exact
-    #    refusal sentence, so manual review found these by hand on dev and test.
-    #    Answerable questions are never scored this way.
+    # An unanswerable question answered by saying, in the model's own words, that the material does not
+    # contain it ("is not specified in the provided sources") is a correct refusal. The refused flag of the
+    # answer phase only marks the exact refusal sentence, so without this rule these answers would be graded
+    # as wrong. Answerable questions are never graded this way.
 
     if not answerable and says_not_in_material(answer):
 
@@ -425,7 +429,7 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
             "judge_method": "semantic_refusal"
         }
 
-    # 2. Any other answer to an unanswerable question is penalized.
+    # Any other answer to an unanswerable question is wrong.
 
     if not answerable:
 
@@ -436,7 +440,7 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
             "judge_method": "deterministic"
         }
 
-    # Empty response
+    # An empty answer to an answerable question is wrong.
 
     if not answer:
 
@@ -447,9 +451,8 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
             "judge_method": "deterministic"
         }
 
-    # Fix temperature to zero to reduce variation across judge runs. The
-    # reference answer and key facts define the required factual content;
-    # the judge intentionally does not evaluate retrieval or citation syntax.
+    # The LLM judge, at temperature 0 so the same answer gets the same grade every time. The reference answer
+    # and the key facts say what the answer must contain; the search and the citation format are not graded.
 
     import ollama
 
@@ -461,7 +464,8 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
         "Return only the requested JSON object."
     )
     if rubric == "v3":
-        # 5. v3 reads the gold source and drops the key-fact list, which made the judge ask for every fact
+        # v3 gives the gold source text instead of the key facts, which made the judge ask for every fact. For a
+        # follow-up, the previous question is added so the judge knows what the question refers to.
         prompt = (
             f"Question:\n{row.get('question', '')}\n\n"
             + (f"Previous question in the conversation:\n{row.get('turn1')}\n\n" if row.get("turn1") else "")
@@ -470,6 +474,7 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
             f"Candidate answer:\n{answer}\n\n"
             "Return only the requested JSON object."
         )
+    # The instructions of the chosen rubric (v1 if the name is unknown).
     system = {"v2": SYSTEM_V2, "v3": SYSTEM_V3}.get(rubric, SYSTEM)
 
     response = ollama.chat(
@@ -488,11 +493,12 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
         options={
             "temperature": 0,
             "num_predict": 350,
-            # 6. room for up to four gold sources in the v3 prompt; v1 and v2 keep the default window
+            # A larger context window for v3, with room for up to four gold sources; v1 and v2 keep the default.
             **({"num_ctx": 8192} if rubric == "v3" else {})
         }
     )
 
+    # Depending on the version of the ollama library, the reply is a dictionary or an object.
     if isinstance(response, dict):
 
         raw = response["message"]["content"]
@@ -508,8 +514,8 @@ def judge_one(row: dict, model: str, rubric: str = "v1") -> dict:
     return verdict
 
 
+# Grade every answer of a saved run and save the verdicts and the summary in the run folder.
 def main():
-    """Judge a saved run and write individual scores plus aggregate metrics."""
 
     parser = argparse.ArgumentParser()
 
@@ -519,6 +525,7 @@ def main():
         required=True
     )
 
+    # The judge model, a different model from the one that answers.
     parser.add_argument(
         "--model",
         default="qwen2.5:7b"
@@ -535,6 +542,7 @@ def main():
         action="store_true"
     )
 
+    # The rubric: SYSTEM (v1), SYSTEM_V2 or SYSTEM_V3 above.
     parser.add_argument(
         "--rubric",
         choices=["v1", "v2", "v3"],
@@ -546,7 +554,7 @@ def main():
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be positive")
 
-    # Load saved RAG results
+    # Load the saved answers of the run (results.jsonl, written by eval/run_eval.py).
 
     run_path = (
         args.run_dir / "results.jsonl"
@@ -560,7 +568,7 @@ def main():
             if line.strip()
         ]
 
-    # Protect the test set
+    # Protect the test set, as in eval/run_eval.py: test answers are graded only with --allow-test.
 
     if not args.allow_test:
 
@@ -573,7 +581,7 @@ def main():
                 "Test set is protected"
             )
 
-    # Keep successful executions
+    # Only the questions answered without an error are graded.
 
     rows = [
         row
@@ -591,7 +599,7 @@ def main():
 
     output = []
 
-    # Judge every answer
+    # Grade every answer. If the judge fails on one, it is saved with status "error" and the run goes on.
 
     for i, row in enumerate(rows, start=1):
 
@@ -634,7 +642,8 @@ def main():
                 "judge_method": "failed"
             })
 
-    # Aggregate results
+    # Summary: the average score, the share of fully correct answers (score 1), and how many answers were
+    # graded by a fixed rule and how many by the LLM.
 
     scores = [
         row["score"]
@@ -685,7 +694,7 @@ def main():
         )
     }
 
-    # Save individual judgments
+    # Save the verdict of each question (judge_questions.csv for v1, judge_questions_v2.csv or _v3.csv).
 
     csv_path = (
         args.run_dir / ("judge_questions.csv" if args.rubric == "v1" else f"judge_questions_{args.rubric}.csv")
@@ -713,7 +722,7 @@ def main():
 
         writer.writerows(output)
 
-    # Save summary
+    # Save the summary (judge_summary.json, with the same suffix for v2 and v3).
 
     json_path = (
         args.run_dir / ("judge_summary.json" if args.rubric == "v1" else f"judge_summary_{args.rubric}.json")
@@ -744,9 +753,11 @@ def main():
         "==================================="
     )
 
+    # Exit with an error code if any answer could not be graded.
     if len(output) != len(scores):
         raise SystemExit(1)
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     main()
