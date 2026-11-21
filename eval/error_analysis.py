@@ -1,13 +1,8 @@
-"""Analyze evaluation errors and assign one primary cause per failed question.
-
-Usage:
-    python -m eval.error_analysis --run-dir eval/runs/RUN_ID
-
-Output:
-    reports/error_analysis.csv
-
-Owner: Elena.
-"""
+# Give every wrong answer of an evaluation run one main cause (refusal, search, citation or generation), so
+# the errors can be counted by type and the next change can target the most common one.
+#   python -m eval.error_analysis --run-dir eval/runs/RUN_ID
+# It reads the judge and metric files of the run (judge_questions.csv, metrics_questions.csv) and writes
+# reports/error_analysis.csv, one row per wrong answer, to review by hand.
 
 from __future__ import annotations
 
@@ -17,25 +12,23 @@ from collections import Counter
 from pathlib import Path
 
 
+# Read a CSV file into a list of dictionaries. utf-8-sig also accepts files saved by Excel, which add an
+# invisible mark at the start.
 def read_csv(path: Path) -> list[dict]:
-    """Read a CSV file into a list of dictionaries."""
     with path.open(encoding="utf-8-sig", newline="") as f:
         return list(csv.DictReader(f))
 
 
+# Turn a CSV value ("1", "true", "yes"...) into True or False.
 def to_bool(value) -> bool:
-    """Convert CSV boolean values."""
     return str(value).strip().lower() in {"1", "true", "yes"}
 
 
+# Give one wrong answer its main cause, from the automatic metrics, and a sentence that explains it.
+# The order of the checks matters: a refusal mistake comes first, then the search (the right source was not
+# among the 5), then a missing citation, and only then the generation. "generation_error" only means the right
+# source was found and cited, so the error is probably the model's; it still has to be checked by hand.
 def classify_error(judge: dict, metrics: dict) -> tuple[str, str]:
-    """Assign one primary error category using available automatic signals.
-
-    The ordering matters: refusal mistakes take precedence over retrieval,
-    missing citations, and generation errors. A generation error label only
-    means gold evidence was available; it is not proof of a model mistake.
-    All such cases should be checked against the original answer manually.
-    """
 
     answerable = to_bool(metrics.get("answerable"))
     refused = to_bool(metrics.get("refused"))
@@ -78,8 +71,8 @@ def classify_error(judge: dict, metrics: dict) -> tuple[str, str]:
     )
 
 
+# Join the judge results, the metrics and the questions of a run, classify every wrong answer and write the CSV.
 def main() -> None:
-    """Join per-question judge and metric files into a reviewable error CSV."""
 
     parser = argparse.ArgumentParser(
         description="Analyze RAG evaluation errors."
@@ -112,6 +105,7 @@ def main() -> None:
     judge_path = run_dir / "judge_questions.csv"
     metrics_path = run_dir / "metrics_questions.csv"
 
+    # Every input file must exist; run eval/run_eval.py and eval/judge.py first.
     for path in [judge_path, metrics_path, questions_path]:
         if not path.exists():
             raise FileNotFoundError(f"Missing required file: {path}")
@@ -120,6 +114,7 @@ def main() -> None:
     metrics = read_csv(metrics_path)
     questions = read_csv(questions_path)
 
+    # The metrics and the questions indexed by question id, to find each one quickly.
     metrics_by_id = {
         row["question_id"]: row
         for row in metrics
@@ -136,6 +131,7 @@ def main() -> None:
 
         qid = judge["question_id"]
 
+        # The judge could not grade this answer: listed as judge_error, to grade it by hand.
         if judge.get("status") != "ok":
             errors.append({
                 "question_id": qid,
@@ -151,6 +147,7 @@ def main() -> None:
             })
             continue
 
+        # Correct answers are not errors.
         if to_bool(judge.get("correct")):
             continue
 
@@ -195,6 +192,7 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(errors)
 
+    # Summary: how many errors of each type.
     counts = Counter(row["error_type"] for row in errors)
 
     print("\n========== ERROR ANALYSIS ==========")
@@ -210,5 +208,6 @@ def main() -> None:
     print("====================================")
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     main()

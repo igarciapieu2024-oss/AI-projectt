@@ -1,9 +1,8 @@
-"""Compare local Ollama models on a fixed, cited-answer task.
-
-Run from the repository root with:
-    python -m eval.benchmark_llm
-    python -m eval.benchmark_llm --models llama3.2:3b qwen2.5:7b --runs 3
-"""
+# Compare the speed of local Ollama models on one fixed task: answer a short question from one excerpt and
+# cite it. Used to choose the answer model: a model must answer within the time target to be usable live.
+# Speed alone says nothing about accuracy, so each answer is also printed to check it by eye.
+#   python -m eval.benchmark_llm
+#   python -m eval.benchmark_llm --models llama3.2:3b qwen2.5:7b --runs 3
 from __future__ import annotations
 
 import argparse
@@ -13,8 +12,10 @@ from dataclasses import dataclass
 from src.config import load_config
 from src.generation.llm import chat
 
+# The models compared by default and the time target per answer (seconds).
 DEFAULT_MODELS = ("llama3.1:8b", "qwen2.5:7b", "llama3.2:3b")
 MAX_SECONDS = 10.0
+# The same prompt for every model and every run, so the timings can be compared.
 MESSAGES = [
     {
         "role": "user",
@@ -29,6 +30,7 @@ MESSAGES = [
 ]
 
 
+# The result of one run: the model, the run number, the time it took and its answer.
 @dataclass
 class BenchmarkRun:
     model: str
@@ -37,12 +39,9 @@ class BenchmarkRun:
     response: str
 
 
+# Run the fixed prompt several times with one model and time each answer. The final system's settings are
+# used, with only the model replaced.
 def benchmark_model(model: str, runs: int) -> list[BenchmarkRun]:
-    """Run a fixed cited-answer prompt repeatedly for one Ollama model.
-
-    Keeping the prompt constant makes timings easier to compare, though
-    latency alone says nothing about answer accuracy or citation quality.
-    """
     config = load_config("configs/final_system.yaml")
     config.generation["llm_model"] = model
     results = []
@@ -58,8 +57,9 @@ def benchmark_model(model: str, runs: int) -> list[BenchmarkRun]:
     return results
 
 
+# Run every model, print each answer with its time, and list the models that stayed within the target.
+# Returns 0 if at least one model passed.
 def main(argv: list[str] | None = None) -> int:
-    """Print per-model latency and the pass/fail time-target comparison."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS, help="Ollama model tags to test")
     parser.add_argument("--runs", type=int, default=1, help="Runs per model (default: 1)")
@@ -95,5 +95,6 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if passed else 1
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     raise SystemExit(main())

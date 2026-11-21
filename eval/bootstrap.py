@@ -1,12 +1,9 @@
-
-"""Bootstrap confidence intervals for evaluation metrics.
-
-Resampling estimates uncertainty without assuming a particular score
-distribution. Paired comparisons resample question-level differences so
-the same questions remain aligned across the two systems.
-
-Owner: Elena.
-"""
+# Confidence intervals for the evaluation metrics, by bootstrap. With 30 test questions a score such as 73%
+# could easily be a few points higher or lower on other questions, so the interval shows how uncertain it is.
+# Bootstrap resampling estimates that uncertainty without assuming any distribution for the scores. To compare
+# two systems, the differences are resampled question by question (paired), so both systems are always
+# compared on the same questions.
+#   python -m eval.bootstrap --results-a <metrics of system A> [--results-b <metrics of system B>] --metric recall_at_5
 from __future__ import annotations
 
 import argparse
@@ -16,14 +13,16 @@ from pathlib import Path
 from statistics import mean
 
 
+# The p-th percentile of the values (p from 0 to 100), interpolating between the two closest values.
 def percentile(values: list[float], p: float) -> float:
-    """Compute a percentile using linear interpolation."""
     if not values:
         raise ValueError("Cannot compute percentile of empty values.")
 
     if not 0 <= p <= 100:
         raise ValueError("Percentile must be between 0 and 100.")
 
+    # The position of the percentile in the sorted list; when it falls between two values, they are mixed
+    # in proportion to the distance.
     ordered = sorted(values)
     position = (len(ordered) - 1) * p / 100
 
@@ -37,17 +36,16 @@ def percentile(values: list[float], p: float) -> float:
     )
 
 
+# The mean of the values and its confidence interval (95% by default). The values are resampled with
+# replacement n_bootstrap times (2000), the mean of each sample is kept, and the interval is the range
+# between the 2.5th and 97.5th percentiles of those means. The fixed seed gives the same interval every time.
+# The interval only shows the uncertainty of having few questions, not errors of the grading itself.
 def bootstrap_ci(
     values: list[float],
     n_bootstrap: int = 2000,
     confidence: float = 0.95,
     seed: int = 42,
 ) -> dict:
-    """Estimate a confidence interval by resampling observations.
-
-    A fixed random seed makes repeated reports reproducible. Percentile
-    bounds summarize sampling variability, not systematic judge bias.
-    """
     if not values:
         raise ValueError("Values cannot be empty.")
 
@@ -61,6 +59,7 @@ def bootstrap_ci(
     n = len(values)
     estimates = []
 
+    # Each sample has as many values as the original, drawn at random with replacement.
     for _ in range(n_bootstrap):
         sample = [
             values[rng.randrange(n)]
@@ -68,6 +67,7 @@ def bootstrap_ci(
         ]
         estimates.append(mean(sample))
 
+    # The share left out on each side of the interval (2.5% for a 95% interval).
     alpha = (1 - confidence) / 2
 
     return {
@@ -82,6 +82,10 @@ def bootstrap_ci(
     }
 
 
+# Compare two systems on the same questions: the difference B minus A of one metric, question by question,
+# with its confidence interval. If the interval does not include 0, B is better (or worse) beyond what the
+# small number of questions can explain. Pairing by question_id matters: some questions are hard for both
+# systems, and resampling the two systems separately would ignore that.
 def paired_bootstrap(
     results_a: list[dict],
     results_b: list[dict],
@@ -90,14 +94,10 @@ def paired_bootstrap(
     confidence: float = 0.95,
     seed: int = 42,
 ) -> dict:
-    """Compare configurations using matched question IDs.
-
-    Difference = system B minus system A; matching IDs is essential because
-    unpaired resampling would ignore the common question difficulty.
-    """
     a = {row["question_id"]: row for row in results_a}
     b = {row["question_id"]: row for row in results_b}
 
+    # Each question must appear once in each system, and both systems must have the same questions.
     if len(a) != len(results_a) or len(b) != len(results_b):
         raise ValueError("Duplicate question IDs are not allowed.")
 
@@ -114,10 +114,12 @@ def paired_bootstrap(
         value_a = a[question_id].get(metric)
         value_b = b[question_id].get(metric)
 
-        # Skip undefined metrics in both configurations.
+        # A metric that does not apply to the question in either system (for example recall on an
+        # unanswerable question) is skipped.
         if value_a is None and value_b is None:
             continue
 
+        # Defined in one system but not in the other: the results do not match.
         if value_a is None or value_b is None:
             raise ValueError(
                 f"Metric missing for question {question_id}."
@@ -148,8 +150,8 @@ def paired_bootstrap(
     }
 
 
+# Read a JSON file with one record of metrics per question.
 def load_results(path: str | Path) -> list[dict]:
-    """Load question-level metric records from a JSON list for bootstrap analysis."""
     data = json.loads(
         Path(path).read_text(encoding="utf-8")
     )
@@ -162,8 +164,8 @@ def load_results(path: str | Path) -> list[dict]:
     return data
 
 
+# Command line: with one results file, the interval of its metric; with two, the paired difference.
 def main() -> None:
-    """Parse bootstrap options and report uncertainty estimates."""
     parser = argparse.ArgumentParser(
         description="Bootstrap evaluation metrics."
     )
@@ -204,5 +206,6 @@ def main() -> None:
     print(json.dumps(result, indent=2))
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     main()

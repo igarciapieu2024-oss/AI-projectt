@@ -1,11 +1,6 @@
-
-"""Find syllabus, slide and image source IDs matching search words.
-
-Usage:
-    python -m eval.find_ids "final exam"
-
-Owner: Elena.
-"""
+# Find the ids of the syllabus sections, slides and slide images that contain some words. Used when writing
+# the evaluation questions, to fill in gold_ids (the correct source of each question).
+#   python -m eval.find_ids "final exam"
 from __future__ import annotations
 
 import argparse
@@ -15,17 +10,15 @@ from pathlib import Path
 from src.config import PATHS
 
 
+# Return every section, slide and image record that contains all the words of the query. It is a plain word
+# search to help write the questions, not the search of the system. An image match gives the id of its slide,
+# because the slide is the source the knowledge base cites.
 def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
-    """Locate candidate gold IDs across syllabus, slide, and OCR records.
-
-    This is a literal all-words search for annotation assistance, not the
-    production semantic retriever. Image matches use their parent slide ID
-    because that is the source cited by the RAG knowledge base.
-    """
     words = query.casefold().split()
     if not words:
         return []
 
+    # The parsed files of the project, or the same three files in another folder (used by the tests).
     if data_dir is None:
         files = [
             (PATHS["syllabus_sections"], "section"),
@@ -47,6 +40,7 @@ def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
             print(f"File not found: {path}")
             continue
 
+        # Read the file line by line (one JSON record per line) and take the id, course, title and text of each record.
         with path.open(encoding="utf-8") as file:
             for line in file:
                 if not line.strip():
@@ -74,6 +68,7 @@ def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
                         + record.get("description", "")
                     )
 
+                # A record matches when every word of the query appears in its title or text (any case).
                 searchable = f"{title} {text}".casefold()
 
                 if all(word in searchable for word in words):
@@ -88,8 +83,8 @@ def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
     return matches
 
 
+# Command line: search the words and print each match with a short piece of its text.
 def main() -> None:
-    """Expose the annotation helper as a command-line search."""
     parser = argparse.ArgumentParser(
         description="Find syllabus section and slide IDs."
     )
@@ -112,5 +107,6 @@ def main() -> None:
     print(f"\nTotal matches: {len(results)}")
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     main()
