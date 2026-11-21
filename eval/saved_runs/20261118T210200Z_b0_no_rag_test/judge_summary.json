@@ -1,0 +1,14 @@
+{
+  "run_dir": "eval\\runs\\20261118T210200Z_b0_no_rag_test",
+  "judge_model": "qwen2.5:7b",
+  "rubric": "v1",
+  "evaluated": 30,
+  "failed": 0,
+  "mean_correctness_score": 0.1833,
+  "exact_correct_rate": 0.1667,
+  "methods": {
+    "deterministic": 6,
+    "llm": 24
+  },
+  "note": "Evaluates factual correctness. Retrieval and citations are scored separately."
+}

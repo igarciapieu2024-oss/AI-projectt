@@ -1,0 +1,21 @@
+{
+  "run_dir": "eval\\runs\\20261118T210200Z_b0_no_rag_test",
+  "evaluated": 30,
+  "failed": 0,
+  "answerable": 24,
+  "unanswerable": 6,
+  "recall_at_k": 0,
+  "mrr_at_k": 0.0,
+  "refusal_accuracy": 0.8,
+  "false_refusal_rate": 0,
+  "correct_unanswerable_refusal_rate": 0,
+  "citation_presence_rate": 0,
+  "citation_validity": null,
+  "mean_latency_ms": 5735.64,
+  "notes": [
+    "Recall and MRR check whether a top-k chunk covers a gold source ID.",
+    "Citation validity checks cited labels and chunk IDs.",
+    "Citation validity is null if no citations were generated.",
+    "Answer correctness requires a separate judge."
+  ]
+}
