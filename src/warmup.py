@@ -1,4 +1,5 @@
-"""Warm local retrieval models before the first question."""
+# Load every model and index into memory before the first question, so the first answer is not slower than
+# the rest. Called by app_components/engine.py when the app starts.
 from __future__ import annotations
 
 from src.config import PATHS, bm25_path, chunks_path
@@ -6,8 +7,9 @@ from src.generation.llm import chat
 from src.retrieval import embed, index_cache, rerank, router
 
 
+# Load what this configuration uses: the ChromaDB collection, the BM25 index, the chunks, the embedding
+# model, the reranker and the router.
 def warm_up(cfg) -> None:
-    """Load the models enabled by this configuration into their process caches."""
     model_name = cfg.kb.get("embed_model")
     if not model_name:
         raise ValueError("kb.embed_model must be configured")
@@ -17,6 +19,7 @@ def warm_up(cfg) -> None:
     embed.warm_up(model_name)
     rerank.warm_up(cfg)
     router.warm_up(cfg)
+    # One very short call to the LLM (one token), so Ollama loads the model into memory now.
     chat(
         [{"role": "user", "content": "Hi"}],
         cfg,
