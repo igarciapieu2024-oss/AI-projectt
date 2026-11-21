@@ -1,4 +1,4 @@
-"""The brand look: loads the CSS and draws HTML blocks (owner: Irene)."""
+# The brand look: loads the CSS (assets/style.css) and draws our HTML blocks and icons; every page uses it.
 from __future__ import annotations  # lets us write types like "str | None" in any Python version
 
 import base64  # turns small images into text so they can go inside the HTML
@@ -12,24 +12,21 @@ CSS_FILE = ROOT / "assets" / "style.css"  # every style rule of the app
 
 #1 the CSS and the HTML helper
 
+# adds our CSS to the page; app.py calls it once, before any page is drawn
 def apply_theme() -> None:
-    """Adds our CSS to the page; app.py calls it once, before any page is drawn."""
     css = CSS_FILE.read_text(encoding="utf-8")  # reads the style file
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)  # inserts it into the page
 
 
+# draws a block of our own HTML. Streamlit reads the text as Markdown first: an indented line becomes a code block
+# and an empty line ends the HTML, so the indentation and the empty lines are removed before drawing it
 def html(markup: str) -> None:
-    """Draws a block of our own HTML.
-
-    Streamlit reads the text as Markdown first: an indented line becomes a code block and an
-    empty line ends the HTML. So we strip the indentation and the empty lines before drawing it.
-    """
     lines = [line.strip() for line in markup.splitlines()]  # removes the indentation of every line
     st.markdown("".join(line for line in lines if line), unsafe_allow_html=True)  # joins the non-empty lines
 
 
+# a small image as text ("data:image/png;base64,..."), so an <img> works without a web server; None if it doesn't exist
 def image_data_uri(path: str | Path) -> str | None:
-    """A small image as text ("data:image/png;base64,..."), so an <img> works without a web server."""
     path = Path(path)
     if not path.is_absolute():  # paths in app_content.py are relative to the repo folder
         path = ROOT / path
@@ -65,8 +62,8 @@ _ICON_PATHS = {
 }
 
 
+# one of the icons above as SVG text, ready to put inside an HTML block
 def icon(name: str, size: int = 28, color: str = "currentColor") -> str:
-    """One of the icons above as SVG text, ready to put inside an HTML block."""
     return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" '
             f'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
             f'{_ICON_PATHS[name]}</svg>')

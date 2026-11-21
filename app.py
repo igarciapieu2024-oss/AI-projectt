@@ -1,9 +1,7 @@
-"""The Streamlit app: entry point with the 4 pages (owner: Irene).
-
-Run with the fake engine (works today):   USE_FAKE=1 streamlit run app.py
-Windows PowerShell:                         $env:USE_FAKE=1; streamlit run app.py
-Run with the real engine (from Wed 11):    streamlit run app.py
-"""
+# The Streamlit app: the entry point with the 4 pages (Home, Assistant, Compare, How it works).
+#   streamlit run app.py                 the real system: needs Ollama open and the knowledge base built
+#   USE_FAKE=1 streamlit run app.py      the fake engine (src/generation/fake.py), to work on the pages without models
+#   Windows PowerShell:                  $env:USE_FAKE=1; streamlit run app.py
 import logging
 
 import streamlit as st  # the library that builds the web app
@@ -18,8 +16,9 @@ logger = logging.getLogger(__name__)
 # the tab shows the logo and the name; "wide" uses the whole screen width, better for the projector
 st.set_page_config(page_title=f"{content.COMPANY_NAME}, {content.SUBTITLE.lower()}", page_icon=content.LOGO_MARK, layout="wide")
 
-# Load local retrieval models before the first assistant question. The fake app
-# does not need the real knowledge-base models.
+# load the models and the indexes once, when the app starts (src/warmup.py), so the first question is not slower
+# than the rest; the fake engine doesn't use them. If the warm-up fails, the error is written in the terminal and
+# the app still opens
 if not USING_FAKE:
     try:
         warm_up_models()

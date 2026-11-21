@@ -1,7 +1,5 @@
-"""Compare: the same question answered by the LLM alone and by our system (owner: Irene).
-
-This page proves the point of the project live: the LLM alone invents, ours cites or refuses.
-"""
+# Compare: the same question answered by the LLM alone and by our system, side by side.
+# This page proves the point of the project live: the LLM alone invents, ours cites or refuses.
 import streamlit as st  # the library that builds the page
 
 import app_content as content  # the example questions
@@ -22,7 +20,9 @@ with st.container(key="askbar"):  # the controls in one white bar
     go = button_col.button("Compare", type="primary", icon=":material/compare_arrows:")  # starts both answers
 
 #2 the two answers side by side
-# each panel: (key for the CSS, config, title, subtitle); baselines/b0_llm_only = no search, no sources
+# each panel: (key for the CSS, config, title, subtitle); baselines/b0_llm_only = no search, no sources.
+# the RAG panel runs the earlier 3B system (baselines/v1_2_small_model, about 14 s an answer), not the final
+# 8B system of the Assistant page (about 30 s)
 PANELS = [
     ("panel_bare", "baselines/b0_llm_only", "The model alone", "Answers from what it memorised in training"),
     ("panel_rag", "baselines/v1_2_small_model", content.COMPANY_NAME, "Answers only from your syllabi and slides"),

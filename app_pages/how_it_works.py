@@ -1,4 +1,5 @@
-"""How it works: the architecture and the key results (owner: Irene). Texts and numbers come from app_content.py."""
+# How it works: the size of the knowledge base, the two halves of the system and the key results.
+# Texts and numbers come from app_content.py.
 import html as html_lib  # escapes the texts before putting them in HTML
 from pathlib import Path  # to check if the architecture image exists
 
@@ -55,7 +56,7 @@ for i, (title, when, nodes) in enumerate(LANES):
         <div class="flow">{'<span class="arrow">›</span>'.join(boxes)}</div></div>
     """)
 
-#4 the architecture figure from Sergio, when it arrives
+#4 the architecture figure, drawn only if assets/architecture.png exists
 if Path(content.ARCHITECTURE_IMAGE).exists():
     st.image(content.ARCHITECTURE_IMAGE)
 

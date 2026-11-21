@@ -1,4 +1,5 @@
-"""Assistant: the chat, the technical core of the app (owner: Irene)."""
+# Assistant: the chat, the technical core of the app. It runs the system chosen in app_components/engine.py
+# (final_system by default) and shows each answer word by word, with its sources and the behind-the-scenes panel.
 import html as html_lib  # escapes the texts before putting them in HTML
 
 import streamlit as st  # the library that builds the page
@@ -34,8 +35,8 @@ with st.container(key="toolbar"):
 #3 the conversation so far
 
 
+# everything under an answer: the refusal note, the source cards and the panel
 def show_result(result: AnswerResult) -> None:
-    """Everything under an answer: the refusal note, the source cards and the panel."""
     if result.refused:  # refusals in their own style, so the demo shows the system knows when to stop
         refusal_notice()
     render_sources(result.context_hits, result.answer_text)

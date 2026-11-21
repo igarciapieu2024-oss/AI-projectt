@@ -1,4 +1,5 @@
-"""How an answer is written on screen: word by word, with the [S1] citations as yellow chips (owner: Irene)."""
+# How an answer is written on screen: word by word, with the [S1] citations as yellow chips, plus the notices for
+# refusals, errors and answers without sources. Used by the Assistant and Compare pages.
 from __future__ import annotations  # lets us write types like "list[dict] | None" in any Python version
 
 import html as html_lib  # escapes < and > in the answer, so the LLM's text can't break our HTML
@@ -16,16 +17,16 @@ _CITATION = re.compile(r"\[(S\d+)\]")  # a citation in the answer text, e.g. [S3
 
 #1 the answer text with citation chips
 
+# the answer as HTML: the text escaped, and every [S1] turned into a yellow chip
 def format_answer(text: str) -> str:
-    """The answer as HTML: the text escaped, and every [S1] turned into a yellow chip."""
     safe = html_lib.escape(text)  # "<" becomes "&lt;" etc., so nothing in the answer is read as HTML
     chips = _CITATION.sub(r'<span class="cite">\1</span>', safe)  # [S1] -> the chip S1
     chips = chips.replace("\n", "<br>")  # keeps the LLM's line breaks (lists, "Where:" lines); without this they are joined
     return f'<div class="answer">{chips}</div>'
 
 
+# draws a finished answer (used when the conversation is redrawn)
 def show_answer(text: str) -> None:
-    """Draws a finished answer (used when the conversation is redrawn)."""
     html(format_answer(text))
 
 
@@ -34,14 +35,12 @@ def show_answer(text: str) -> None:
 THINKING = '<div class="thinking"><span></span><span></span><span></span>Searching your course material</div>'
 
 
+# asks the engine and writes the answer as it arrives; returns the full result at the end.
+# st.write_stream isn't used because it writes plain text: here every new word redraws the answer through
+# format_answer, so the citation chips appear while the answer is being written.
+# if the engine fails, it shows what went wrong and how to fix it, and returns None
 def stream_answer(question: str, cfg, history: list[dict] | None = None,
                   filters: Filters | None = None) -> AnswerResult | None:
-    """Asks the engine and writes the answer as it arrives; returns the full result at the end.
-
-    We don't use st.write_stream because it writes plain text: here every new word redraws the
-    answer through format_answer, so the citation chips appear while the answer is being written.
-    If the engine fails, it shows what went wrong and how to fix it, and returns None.
-    """
     box = st.empty()  # one place on the page that we overwrite with the answer so far
     box.markdown(THINKING, unsafe_allow_html=True)  # 3 moving dots until the first word arrives
     text = ""  # the answer so far
@@ -65,10 +64,10 @@ def stream_answer(question: str, cfg, history: list[dict] | None = None,
 
 #3 the notices
 
+# (what went wrong, how to fix it) in plain words, from the type and the text of the error
 def explain_error(error: Exception) -> tuple[str, str]:
-    """(what went wrong, how to fix it) in plain words, from the type and the text of the error."""
     message = str(error).lower()
-    if isinstance(error, NotImplementedError):  # the real answer() isn't written yet
+    if isinstance(error, NotImplementedError):  # a part of the engine that isn't written
         return ("The answer engine isn't connected yet.",
                 "Start the app with the fake engine: $env:USE_FAKE=1; streamlit run app.py")
     if isinstance(error, ConnectionError) or "connect" in message or "ollama" in message:
@@ -83,8 +82,8 @@ def explain_error(error: Exception) -> tuple[str, str]:
     return ("Something went wrong while answering.", f"Details for the team: {type(error).__name__}: {error}")
 
 
+# a red notice with what went wrong and the command that fixes it
 def error_notice(error: Exception) -> None:
-    """A red notice with what went wrong and the command that fixes it."""
     what, fix = explain_error(error)
     html(f"""
         <div class="notice warn">{icon("offline", 22)}
@@ -92,8 +91,8 @@ def error_notice(error: Exception) -> None:
     """)
 
 
+# shown under a refusal, so the demo makes clear that refusing is on purpose
 def refusal_notice() -> None:
-    """Shown under a refusal, so the demo makes clear that refusing is on purpose."""
     html(f"""
         <div class="notice refuse">{icon("shield", 22)}
         <div><b>Not in your course material</b>
@@ -101,8 +100,8 @@ def refusal_notice() -> None:
     """)
 
 
+# shown under the LLM alone on the Compare page: an answer nobody can check
 def no_sources_notice() -> None:
-    """Shown under the LLM alone on the Compare page: an answer nobody can check."""
     html(f"""
         <div class="notice warn">{icon("page", 22)}
         <div><b>No sources</b>

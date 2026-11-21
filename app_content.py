@@ -1,9 +1,5 @@
-"""Every text and number the app shows that will change later (owner: Irene).
-
-The pages read from here, so when the real name, logo, survey numbers or results arrive,
-we only edit this file (and drop the images into assets/), never the pages.
-"XX" marks the values we still don't have.
-"""
+# Every text and number the app shows. The pages read them from here, so changing a text, a number or a result
+# means editing only this file (and the images in assets/), never the pages.
 
 # company (from the business case)
 COMPANY_NAME = "SyllabusAI"
@@ -76,7 +72,7 @@ FOR_UNIVERSITIES = ("Universities license SyllabusAI per year, by number of enro
 CLOSING = "Try it with a question from one of the 7 courses of the pilot."  # the dark band at the end of the landing page
 FOOTER = "SyllabusAI, a student project at IE University, 2026."
 
-# example questions: the starter cards of the chat and the Compare page (Elena confirms the 4 that work best on Sat 14)
+# example questions: the starter cards of the chat and the Compare page
 # one per route of the router, so the demo shows all 4 behaviours; all of them are answered in the real PDFs
 EXAMPLE_QUESTIONS = [
     "What is the final exam worth in Management Control?",  # course admin: Management Control syllabus, evaluation criteria
@@ -101,6 +97,8 @@ RESULTS = [  # (metric, bare LLM, our system)
     ("Answers that cite a source", "0%", "77%"),
     ("Unanswerable questions refused", "83%", "100%"),
 ]
+# the 70% on 90 questions (holdouts 1-3) was measured with experiment 5 (configs/experiments/05_all_improvements.yaml),
+# the version before the final changes; the result of the final system on unseen questions is the 73% of holdout 3 above
 RESULTS_NOTE = ("Each answer checked against its source slide or syllabus section. On 90 unseen questions over three "
                 "sets the system is fully correct on 70%; method and confidence intervals in the documentation.")
-ARCHITECTURE_IMAGE = "assets/architecture.png"  # Sergio's architecture figure (Sat 14)
+ARCHITECTURE_IMAGE = "assets/architecture.png"  # the architecture figure of the How it works page, shown only if the file exists
