@@ -1,12 +1,11 @@
-"""Fake answer() with the same inputs and outputs as the real one (owner: Sergio).
-
-The app and the evaluation use it until the real engine exists:
-    USE_FAKE=1 streamlit run app.py
-It never searches or calls an LLM. It returns made-up answers that cover every case the app must show:
-- a normal answer with 5 sources (a syllabus section, slides, and a slide whose source is an image);
-- a refusal, when the question looks out of scope (it mentions "party", "weather", "football"...);
-- the bare-LLM answer with no sources, when the config has generation.rag = false (baselines/b0_llm_only.yaml).
-"""
+# A fake answer() and answer_stream() with the same inputs and outputs as the real ones in answer.py.
+# It never searches or calls an LLM: it returns made-up answers that cover every case the app must show,
+# so the app could be designed and tested before the real engine existed, and can still be opened on a
+# laptop without Ollama:
+#   USE_FAKE=1 streamlit run app.py      (app_components/engine.py chooses the fake or the real engine)
+# The three cases: a normal answer with 5 sources (a syllabus section, slides, and a slide whose source is an
+# image), a refusal when the question looks out of scope, and the answer of the LLM alone, without sources,
+# when the config has generation.rag = false (baselines/b0_llm_only.yaml).
 from __future__ import annotations
 
 import time
@@ -14,20 +13,20 @@ from typing import Iterator
 
 from src.schemas import REFUSAL, AnswerResult, Chunk, Citation, Filters, Hit, RouteDecision
 
-# words that make the fake answer refuse, so the app can show what a refusal looks like
+# Words that make the fake answer refuse, so the app can show what a refusal looks like.
 _OUT_OF_SCOPE_WORDS = ("party", "weather", "football", "capital of", "recipe")
 
 
+# Build one fake source with every field the real chunks have.
 def _chunk(chunk_id: str, doc_type: str, source_id: str, covers: list[str], sessions: list[int],
            outline: str, text: str, has_image_text: bool = False) -> Chunk:
-    """Builds one fake source with every field the real ones have."""
     return Chunk(chunk_id=chunk_id, kb_sig="fake0000", strategy="slide" if doc_type == "slide" else "section",
                  doc_type=doc_type, course_code="c01", sessions=sessions, source_id=source_id, covers=covers,
                  parent_id=f"{source_id}_parent", outline_path=outline, text=text, embed_text=f"{outline}\n{text}",
                  has_image_text=has_image_text)
 
 
-# 5 example sources: one syllabus section, three slides, and one slide answered from its image
+# 5 example sources: two syllabus sections and three slides, one of them answered from its image.
 _SOURCES = [
     _chunk("section__c01_syl_sec04__00", "syllabus_section", "c01_syl", ["c01_syl_sec04"], [],
            "Course 1 · Syllabus › EVALUATION",
@@ -47,19 +46,24 @@ _SOURCES = [
 ]
 
 
+# Return a made-up AnswerResult for the question, with the same fields and timings the real one has.
 def answer(question: str, history: list[dict] | None = None, filters: Filters | None = None, cfg=None) -> AnswerResult:
     start = time.perf_counter()
-    rag = True if cfg is None else bool(cfg.generation.get("rag", True))  # baselines/b0_llm_only.yaml sets rag to false
+    # baselines/b0_llm_only.yaml sets rag to false.
+    rag = True if cfg is None else bool(cfg.generation.get("rag", True))
     out_of_scope = any(w in question.lower() for w in _OUT_OF_SCOPE_WORDS)
     rewritten = question if not history else f"{question} (rewritten with the previous question)"
 
-    if not rag:  # the bare LLM: no search, no sources, and it invents a confident answer
+    # The LLM alone: no search, no sources, and a confident answer that is not checked against the material.
+    if not rag:
         text = "The final exam is usually worth 50% of the grade and takes place in the last week of the course."
         hits, route, refused = [], RouteDecision(label="none", prob=0.0, source="none"), False
-    elif out_of_scope:  # nothing relevant found: the system refuses instead of inventing
+    # Out of scope: the system refuses instead of inventing an answer.
+    elif out_of_scope:
         text = REFUSAL
         hits, route, refused = [], RouteDecision(label="out_of_scope", prob=0.91, source="classifier"), True
-    else:  # a normal cited answer with 5 sources
+    # A normal cited answer with 5 sources and plausible scores for every search stage.
+    else:
         hits = [
             Hit(chunk=c, rank=i + 1, score_dense=round(0.82 - 0.06 * i, 3), score_bm25=round(12.5 - 1.7 * i, 2),
                 score_rrf=round(0.0325 - 0.0021 * i, 4), score_rerank=round(0.91 - 0.15 * i, 3), label=f"S{i + 1}")
@@ -70,6 +74,7 @@ def answer(question: str, history: list[dict] | None = None, filters: Filters | 
                 "Attendance must be at least 80% [S5].")
         route, refused = RouteDecision(label="course_admin", prob=0.93, source="classifier"), False
 
+    # Made-up timings close to the real ones, so the app shows realistic numbers.
     total = (time.perf_counter() - start) * 1000
     timings = {"rewrite": 0.0 if not history else 310.0, "route": 4.0, "retrieve": 120.0 if rag else 0.0,
                "rerank": 380.0 if rag else 0.0, "generate": 5200.0, "total": round(total + 6014.0, 1)}
@@ -88,9 +93,12 @@ def answer(question: str, history: list[dict] | None = None, filters: Filters | 
     )
 
 
+# The streaming version for the app: the answer word by word, then the complete result as the last item,
+# exactly like answer_stream() in answer.py.
 def answer_stream(question: str, history: list[dict] | None = None, filters: Filters | None = None, cfg=None) -> Iterator[str | AnswerResult]:
     result = answer(question, history, filters, cfg)
-    for word in result.answer_text.split(" "):  # yields the answer word by word, like the real LLM
-        time.sleep(0.02)  # a small pause, so the app shows the text appearing
+    for word in result.answer_text.split(" "):
+        # A small pause between words, so the app shows the text appearing as with the real LLM.
+        time.sleep(0.02)
         yield word + " "
-    yield result  # the last item is the full result, with the sources and the timings
+    yield result

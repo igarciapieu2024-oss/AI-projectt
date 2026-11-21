@@ -1,7 +1,8 @@
-"""Cross-course questions answered from the course table.
-
-Owner: Sergio.
-"""
+# Answer cross-course questions from the course table (data/processed/course_table.csv, built by
+# src/kb/course_table.py). Called by _prepare_answer() in src/generation/answer.py when the router labels a
+# question cross_course: instead of searching chunks of 7 syllabi at once, every course becomes one source
+# row with its facts, and for questions that rank courses the answer is written out directly.
+# course_rows() and asks_for_ranking() are also used by answer.py for the course filter and the per-course answers.
 from __future__ import annotations
 
 import json
@@ -15,17 +16,22 @@ from src.schemas import Chunk, CourseRow, Hit
 from src.utils.io import read_csv
 
 
+# The key of one version of the file (path, modification time, size), so a rebuilt table is read again.
 def _file_key(path: Path) -> tuple[str, int, int]:
     stat = path.stat()
     return str(path.resolve()), stat.st_mtime_ns, stat.st_size
 
 
+# Read the course table once per version and keep it in memory.
 @lru_cache(maxsize=2)
 def _load_rows(path: str, modified_ns: int, size: int) -> tuple[dict[str, str], ...]:
+    # The time and size are only part of the cache key.
     del modified_ns, size
+    # A tuple, so the cached rows cannot be changed by mistake.
     return tuple(read_csv(path))
 
 
+# The evaluation components of a row, stored as JSON text in the CSV, as a list of {"name", "weight"}.
 def _components(value: str) -> list[dict]:
     if not value:
         return []
@@ -38,6 +44,7 @@ def _components(value: str) -> list[dict]:
     return components
 
 
+# A number from the CSV, or None when the cell is empty (for example, a course without a final exam).
 def _optional_float(value: str) -> float | None:
     if not value:
         return None
@@ -47,6 +54,7 @@ def _optional_float(value: str) -> float | None:
         raise ValueError(f"course table contains an invalid numeric value: {value!r}") from exc
 
 
+# A whole number from the CSV (the number of sessions), or None when the cell is empty.
 def _optional_int(value: str) -> int | None:
     if not value:
         return None
@@ -56,12 +64,13 @@ def _optional_int(value: str) -> int | None:
         raise ValueError(f"course table contains an invalid session count: {value!r}") from exc
 
 
+# Write one course row as one line of text, the source text the LLM reads and cites.
 def _row_text(row: CourseRow) -> str:
     parts = [f"{row.course_name} ({row.course_code})"]
     if row.final_exam_weight is not None:
         parts.append(f"final exam {row.final_exam_weight:g}%")
     else:
-        # said explicitly: without it the model read another component (e.g. "Intermediate Tests 60%") as the final exam
+        # Said explicitly: without it the model read another component as the final exam.
         parts.append("no final exam")
     components = _components(row.components)
     if components:
@@ -85,16 +94,17 @@ def _row_text(row: CourseRow) -> str:
     return "; ".join(parts)
 
 
-# which column a comparison question is about, and the words that ask for the top or the bottom of it
+# Which column of the table a comparison question is about, found from its words.
 _SORT_FIELDS = [
     (re.compile(r"final[\s-]exam", re.I), "final_exam_weight"),
     (re.compile(r"attendance|absence|absences|miss", re.I), "attendance_limit_pct"),
     (re.compile(r"sessions|classes|long", re.I), "n_sessions"),
 ]
+# Words that ask for the bottom of the ranking instead of the top.
 _ASCENDING = re.compile(r"\b(lowest|least|smallest|fewest|minimum|less|shortest)\b", re.I)
-# 1. Words that ask to order or compare courses. Without one of them the question is about something else that only
-#    mentions the field ("Which two courses require a minimum of 4.5 on the final exam?", "What happens if I fall
-#    below 80% attendance?"), and the ranking line would answer a different question.
+# Words that ask to order or compare courses. Without one of them the question only mentions the field but
+# asks something else (a minimum grade, what happens below the attendance limit), and the ranking line
+# would answer a different question.
 _RANKING = re.compile(
     r"\b(highest|lowest|most|least|largest|smallest|larger|smaller|higher|lower|bigger|biggest|greatest|"
     r"fewest|longest|shortest|compare|comparison|rank|ranking|order)\b",
@@ -102,15 +112,15 @@ _RANKING = re.compile(
 )
 
 
-# 2. Words that ask for something the ranking line does not hold. "Who teaches the course with the
-#    highest final exam weight?" mentions the ranked field but asks for the professor, so the model
-#    answers it from the course rows instead.
+# Words that ask for something the ranking line does not hold (who teaches, a book, a date...). A question
+# that ranks a field but asks for one of these is answered by the model from the course rows instead.
 _OTHER_ASK = re.compile(
     r"\b(who|whom|professor|lecturer|teach\w*|book|textbook|bibliography|when|where|which session|date)\b",
     re.I,
 )
 
-# how each compared column is named and printed in the ranking line
+# How each compared column is named in the ranking line, its unit, and what is written for a course
+# without a value.
 _FIELD_WORDS = {
     "final_exam_weight": ("final exam weight", "%", "no final exam"),
     "attendance_limit_pct": ("minimum attendance", "%", "not stated in the syllabus"),
@@ -118,23 +128,23 @@ _FIELD_WORDS = {
 }
 
 
+# The column the question compares, or None if it compares none of them.
 def _compared_field(question: str) -> str | None:
     return next((name for pattern, name in _SORT_FIELDS if pattern.search(question)), None)
 
 
+# The answer to a ranking question written out as one line: the top course(s) first, then the rest in order,
+# with courses of equal value grouped together. Sorting the rows and letting the model read them was not
+# enough: the small local model skipped the first row or merged rows with different values. Returns None when
+# the question is not a ranking question. The rows arrive already sorted by _ordered_for().
 def _ranking_text(question: str, rows: list[dict[str, str]]) -> str | None:
-    """The answer to a comparison question written out, e.g. "Highest final exam weight: Strategies (45%). ...".
-
-    Sorting the rows was not enough: the small local model skipped S1 ("Management Control and Organizational
-    Behaviour, both 40%") or merged rows ("Strategies and Organizational Behaviour, both 45%"; OB is 40%). So the
-    first sentence states the top course(s) on its own, ties grouped, and the rest follows in order.
-    """
     field = _compared_field(question)
     if field is None or len(rows) < 2 or not _RANKING.search(question) or _OTHER_ASK.search(question):
         return None
     label, unit, missing = _FIELD_WORDS[field]
     lowest = bool(_ASCENDING.search(question))
-    groups: list[tuple[float, list[str]]] = []  # rows arrive sorted: equal values become one group
+    # Groups of courses with the same value, in order; courses without a value are listed apart.
+    groups: list[tuple[float, list[str]]] = []
     without = []
     for row in rows:
         try:
@@ -149,6 +159,7 @@ def _ranking_text(question: str, rows: list[dict[str, str]]) -> str | None:
     if not groups:
         return None
 
+    # Two names joined with "and", more with commas.
     def names(group):
         return " and ".join(group[1]) if len(group[1]) == 2 else ", ".join(group[1])
 
@@ -161,12 +172,10 @@ def _ranking_text(question: str, rows: list[dict[str, str]]) -> str | None:
     return text
 
 
+# Sort the course rows by the column the question compares (highest first, or lowest first when the
+# question asks for the lowest), so the model does not have to compare 7 rows itself, which it got wrong.
+# Rows without a value go last. Questions that compare no column keep the table order.
 def _ordered_for(question: str, rows: list[dict[str, str]]) -> list[dict[str, str]]:
-    """Sort the course rows by the column the question compares, so S1 is the answer and the model only reads it.
-
-    The small local model mixed up the numbers when it had to compare 7 rows itself
-    ("Strategies and Management Control, both 40%"; Strategies is 45%). Rows without a value go last.
-    """
     field = _compared_field(question)
     if field is None:
         return rows
@@ -176,17 +185,21 @@ def _ordered_for(question: str, rows: list[dict[str, str]]) -> list[dict[str, st
         try:
             value = float(row.get(field) or "")
         except ValueError:
-            return (1, 0.0)  # no value: always at the end
+            return (1, 0.0)  # no value: at the end
         return (0, value if ascending else -value)
 
     return sorted(rows, key=key)
 
 
+# Return the sources for a cross-course question: one Hit per course (only the courses the question names,
+# or all of them when it names none), sorted for the question, with the ranking line first when it applies.
+# These Hits replace the search results; their covers are the syllabus sections the facts came from, so
+# the evaluation can check them like any other source.
 def answer_from_table(question: str, cfg) -> list[Hit]:
-    """Return table-row evidence for every course, or courses named in the question."""
     if not isinstance(question, str) or not question.strip():
         raise ValueError("question must not be empty")
     path = PATHS["course_table"]
+    # Without the table there are no table sources; answer.py then searches normally.
     if not path.is_file():
         return []
     rows = list(_load_rows(*_file_key(path)))
@@ -196,7 +209,8 @@ def answer_from_table(question: str, cfg) -> list[Hit]:
     hits = []
     ranking = _ranking_text(question, selected)
     if ranking:
-        # S1 = the ranking already written out; the course rows follow as S2, S3... for the details and citations
+        # S1 is the ranking already written out; the course rows follow as S2, S3... for details and citations.
+        # answer.py returns this line as the answer without calling the model (_ranking_answer()).
         covers = sorted({value for row in selected for value in row.get("evidence_section_ids", "").split(";") if value})
         chunk = Chunk(
             chunk_id="course_ranking", kb_sig=cfg.kb_sig, strategy="section", doc_type="course_row",
@@ -204,6 +218,7 @@ def answer_from_table(question: str, cfg) -> list[Hit]:
             outline_path="Course comparison", text=ranking, embed_text=ranking,
         )
         hits.append(Hit(chunk=chunk, rank=1, label="S1"))
+    # One source per course, built from its row.
     for row in selected:
         components = _components(row.get("components", ""))
         course = CourseRow(
@@ -222,6 +237,7 @@ def answer_from_table(question: str, cfg) -> list[Hit]:
         rank = len(hits) + 1
         covers = [value for value in course.evidence_section_ids.split(";") if value]
         text = _row_text(course)
+        # The same chunk_id as the course summary chunk of the knowledge base, so the app shows both the same way.
         chunk = Chunk(
             chunk_id=f"course_row__{course.course_code}",
             kb_sig=cfg.kb_sig,
@@ -240,17 +256,19 @@ def answer_from_table(question: str, cfg) -> list[Hit]:
     return hits
 
 
+# The rows of the course table (course_code, course_name...), or an empty list when it is not built.
+# answer.py uses them to find which courses a question names.
 def course_rows() -> list[dict[str, str]]:
-    """The course table rows (course_code, course_name...), or [] when the table is not built."""
     path = PATHS["course_table"]
     return list(_load_rows(*_file_key(path))) if path.is_file() else []
 
 
+# True when the question is answered by the ranking line: it compares a column the table holds, uses a
+# ranking word and asks for nothing else. answer.py uses it to send such questions to the table.
 def asks_for_ranking(question: str) -> bool:
-    """True when the question is answered by the ranking line (order or compare a field the table holds)."""
     return bool(_compared_field(question) and _RANKING.search(question) and not _OTHER_ASK.search(question))
 
 
+# Empty the cached rows, so the table is read again after it is rebuilt.
 def clear_table_cache() -> None:
-    """Clear cached course rows after rebuilding the course table."""
     _load_rows.cache_clear()
