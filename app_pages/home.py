@@ -29,7 +29,7 @@ def laptop() -> str:
     slips = "".join(f'<div class="slip"><span class="cite">{label}</span><b>{esc(where)}</b>{esc(section)}</div>'
                     for label, where, section in content.HERO_DEMO["sources"])  # one small card per source
     menu = "".join(f'<div class="{"on" if name == "Assistant" else ""}">{name}</div>'
-                   for name in ("Home", "Assistant", "Compare", "How it works"))  # the same pages as the real menu
+                   for name in ("Home", "Assistant", "Compare"))  # the same pages as the real menu
     n = len(content.HERO_DEMO["sources"])  # how many sources the demo answer cites
 
     # the 3 documents floating next to the laptop: what the assistant reads

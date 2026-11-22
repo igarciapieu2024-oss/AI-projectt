@@ -88,17 +88,3 @@ COURSE_DISPLAY_NAMES = {"ob": "Organizational Behaviour", "ai_ml": "Machine Lear
 
 # placeholder courses for the filter, used until data/manifest.csv has rows
 PLACEHOLDER_COURSES = {"c01": "Course 1", "c02": "Course 2"}
-
-# results for the How-it-works page: holdout 3, 30 new questions run once (eval/reference_labels_holdout3.csv)
-RESULTS_TITLE = "Results on 30 unseen questions"
-RESULTS = [  # (metric, bare LLM, our system)
-    ("Fully correct answers", "20%", "73%"),
-    ("Right source found in the top 5", "—", "83%"),
-    ("Answers that cite a source", "0%", "77%"),
-    ("Unanswerable questions refused", "83%", "100%"),
-]
-# the 70% on 90 questions (holdouts 1-3) was measured with experiment 5 (configs/experiments/05_all_improvements.yaml),
-# the version before the final changes; the result of the final system on unseen questions is the 73% of holdout 3 above
-RESULTS_NOTE = ("Each answer checked against its source slide or syllabus section. On 90 unseen questions over three "
-                "sets the system is fully correct on 70%; method and confidence intervals in the documentation.")
-ARCHITECTURE_IMAGE = "assets/architecture.png"  # the architecture figure of the How it works page, shown only if the file exists

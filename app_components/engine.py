@@ -69,7 +69,7 @@ def pdf_path(manifest_file: str) -> Path | None:
     return Path(found) if found else None
 
 
-# what the assistant knows, counted from the real files: shown on the Home and How it works pages.
+# what the assistant knows, counted from the real files: shown on the Home page.
 # None means "not available on this laptop yet" (e.g. the images before the image extraction runs)
 @st.cache_data(show_spinner=False)  # counted once per app start (opening 86 PDFs takes a second)
 def knowledge_base_stats() -> dict[str, int | None]:

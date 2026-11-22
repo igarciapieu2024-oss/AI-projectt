@@ -260,23 +260,7 @@ h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; color: var(--
 .panel-title { font-family: var(--display); font-size: 1.4rem; font-weight: 700; margin: 0; }
 .panel-sub { color: var(--slate); font-size: 0.88rem; margin: 0.1rem 0 0.9rem; }
 
-/*15 HOW IT WORKS: the two lanes of the pipeline and the results table */
-.lane { background: #fff; box-shadow: var(--shadow); border-radius: 18px; padding: 1.3rem 1.4rem; margin-bottom: 1rem; }
-.lane-title { font-family: var(--display); font-size: 1.25rem; font-weight: 700; margin: 0 0 0.2rem; }
-.lane-when { color: var(--slate); font-size: 0.88rem; margin-bottom: 1rem; }
-.flow { display: flex; align-items: stretch; gap: 0.4rem; flex-wrap: wrap; }
-.node { background: var(--tint); border-radius: 10px; padding: 0.55rem 0.75rem; font-size: 0.86rem; flex: 1 1 120px; }
-.node b { display: block; font-size: 0.92rem; }
-.node span { color: var(--slate); font-size: 0.78rem; }
-.node.end { background: var(--marker); }
-.arrow { align-self: center; color: var(--slate); }
-.results { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 1rem; background: #fff; border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
-.results th { text-align: left; font-weight: 600; color: var(--slate); font-size: 0.85rem; padding: 0.6rem 0.8rem; border-bottom: 2px solid var(--ink); }
-.results td { padding: 0.8rem; border-bottom: 1px solid var(--line); }
-.results td.num { font-family: var(--display); font-size: 1.3rem; font-weight: 700; }
-.results .ours { background: #FFFBE0; }                       /* our column lightly highlighted */
-
-/*16 phones and small windows: stack the grids */
+/*15 phones and small windows: stack the grids */
 @media (max-width: 760px) {
   .st-key-hero { padding: 2rem 1.3rem; }
   .stats, .steps, .features, .trust { grid-template-columns: 1fr; gap: 1.2rem; }
@@ -287,11 +271,11 @@ h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; color: var(--
   .float-badge { right: 0.4rem; }
 }
 
-/*17 small fixes for the app look */
+/*16 small fixes for the app look */
 .st-key-starters .stButton button p { white-space: normal; text-align: left; }  /* long example questions wrap instead of being cut */
 [data-testid="stChatInput"] > div, [data-testid="stChatInput"] textarea { background: #fff; }  /* the typing box white, not grey */
 
-/*18 the "searching" indicator: 3 dots that pulse one after the other until the first word arrives */
+/*17 the "searching" indicator: 3 dots that pulse one after the other until the first word arrives */
 .thinking { display: flex; align-items: center; gap: 0.35rem; color: var(--slate); font-size: 0.95rem; padding: 0.3rem 0; }
 .thinking span { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); animation: pulse 1.2s infinite ease-in-out; }
 .thinking span:nth-child(2) { animation-delay: 0.15s; }
@@ -299,21 +283,13 @@ h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; color: var(--
 @keyframes pulse { 0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .thinking span { animation: none; opacity: 0.6; } }
 
-/*19 "what it knows": the size of the knowledge base, on How it works */
-.kb { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.4rem; }
-.kb div { background: #fff; border-radius: 16px; padding: 1.1rem 1.2rem; box-shadow: var(--shadow); }
-.kb b { display: block; font-family: var(--display); font-size: 2.2rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1.1; }
-.kb span { color: var(--slate); font-size: 0.9rem; }
-.course-list { color: var(--slate); font-size: 0.92rem; margin: -0.4rem 0 2rem; line-height: 1.6; }
-@media (max-width: 760px) { .kb { grid-template-columns: 1fr 1fr; } }
-
-/*20 behind the scenes: the table with the score of each source */
+/*18 behind the scenes: the table with the score of each source */
 .scores { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 0.6rem; }
 .scores th { text-align: left; color: var(--slate); font-weight: 600; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); }
 .scores td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); }
 .scores td.n, .scores th:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }  /* numbers aligned on the right */
 
-/*21 HOME: who it is for, mission and vision (from the business plan) */
+/*19 HOME: who it is for, mission and vision (from the business plan) */
 .features.three { grid-template-columns: repeat(3, 1fr); }
 .source-note { color: var(--slate); font-size: 0.8rem; margin-top: 0.8rem; }
 .mission {
