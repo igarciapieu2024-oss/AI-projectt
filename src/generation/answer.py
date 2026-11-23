@@ -6,7 +6,7 @@ from __future__ import annotations
 import copy                      # allows for creating true duplicates for mutable objects
 import re                        # used for searching, matching, extracting, manipulating text based on pattern in the text in question
 import time                      # for timing
-from dataclasses import replace  # 
+from dataclasses import replace  #
 from typing import Iterator
 
 from src.config import Config, load_config
@@ -31,7 +31,7 @@ _COMPLETE_SENTENCE = re.compile(r"[.!?](?=\s|$)")          # detects the end of 
 
 
 # Removes the unfinished end of an answer (when the output limit cuts it off mid-sentence)
-  
+
 def _trim_to_last_complete_sentence(answer_text: str, rag_enabled: bool) -> str:
     """Drop a length-truncated tail that does not end in a complete sentence."""
     sentence_pattern = _COMPLETE_CITED_SENTENCE if rag_enabled else _COMPLETE_SENTENCE
@@ -42,7 +42,7 @@ def _trim_to_last_complete_sentence(answer_text: str, rag_enabled: bool) -> str:
 
 
 # Makes sure the value for top_k is a valid number
-  
+
 def _top_k(cfg: Config) -> int:
     top_k = cfg.retrieval.get("top_k", 5)
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k < 1:
@@ -53,13 +53,13 @@ def _top_k(cfg: Config) -> int:
 # Performing retrieval
 
 def _build_hits(question: str, cfg: Config, filters: Filters | None) -> list[Hit]:
-    
+
     top_k = _top_k(cfg)
-    
-    mode = cfg.retrieval.get("mode", "hybrid") # validates & saves the kind of search
+
+    mode = cfg.retrieval.get("mode", "hybrid") # validates & saves the kind of search that will be performed
     if mode not in {"dense", "hybrid"}:
         raise ValueError(f"unsupported retrieval.mode: {mode!r}")
-    
+
     dense_k = cfg.retrieval.get("k_dense", top_k) # validates & saves the number of candidates to retrieve for embedding search
     if not isinstance(dense_k, int) or isinstance(dense_k, bool) or dense_k < 1:
         raise ValueError(f"retrieval.k_dense must be a positive integer; got {dense_k!r}")
@@ -71,13 +71,13 @@ def _build_hits(question: str, cfg: Config, filters: Filters | None) -> list[Hit
     bm25_k = cfg.retrieval.get("k_bm25", top_k) # validates & saves the number of candidates to retrieve for keyword search
     if not isinstance(bm25_k, int) or isinstance(bm25_k, bool) or bm25_k < 1:
         raise ValueError(f"retrieval.k_bm25 must be a positive integer; got {bm25_k!r}")
-    
+
     bm25_hits = bm25.search(question, cfg, filters, bm25_k) # performs the keyword search (BM25, searches by keywords )
-    
+
     rrf_k = cfg.retrieval.get("rrf_k", 60) # validates & saves the reciprocal-rank-fusion constant
     if not isinstance(rrf_k, int) or isinstance(rrf_k, bool) or rrf_k < 1:
         raise ValueError(f"retrieval.rrf_k must be a positive integer; got {rrf_k!r}")
-    
+
     return fusion.rrf([dense_hits, bm25_hits], k=rrf_k) # combines the dense and keyword search into one list
 
 
@@ -100,11 +100,11 @@ def _course_search_hits(question: str, cfg: Config, table_rows: list[Hit]) -> li
     # decides how many extra chunks to retrieve per course
     if not codes or len(codes) >= 7: # if no course codes are available / all courses are involved
         return best(None, 3)         # uses the helper function to find 3 best chunks
-    
+
     keep = 2 if len(codes) <= 2 else 1 # "keep" is the number of chunks per course (keeps 1 if there are more than 2 courses)
-    
+
     found = [] # "found" will become a list of chunks with matching course codes to the question
-    
+
     for code in codes:
         found.extend(best(Filters(course_code=code), keep)) # runs the "best" function and keeps a limited number per course
     return found                                            # gives the chunks that are found
@@ -132,7 +132,7 @@ def _prepare_answer(
     rag_enabled = cfg.generation.get("rag", True)
     rewrite_ms = 0.0
     translation_enabled = rag_enabled and cfg.generation.get("translate_query", False)
-    
+
     # translates the question (if config enables it)
     if (history and cfg.generation.get("rewrite", False)) or translation_enabled:
         rewrite_started = time.perf_counter()
@@ -151,41 +151,53 @@ def _prepare_answer(
             rewritten_question = rewrite.translate_to_english(question, cfg)
         rewrite_ms = (time.perf_counter() - rewrite_started) * 1000
 
-    # classifies the rewritten question
-    route_ms = 0.0
-    route_decision = RouteDecision(label="none", prob=0.0, source="none")
+    # ROUTING DECISION:
+
+    route_ms = 0.0 # just for timing
+    route_decision = RouteDecision(label="none", prob=0.0, source="none") # initially no route decision
+
     if rag_enabled:
         route_started = time.perf_counter()
-        route_decision = route_question(rewritten_question, cfg) # routes the question
+        route_decision = route_question(rewritten_question, cfg) # classifies the rewritten question
         route_ms = (time.perf_counter() - route_started) * 1000
+    #
 
+    #
     if (
         rag_enabled
-        and cfg.generation.get("course_split", False)
+        and cfg.generation.get("course_split", False) # if course_split is enabled
         and route_decision.label not in ("cross_course", "out_of_scope")
-        and len(_named_courses(rewritten_question)) >= 2
+        and len(_named_courses(rewritten_question)) >= 2 # at least two courses named
         and table_qa.asks_for_ranking(rewritten_question)
     ):
+        # classifies it as cross_course
         route_decision = RouteDecision(label="cross_course", prob=1.0, source="course_split")
+    #
 
+    #
     if (
         rag_enabled
-        and route_decision.label == "out_of_scope"
-        and getattr(cfg, "routing", {}).get("named_course_in_scope", False)
-        and _named_courses(rewritten_question)
+        and route_decision.label == "out_of_scope" # if out of scope
+        and getattr(cfg, "routing", {}).get("named_course_in_scope", False) # if named_course_in_scope is enabled
+        and _named_courses(rewritten_question) # if at least one known course is named
     ):
+        # Overrides the router's out-of-scope label to course_content.
         route_decision = RouteDecision(label="course_content", prob=route_decision.prob, source="named_course")
+    #
 
+    # if the question is out_of_scope
     if (
         rag_enabled
-        and route_decision.label == "out_of_scope"
+        and route_decision.label == "out_of_scope" # if out of scope
         and not getattr(cfg, "routing", {}).get("out_of_scope_search", False)
     ):
         return (
             question, rewritten_question, cfg, [], None, route_decision, started,
             rewrite_ms, route_ms, 0.0, 0.0, rag_enabled, filters,
-        )
+        ) # refusal
+    #
 
+    #
     if (
         rag_enabled
         and cfg.retrieval.get("auto_course_filter", False)
@@ -195,47 +207,70 @@ def _prepare_answer(
         named = _named_courses(rewritten_question)
         if len(named) == 1:
             filters = Filters(course_code=named[0], sessions=list(filters.sessions) if filters else [])
+    # limits the filter to one course if there is one named course in the rewritten question
 
     retrieval_started = time.perf_counter()
     table_hits = False
     hits = []
+
+    #
     if rag_enabled:
 
-        if route_decision.label == "cross_course" and not (filters and filters.course_code):
+        if route_decision.label == "cross_course" and not (filters and filters.course_code): # if no filter
             hits = table_qa.answer_from_table(rewritten_question, cfg)
-            table_hits = bool(hits)
+            # looks up relevant course-table rows and returns them as hits
+            table_hits = bool(hits) # records if any results were returned
+
+            # if results were found and the first isn’t a prewritten ranking result
             if table_hits and hits[0].chunk.chunk_id != "course_ranking":
                 hits = hits + _course_search_hits(rewritten_question, cfg, hits)
+                # searches course materials for additional chunks
+
         if not hits:
             hits = _build_hits(rewritten_question, cfg, filters)
+            # if hits is empty, it performs regular search (dense & BM25)
+    #
+
     retrieve_ms = (time.perf_counter() - retrieval_started) * 1000
     rerank_ms = 0.0
-    if rag_enabled and hits and not table_hits:
-        top_k = _top_k(cfg)
-        if cfg.retrieval.get("rerank", False):
+
+    #
+    if rag_enabled and hits and not table_hits: # if using regular retrieval results, not course-table results
+
+        top_k = _top_k(cfg) # chunks to keep
+
+        if cfg.retrieval.get("rerank", False): # if reranking is enabled
             rerank_started = time.perf_counter()
-            hits = rerank.rerank(rewritten_question, hits, top_k, cfg)
+            hits = rerank.rerank(rewritten_question, hits, top_k, cfg) # rerank
             rerank_ms = (time.perf_counter() - rerank_started) * 1000
         else:
-            hits = hits[:top_k]
+            hits = hits[:top_k] # if rerank is disabled (keep first top_k chunks in existing order)
+
+                                                             # checks if the reranker score is below the threshold
         is_weak = cfg.generation.get("selfcheck", False) and selfcheck.is_weak(hits, cfg)
-        hits = [replace(hit, rank=rank, label=f"S{rank}") for rank, hit in enumerate(hits, start=1)]
-    elif table_hits:
+        hits = [replace(hit, rank=rank, label=f"S{rank}") for rank, hit in enumerate(hits, start=1)] # keep chunks in position
+
+    elif table_hits: # if course_table lookup found results
         is_weak = False
-        hits = [replace(hit, rank=rank, label=f"S{rank}") for rank, hit in enumerate(hits, start=1)]
+        hits = [replace(hit, rank=rank, label=f"S{rank}") for rank, hit in enumerate(hits, start=1)] # keep chunks in position
+
     else:
         is_weak = False
+    #
+
     messages = (
         build_messages(question, hits, cfg, history)
         if not rag_enabled or (hits and not is_weak)
         else None
     )
+
     return (
         question, rewritten_question, cfg, hits, messages, route_decision, started,
         rewrite_ms, route_ms, retrieve_ms, rerank_ms, rag_enabled, filters,
     )
 
 
+# keeps the model's Answer section
 def _answer_part(answer_text: str, cfg: Config) -> str:
     """8. With prompt v4 the model writes "Evidence: ... Answer: ..."; the student only sees the answer part.
 
@@ -247,6 +282,7 @@ def _answer_part(answer_text: str, cfg: Config) -> str:
     return answer_text[match.end():].strip() if match else answer_text
 
 
+# if course-table produces exact ranking, uses that instead of asking LLM to calculate
 def _ranking_answer(hits: list[Hit]) -> str | None:
     """1. Comparison questions are answered with the ranking line itself, without calling the model.
 
@@ -259,6 +295,7 @@ def _ranking_answer(hits: list[Hit]) -> str | None:
     return None
 
 
+# checks if answer is valid from RAG
 def _validated_answer(answer_text: str, hits: list[Hit], rag_enabled: bool) -> tuple[str, list[Hit]]:
     if not rag_enabled:
         return answer_text.strip(), []
@@ -282,7 +319,7 @@ def _validated_answer(answer_text: str, hits: list[Hit], rag_enabled: bool) -> t
         return REFUSAL, []
     return answer_text, [hits_by_label[label] for label in used_labels]
 
-
+# packages the answer into an AnswerResult
 def _make_result(
     question: str,
     rewritten_question: str,
@@ -339,6 +376,7 @@ def _named_courses(question: str) -> list[str]:
     return list(dict.fromkeys(mentioned_course_codes(question, table_qa.course_rows() + _COURSE_ALIASES)))
 
 
+# for questions naming multiple courses, answers each separately and combines the answers
 def _split_by_course(
     question: str,
     history: list[dict] | None,
@@ -388,6 +426,8 @@ def _split_by_course(
     )
 
 
+# main flow
+# prepares everything -> refuses without prompt -> uses table rankings -> calls LLM -> validates and packages answer
 def answer(
     question: str,
     history: list[dict] | None = None,
@@ -436,6 +476,7 @@ def answer(
     )
 
 
+# yields answer in pieces as LLM generates it (app can show a streamed answer sooner)
 def answer_stream(
     question: str,
     history: list[dict] | None = None,

@@ -21,6 +21,7 @@ def _model(model_name: str):
         ) from exc
 
 
+# converts each text to normalized vectors
 def embed(texts: list[str], model_name: str):
     """Return a numpy array of normalized embeddings."""
     if not isinstance(model_name, str) or not model_name.strip():
@@ -46,6 +47,7 @@ def embed(texts: list[str], model_name: str):
     return vectors
 
 
+# Warms up the model with sample text so the first real query incurs less startup delay.
 def warm_up(model_name: str) -> None:
     """Load the configured embedder and initialize its inference path."""
     embed(["warm-up"], model_name)

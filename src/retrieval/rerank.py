@@ -30,7 +30,7 @@ def _model(model_name: str):
 def rerank(query: str, hits: list, top_k: int, cfg) -> list:
     """Return top hits scored by sigmoid-normalized cross-encoder confidence."""
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k < 1:
-        raise ValueError(f"top_k must be a positive integer; got {top_k!r}")
+        raise ValueError(f"top_k must be a positive integer; got {top_k!r}") # validation
     if not query.strip() or not hits:
         return []
     model_name = cfg.retrieval.get("reranker_model")
@@ -39,15 +39,15 @@ def rerank(query: str, hits: list, top_k: int, cfg) -> list:
     pairs = [
         (query, hit.chunk.embed_text)  # course name + outline + text, the same text the search used
         for hit in hits
-    ]
-    try:
+    ] # pairs query with chunk
+    try: # asks cross-encoder to score the pair
         scores = _model(model_name).predict(pairs, show_progress_bar=False)
     except Exception as exc:
         raise RuntimeError(f"Could not rerank hits with local model {model_name!r}") from exc
     if len(scores) != len(hits):
         raise ValueError("reranker returned a different number of scores than input hits")
     normalized_scores = []
-    for score in scores:
+    for score in scores: # converts scores to a normalized 0-1 value
         score = float(score)
         if not math.isfinite(score):
             raise ValueError("reranker returned a non-finite score")
@@ -57,16 +57,16 @@ def rerank(query: str, hits: list, top_k: int, cfg) -> list:
             exp_score = math.exp(score)
             confidence = exp_score / (1.0 + exp_score)
         normalized_scores.append(confidence)
-    ranked = sorted(
+    ranked = sorted( # sorts the highest one first
         zip(normalized_scores, hits),
         key=lambda item: (-item[0], item[1].chunk.chunk_id),
     )
-    return [
+    return [ # returns up to top_k chunks with new ranks
         replace(hit, rank=rank, score_rerank=score)
         for rank, (score, hit) in enumerate(ranked[:top_k], start=1)
     ]
 
-
+# warms up the reranker so it's ready for search
 def warm_up(cfg) -> None:
     """Load the configured reranker without running a question."""
     if not cfg.retrieval.get("rerank", False):

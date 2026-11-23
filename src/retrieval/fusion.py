@@ -16,17 +16,25 @@ def rrf(result_lists: list[list[Hit]], k: int = 60) -> list[Hit]:
 
     fused: dict[str, Hit] = {}
     scores: dict[str, float] = {}
+
+    # for each result/chunk
     for results in result_lists:
         seen: set[str] = set()
+
         for rank, hit in enumerate(results, start=1):
             chunk_id = hit.chunk.chunk_id
+
             if chunk_id in seen:
                 continue
+
             seen.add(chunk_id)
             scores[chunk_id] = scores.get(chunk_id, 0.0) + 1 / (k + rank)
-            if chunk_id not in fused:
-                fused[chunk_id] = hit
-            else:
+            # adds a score based on its position in each list (being in both gets contribution)
+
+            if chunk_id not in fused: # if chunk hasnt appeared yet
+                fused[chunk_id] = hit # save in fused
+
+            else: # keep existing chunk record and combine scores by keeping available/higher value
                 previous = fused[chunk_id]
                 fused[chunk_id] = replace(
                     previous,
@@ -35,7 +43,7 @@ def rrf(result_lists: list[list[Hit]], k: int = 60) -> list[Hit]:
                     score_rerank=_max_score(previous.score_rerank, hit.score_rerank),
                 )
 
-    ordered = sorted(
+    ordered = sorted( # sort the unique chunks ("-" so higher scores come first)
         fused.values(),
         key=lambda hit: (-scores[hit.chunk.chunk_id], hit.chunk.chunk_id),
     )
@@ -44,7 +52,7 @@ def rrf(result_lists: list[list[Hit]], k: int = 60) -> list[Hit]:
         for rank, hit in enumerate(ordered, start=1)
     ]
 
-
+# combines two versions of a score, keeps the highest or available score)
 def _max_score(first: float | None, second: float | None) -> float | None:
     if first is None:
         return second
