@@ -1,0 +1,14 @@
+# EXPERIMENT 6 (dev only, after the first holdout): experiment 5 plus routing.out_of_scope_search.
+# An "out of scope" label still searches, and the self-check refuses only when no source scores well
+# (the router had refused two answerable holdout questions). Not kept.
+extends: ../base.yaml
+
+retrieval:
+  auto_course_filter: true
+
+routing:
+  out_of_scope_search: true
+
+generation:
+  llm_model: llama3.1:8b
+  course_split: true

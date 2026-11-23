@@ -1,17 +1,11 @@
-"""
-Compute evaluation metrics from saved RAG results.
-
-Metrics:
-- Recall@k
-- MRR@k
-- Refusal accuracy
-- False refusal rate
-- Citation validity
-- Citation presence
-- Latency
-
-Owner: Elena.
-"""
+# Compute the automatic metrics of one evaluation run from its saved answers (results.jsonl, written by
+# eval/run_eval.py). No model is called: everything is counted from what the system returned.
+#   python -m eval.metrics --run-dir eval/runs/RUN_ID
+# Metrics: recall@5 and MRR (did the search find the right source, and how high), refusal accuracy, false
+# refusal rate, citation validity and presence, and latency. Whether an answer is correct is graded
+# separately by eval/judge.py.
+# Writes metrics_questions.csv (one row per question) and metrics_summary.json (the averages) in the run
+# folder; eval/error_analysis.py, eval/figures.py and the results of the report read them.
 
 from __future__ import annotations
 
@@ -23,8 +17,8 @@ from pathlib import Path
 from statistics import mean
 
 
+# Read results.jsonl: one JSON record per question, with the question and the answer of the system.
 def load_run(path: Path) -> list[dict]:
-    """Load one JSON object per evaluated question; fail clearly if absent."""
 
     if not path.is_file():
         raise FileNotFoundError(
@@ -40,8 +34,9 @@ def load_run(path: Path) -> list[dict]:
         ]
 
 
+# The ids of the original sources (slides, syllabus sections) a retrieved chunk comes from. "covers" holds
+# all of them: a chunk of a merged slide can cover several slides.
 def source_ids(hit: dict) -> set[str]:
-    """Identify the original sources covered by a chunk."""
 
     chunk = hit.get("chunk") or {}
 
@@ -59,13 +54,10 @@ def source_ids(hit: dict) -> set[str]:
     return ids
 
 
+# The metrics of one question. The search counts as a hit if any of the first k chunks (the 5 the LLM
+# reads) covers at least one gold id; it does not say whether the answer used that source correctly.
+# Retrieval metrics are left empty ("") for unanswerable questions, which have no right source.
 def score_question(row: dict, k: int) -> dict:
-    """Compute retrieval, refusal, citation, and latency metrics for a question.
-
-    Gold source IDs are semicolon-separated. A retrieval counts as a hit if
-    any top-k chunk covers at least one gold ID. This does not assess
-    whether the generated answer used that evidence correctly.
-    """
 
     result = row["result"]
 
@@ -85,13 +77,13 @@ def score_question(row: dict, k: int) -> dict:
         str(row.get("answerable", "")).strip() == "1"
     )
 
-    # This is the engine's explicit refusal flag, not a semantic reading of
-    # the answer text.
+    # Refused is the flag the answer phase sets when it returns the refusal sentence (src/generation/answer.py),
+    # not a reading of the answer text.
     refused = bool(
         result.get("refused")
     )
 
-    # Retrieval metrics
+    # Retrieval: the position of the first chunk that covers a gold id (None if none of the first k does).
 
     first_rank = None
 
@@ -110,8 +102,8 @@ def score_question(row: dict, k: int) -> dict:
 
                 break
 
-    # A citation is structurally valid when its label resolves to the same
-    #retrieved chunk ID.
+    # A citation is valid when its label ([S1], [S2]...) points to the same chunk the system gave the LLM under
+    # that label, so the answer cannot cite a source it did not receive.
 
     labels = {
         hit.get("label"): (
@@ -129,7 +121,8 @@ def score_question(row: dict, k: int) -> dict:
 
     total_citations = len(citations)
 
-    # Build question-level metrics
+    # One row of metrics_questions.csv. The refusal decision is correct when the system refused exactly the
+    # unanswerable questions; the reciprocal rank is 1/position, or 0 if the right source was not found.
 
     return {
         "question_id": row.get("question_id", ""),
@@ -178,8 +171,8 @@ def score_question(row: dict, k: int) -> dict:
     }
 
 
+# The mean rounded to 4 decimals, or None if there are no values (for example no unanswerable questions).
 def average(values: list[float]):
-    """Return a rounded mean, or None for an empty denominator."""
 
     if not values:
         return None
@@ -188,20 +181,20 @@ def average(values: list[float]):
         mean(values),
         4
     )
+# The functions from here to average_latency are the general versions of the metrics, checked by
+# tests/test_metrics.py; main() below uses score_question instead.
+
+# Turn each retrieved item (one id or a group of ids) into a set of ids.
 def _source_sets(retrieved):
-    """Normalize strings or ID collections for metric helper tests."""
     return [
         {source} if isinstance(source, str) else set(source)
         for source in retrieved
     ]
 
 
+# Share of the gold ids found in the first k results. Unlike score_question (found or not), it gives
+# partial credit when only some of the gold ids are found.
 def recall_at_k(retrieved, gold, k=5):
-    """Fraction of gold IDs retrieved within k, for the helper interface.
-
-    Unlike score_question (binary hit/miss per answerable question),
-    this helper can return partial credit for recovering some gold IDs.
-    """
     if k < 1:
         return 0.0
 
@@ -218,8 +211,8 @@ def recall_at_k(retrieved, gold, k=5):
     return len(retrieved_ids & gold_set) / len(gold_set)
 
 
+# 1 divided by the position of the first result that covers a gold id, or 0 if none does.
 def reciprocal_rank(retrieved, gold):
-    """Reciprocal position of the first source covering a gold ID."""
     gold_set = set(gold)
 
     if not gold_set:
@@ -232,8 +225,9 @@ def reciprocal_rank(retrieved, gold):
     return 0.0
 
 
+# nDCG@k: every right result found adds more the higher it is ranked (1/log2(position + 1)), divided by the
+# best score possible, so 1 means all the right sources are at the top.
 def ndcg_at_k(retrieved, gold, k=5):
-    """Normalized discounted gain: relevant sources rank higher when early."""
     from math import log2
 
     if k < 1:
@@ -262,8 +256,9 @@ def ndcg_at_k(retrieved, gold, k=5):
     return dcg / idcg if idcg else 0.0
 
 
+# Compare the refusals expected with the refusals made: precision (refusals that were right), recall
+# (questions to refuse that were refused) and accuracy. Each ratio is 0 when its denominator is 0.
 def refusal_metrics(expected, predicted):
-    """Compare expected vs predicted refusal decisions with zero-safe ratios."""
     if len(expected) != len(predicted):
         raise ValueError("Expected and predicted lengths must match")
 
@@ -301,12 +296,12 @@ def refusal_metrics(expected, predicted):
     }
 
 
+# Average time per answer, in milliseconds.
 def average_latency(latencies):
-    """Mean response latency in milliseconds."""
     return sum(latencies) / len(latencies) if latencies else 0.0
 
+# Score every question of a run, average the metrics and save both files in the run folder.
 def main():
-    """Aggregate question-level metrics and write per-run CSV/JSON reports."""
 
     parser = argparse.ArgumentParser()
 
@@ -327,7 +322,7 @@ def main():
     if args.k < 1:
         parser.error("--k must be at least 1")
 
-    # Load results
+    # Load the answers. Questions that failed with an error (status not "ok") are counted but not scored.
 
     results_path = (
         args.run_dir / "results.jsonl"
@@ -352,7 +347,7 @@ def main():
             "No successful question results to score"
         )
 
-    # Score each question
+    # Score each question, then split them into answerable and unanswerable for the averages.
 
     scores = [
         score_question(row, args.k)
@@ -381,7 +376,9 @@ def main():
         for row in scores
     )
 
-    # Aggregate metrics
+    # The averages. Recall and MRR use only the answerable questions; the false refusal rate is the share of
+    # answerable questions refused, and correct_unanswerable_refusal_rate the share of unanswerable ones
+    # refused. Citation validity is valid citations over all citations of the run.
 
     summary = {
         "run_dir": str(args.run_dir),
@@ -447,7 +444,7 @@ def main():
         ]
     }
 
-    # Save question-level metrics
+    # Save the metrics of each question (read by eval/error_analysis.py).
 
     csv_path = (
         args.run_dir / "metrics_questions.csv"
@@ -468,7 +465,7 @@ def main():
 
         writer.writerows(scores)
 
-    # Save aggregate metrics
+    # Save the averages (read by eval/figures.py).
 
     json_path = (
         args.run_dir / "metrics_summary.json"
@@ -483,7 +480,7 @@ def main():
         encoding="utf-8"
     )
 
-    # Display results
+    # Print the averages.
 
     print(
         "\n========== EVALUATION METRICS =========="
@@ -506,5 +503,6 @@ def main():
     print(f"Saved: {json_path}")
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     main()

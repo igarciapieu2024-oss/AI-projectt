@@ -1,0 +1,7 @@
+# EXPERIMENT 1 (dev only, after the test evaluation): prompt v3.
+# Main change vs base.yaml: course name on every source and explicit rules for several courses,
+# two-part questions and facts that are not in the material. Not kept.
+extends: ../base.yaml
+
+generation:
+  prompt_version: v3

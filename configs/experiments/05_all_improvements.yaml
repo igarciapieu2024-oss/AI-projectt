@@ -1,0 +1,11 @@
+# EXPERIMENT 5 (dev only): experiment 4 with the v2 prompt. Measured on holdouts 1-3: 70% (63 of 90).
+# With v3 the 8B model added "the material does not cover..." sentences to correct answers.
+# Main changes vs base.yaml: llama3.1:8b, course_split, auto_course_filter.
+extends: ../base.yaml
+
+retrieval:
+  auto_course_filter: true
+
+generation:
+  llm_model: llama3.1:8b
+  course_split: true

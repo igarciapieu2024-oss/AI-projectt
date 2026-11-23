@@ -1,16 +1,10 @@
-"""
-Run reproducible RAG evaluation on dev or the held-out test split.
-
-Each run records answers and evidence in JSONL plus a summary JSON. The CLI
-requires explicit ``--allow-test`` for held-out questions and saves each
-question immediately so partial failures can be diagnosed. The separate
-``evaluate`` function supports isolated fake-engine unit tests.
-
-Usage:
-python -m eval.run_eval --config configs/b1_v1.yaml --split dev --limit 2
-
-Owner: Elena.
-"""
+# Run the system on a set of evaluation questions and save every answer with its sources, so the metrics
+# (eval/metrics.py) and the judge (eval/judge.py) can be computed afterwards without asking the LLM again.
+#   python -m eval.run_eval --config configs/final_system.yaml --split dev --limit 2
+#   python -m eval.run_eval --config configs/final_tables.yaml --questions eval/questions_holdout3.csv --split test --allow-test
+# Each run gets its own folder eval/runs/<time>_<config>_<split>/ with results.jsonl (one record per question)
+# and summary.json. The test questions need --allow-test, so they are not run by mistake while the system is
+# still being changed. main() is the real evaluation; evaluate() is a smaller version used by the tests.
 
 from __future__ import annotations
 
@@ -28,12 +22,10 @@ from src.config import load_config, PATHS
 from src.generation.answer import answer
 
 
+# Turn the result of the answer phase (dataclasses with lists, paths and numbers inside) into plain
+# dictionaries and lists that can be written as JSON. NaN or infinite numbers become null, because JSON
+# cannot store them.
 def make_jsonable(value):
-    """Convert nested engine results to safe JSON-compatible structures.
-
-    Non-finite floating-point values become null because standard JSON
-    cannot represent NaN or infinity reliably.
-    """
 
     if hasattr(value, "__dataclass_fields__"):
         return make_jsonable(asdict(value))
@@ -56,11 +48,9 @@ def make_jsonable(value):
     return value
 
 
+# Read the question file and keep only the questions of the requested split (dev or test). utf-8-sig also
+# accepts files saved by Excel.
 def read_questions(path: Path, split: str):
-    """Select only the requested split from the question bank CSV.
-
-    ``utf-8-sig`` accepts files exported with a UTF-8 byte-order mark.
-    """
 
     with path.open(
         encoding="utf-8-sig",
@@ -83,8 +73,9 @@ def read_questions(path: Path, split: str):
     return selected
 
 
+# Add one result at the end of results.jsonl as soon as it is ready, so the answers already given are kept
+# if the run stops halfway.
 def save_jsonl(path: Path, record: dict):
-    """Append one result immediately to preserve progress if a run fails."""
 
     with path.open("a", encoding="utf-8") as file:
 
@@ -95,19 +86,17 @@ def save_jsonl(path: Path, record: dict):
                 default=str
             ) + "\n"
         )
+# A smaller evaluation used by tests/test_run_eval.py. With use_fake it answers with src/generation/fake.py
+# (no models), so the tests are fast and always give the same result. It only accepts the dev split; the
+# real runs, including the test questions, use main() below.
 def evaluate(
-    config_path="configs/b1_v1.yaml",
+    config_path="configs/final_system.yaml",
     split="dev",
     use_fake=False,
     questions_path=None,
     use_judge=False,
     judge_fn=None,
 ):
-    """Evaluation interface supporting deterministic fake-mode tests.
-
-    This interface is separate from the production CLI runner and always
-    blocks the test split. Production's authorized test runs use ``main``.
-    """
 
     if split == "test":
         raise ValueError("The test split is locked")
@@ -124,6 +113,7 @@ def evaluate(
 
     selected = read_questions(questions_path, split)
 
+    # The answer function: the fake one for the tests, or the real answer phase.
     if use_fake:
         from src.generation.fake import answer as answer_fn
     else:
@@ -159,6 +149,7 @@ def evaluate(
         history = None
         first_turn = (row.get("turn1") or "").strip()
 
+        # A follow-up question: the first question is answered first, and both are passed as the conversation.
         if first_turn:
             first_result = answer_fn(first_turn, cfg=cfg)
 
@@ -185,6 +176,7 @@ def evaluate(
             if item.strip()
         }
 
+        # The sources covered by the first 5 chunks, and the share of the gold ids among them.
         retrieved = [
             set(hit.chunk.covers)
             for hit in result.context_hits
@@ -219,6 +211,7 @@ def evaluate(
             "latency_ms": result.timings_ms.get("total", 0),
         }
 
+        # Optionally grade the answer with the judge, giving it the sources the system used.
         if use_judge:
             sources = [
                 {
@@ -243,6 +236,7 @@ def evaluate(
         encoding="utf-8",
     )
 
+    # The averages of the run, saved in summary.json and added as a row to reports/ablation_<split>.csv.
     retrieval_scores = [
         row["recall_at_5"]
         for row in results
@@ -299,6 +293,7 @@ def evaluate(
 
     previous_rows = []
 
+    # The rows already in the report are kept and the new run is added at the end.
     if report_path.exists():
         with report_path.open(
             encoding="utf-8",
@@ -328,19 +323,16 @@ def evaluate(
 
     return output_path
 
+# The real evaluation: run one config on one question split and save each answer as soon as it is ready.
+# A follow-up question is run in two turns: first its first question, then the follow-up with the first
+# answer as the conversation, as in the app.
 def main():
-    """Run the selected config and split, persisting each question result.
-
-    The protected test split requires an explicit command-line opt-in.
-    Follow-up questions first run their initial turn and pass its answer as
-    conversation history to the evaluated second turn.
-    """
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
         "--config",
-        default="configs/b1_v1.yaml"
+        default="configs/final_system.yaml"
     )
 
     parser.add_argument(
@@ -355,6 +347,7 @@ def main():
         default=Path("eval/questions.csv")
     )
 
+    # --limit runs only the first questions, to check a change quickly.
     parser.add_argument(
         "--limit",
         type=int,
@@ -374,7 +367,7 @@ def main():
 
     args = parser.parse_args()
 
-    # Protect the test set
+    # Protect the test set: the test questions are run only on purpose, once the system is fixed.
 
     if args.split == "test" and not args.allow_test:
 
@@ -403,7 +396,7 @@ def main():
     if args.limit is not None:
         selected = selected[:args.limit]
 
-    # Create run directory
+    # Create the run folder: the time, the config and the split, so no run overwrites another one.
 
     timestamp = datetime.now(
         timezone.utc
@@ -469,7 +462,7 @@ def main():
 
             first_turn_result = None
 
-            # Handle follow-up questions
+            # Follow-up questions: answer the first question and keep it as the conversation history.
 
             if first_turn:
 
@@ -501,7 +494,8 @@ def main():
                 cfg=cfg
             )
 
-            # Save evaluation information
+            # Everything the metrics and the judge need: the question with its gold ids and reference answer,
+            # and the full result of the system (answer, citations, the chunks it used, timings).
 
             payload = {
                 "question_id": qid,
@@ -536,6 +530,7 @@ def main():
 
             successes += 1
 
+        # A question that fails is saved with its error and the run goes on with the next one.
         except Exception as exc:
 
             failures += 1
@@ -561,7 +556,7 @@ def main():
             payload
         )
 
-    # Calculate execution summary
+    # Summary of the run. metrics_status "pending" means eval/metrics.py has not been run on it yet.
 
     if latencies:
 
@@ -614,9 +609,11 @@ def main():
 
     print("========================================")
 
+    # Exit with an error code if any question failed, so it is not missed.
     if failures:
         raise SystemExit(1)
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     main()

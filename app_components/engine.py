@@ -1,11 +1,6 @@
-"""Connects the app to the answer engine and to the course list (owner: Irene).
-
-Every page imports answer_stream and courses from here, so the switch between the fake
-and the real engine happens in one place only.
-"""
-
-# connects the app to the answer system
-
+# Connects the app to the answer engine and to the course list.
+# Every page imports answer_stream and courses from here, so the switch between the fake and the real engine
+# happens in one place only.
 from __future__ import annotations  # lets us write types like "dict[str, str]" in any Python version
 
 import csv  # reads the manifest
@@ -17,27 +12,28 @@ import streamlit as st  # for st.cache_data
 import app_content as content  # the placeholder courses
 from src.config import PATHS, load_config  # the shared folder paths and the settings loader
 
-# USE_FAKE=1 -> the fake answer (works today); otherwise the real engine (from Wed 11).
+# USE_FAKE=1 -> the fake answer (src/generation/fake.py); otherwise the real engine (src/generation/answer.py).
 # both have exactly the same inputs and outputs, so the pages don't need to know which one is running
 USING_FAKE = os.environ.get("USE_FAKE") == "1"
-# APP_CONFIG picks the system the assistant runs: final (3B, ~14 s an answer) by default,
-# final_tables for the evaluated 8B system (~30 s an answer on a laptop CPU)
-MAIN_CONFIG = os.environ.get("APP_CONFIG", "final")
+# APP_CONFIG picks the system the assistant runs: final_system (our final 8B system, ~30 s an answer
+# on a laptop CPU) by default; APP_CONFIG=baselines/v1_2_small_model runs the earlier 3B system (~14 s)
+MAIN_CONFIG = os.environ.get("APP_CONFIG", "final_system")
 if USING_FAKE:
     from src.generation.fake import answer_stream  # noqa: F401  (pages import it from here)
 else:
     from src.generation.answer import answer_stream  # noqa: F401
 
 
+# loads configs/<name>.yaml, e.g. "final_system" or "baselines/b0_llm_only"
 @st.cache_resource  # loads each config once and keeps it, instead of reading the file on every click
 def config(name: str):
-    """final = our full system; b0_no_rag = the LLM alone (for the Compare page)."""
     return load_config(f"configs/{name}.yaml")
 
 
+# loads the models and the indexes of this configuration once, when the app starts (called by app.py);
+# returns kb_sig, the name of the knowledge base that was loaded
 @st.cache_resource(show_spinner="Loading local retrieval models...")
 def warm_up_models(name: str = MAIN_CONFIG) -> str:
-    """Load this configuration's retrieval models once when the app starts."""
     from src.warmup import warm_up
 
     cfg = config(name)
@@ -45,9 +41,9 @@ def warm_up_models(name: str = MAIN_CONFIG) -> str:
     return cfg.kb_sig
 
 
+# course_code -> course name, from data/manifest.csv; the placeholders until it has rows
 @st.cache_data  # reads the manifest once, not on every click
 def courses() -> dict[str, str]:
-    """course_code -> course_name, from data/manifest.csv; the placeholders until it has rows."""
     found: dict[str, str] = {}
     if PATHS["manifest"].exists():  # the manifest is written when the PDFs are added
         with PATHS["manifest"].open(encoding="utf-8", newline="") as f:
@@ -58,29 +54,25 @@ def courses() -> dict[str, str]:
     return found or content.PLACEHOLDER_COURSES  # placeholders if the manifest is still empty
 
 
+# every PDF under data/raw/, keyed by its path in lower case -> its real path.
+# the manifest and the folders don't always use the same capitals ("presentations" vs "Presentations"); Windows
+# and Mac don't mind, Linux does, so looking files up in lower case makes the app work on all three
 @st.cache_data  # the folder is scanned once per app start
 def _all_pdfs() -> dict[str, str]:
-    """Every PDF under data/raw/, keyed by its path in lower case -> its real path.
-
-    The manifest and the folders don't always use the same capitals ("presentations" vs "Presentations").
-    Windows and Mac don't mind, Linux does; looking files up in lower case makes the app work on all three.
-    """
     raw = PATHS["root"] / "data" / "raw"
     return {p.relative_to(raw).as_posix().lower(): str(p) for p in raw.rglob("*.pdf")}
 
 
+# the real path of a PDF named in the manifest, or None if it isn't on this laptop
 def pdf_path(manifest_file: str) -> Path | None:
-    """The real path of a PDF named in the manifest, or None if it isn't on this laptop."""
     found = _all_pdfs().get(manifest_file.replace("\\", "/").lower())
     return Path(found) if found else None
 
 
+# what the assistant knows, counted from the real files: shown on the Home page.
+# None means "not available on this laptop yet" (e.g. the images before the image extraction runs)
 @st.cache_data(show_spinner=False)  # counted once per app start (opening 86 PDFs takes a second)
 def knowledge_base_stats() -> dict[str, int | None]:
-    """What the assistant knows, counted from the real files: shown on the How it works page.
-
-    None means "not available on this laptop yet" (e.g. the images before the image extraction runs).
-    """
     stats: dict[str, int | None] = {"courses": 0, "syllabi": 0, "decks": 0, "slides": None, "images": None}
     if not PATHS["manifest"].exists():
         return stats

@@ -1,4 +1,5 @@
-"""The source cards shown under each answer (owner: Irene)."""
+# The source cards shown under each answer: the slide picture, the course, where the source comes from, its text
+# and the text read from its image. The cited sources get a card; the others are listed in one line.
 from __future__ import annotations  # lets us write types like "list[Hit]" in any Python version
 
 import csv  # reads the manifest and the image index
@@ -20,13 +21,13 @@ _DOC_TYPE_NAMES = {"syllabus_section": "Syllabus", "slide": "Slide", "course_row
 
 #1 small helpers
 
+# the sources the answer actually cites, so they can be shown as cards
 def cited_labels(answer_text: str) -> set[str]:
-    """The sources the answer actually cites, e.g. {"S1", "S3"}, so we can highlight them."""
     return set(re.findall(r"\[(S\d+)\]", answer_text))
 
 
+# source_id -> the PDF file of that source, read from the manifest
 def _source_files() -> dict[str, str]:
-    """source_id -> the PDF file of that source, read from the manifest (e.g. "ai_ml_s04" -> "AI-.../Session 4.pdf")."""
     path = PATHS["manifest"]
     if not path.exists():  # no manifest yet: no slide pictures, the cards show the page icon
         return {}
@@ -34,8 +35,8 @@ def _source_files() -> dict[str, str]:
         return {row["source_id"]: row["file"] for row in csv.DictReader(f)}
 
 
+# slide_id -> the thumbnail the image extraction already made of the whole slide (only for visual slides)
 def _full_slide_thumbs() -> dict[str, Path]:
-    """slide_id -> the thumbnail the image extraction already made of the whole slide (only for visual slides)."""
     path = PATHS["images_index"]  # data/interim/images_index.csv, written once by the image extraction
     if not path.exists():
         return {}
@@ -44,14 +45,11 @@ def _full_slide_thumbs() -> dict[str, Path]:
                 for row in csv.DictReader(f) if row["kind"] == "full_slide"}
 
 
+# a small picture of one slide, as an image the HTML can show. If the image extraction already rendered this slide
+# whole, its thumbnail is reused; otherwise the page is rendered from the PDF and saved in data/interim/app_thumbs/,
+# a folder only the app uses, so the files the image pipeline writes are never touched
 @st.cache_data(show_spinner=False)  # computed once per slide; the next time the same slide is cited it is instant
 def _slide_thumbnail(slide_id: str) -> str | None:
-    """A small picture of one slide, as an image the HTML can show.
-
-    1. If the image extraction already rendered this slide whole, we reuse its thumbnail.
-    2. Otherwise we render the page from the PDF ourselves and save it in data/interim/app_thumbs/,
-       a folder only the app uses, so we never touch the files the image pipeline writes.
-    """
     full = _full_slide_thumbs().get(slide_id)  # option 1: the extraction's own render
     if full and full.exists():
         return image_data_uri(full)
@@ -74,8 +72,8 @@ def _slide_thumbnail(slide_id: str) -> str | None:
     return image_data_uri(cached)
 
 
+# the picture on top of a source card: the slide itself for slides, nothing for syllabus sections
 def thumbnail(hit: Hit) -> str | None:
-    """The picture on top of a source card: the slide itself for slides, nothing for syllabus sections."""
     if hit.chunk.doc_type != "slide" or not hit.chunk.covers:  # syllabus sections have no picture
         return None
     try:
@@ -86,8 +84,8 @@ def thumbnail(hit: Hit) -> str | None:
 
 #2 one card
 
+# the HTML of one cited source: thumbnail, tags, where it comes from, the text and the image text
 def _card(hit: Hit) -> str:
-    """The HTML of one cited source: thumbnail, tags, where it comes from, the text and the image text."""
     thumb = thumbnail(hit)
     # the top of the card: the slide picture, or a page icon until the thumbnails exist (and for syllabi)
     top = f'<img src="{thumb}" alt="">' if thumb else icon("page", 30)
@@ -121,8 +119,8 @@ def _card(hit: Hit) -> str:
 
 #3 all the cards of one answer
 
+# the cited sources as cards; the ones retrieved but not cited in one quiet line underneath
 def render_sources(hits: list[Hit], answer_text: str) -> None:
-    """The cited sources as cards; the ones retrieved but not cited in one quiet line underneath."""
     if not hits:  # refusals and the LLM alone have no sources
         return
     cited = cited_labels(answer_text)

@@ -1,4 +1,5 @@
-"""The "behind the scenes" panel: what the system did to answer (owner: Irene)."""
+# The "behind the scenes" panel under each answer of the Assistant page: what the system did to answer (the route,
+# the rewritten question, the filters, the time of each step and the score of each source at each search stage).
 from __future__ import annotations  # lets us write types like "dict[str, float]" in any Python version
 
 import html as html_lib  # escapes the rewritten question before putting it in HTML
@@ -26,8 +27,8 @@ STEPS = [
 ]
 
 
+# one horizontal bar split by step, each part as wide as the time it took (shows the LLM takes most of it)
 def _time_bar(timings_ms: dict[str, float]) -> str:
-    """One horizontal bar split by step, each part as wide as the time it took (shows the LLM takes most of it)."""
     parts = [(name, label, color, timings_ms.get(name, 0) / 1000) for name, label, color in STEPS]
     parts = [p for p in parts if p[3] > 0]  # skips the steps that didn't run (e.g. no follow-up)
     total = sum(p[3] for p in parts) or 1  # avoids dividing by zero
@@ -37,8 +38,8 @@ def _time_bar(timings_ms: dict[str, float]) -> str:
     return f'<div class="timebar">{bar}</div><div class="timelegend">{legend}</div>'
 
 
+# the panel: route, rewritten question, filters, time per step and the score of each source
 def render_behind(result: AnswerResult) -> None:
-    """Route, rewritten question, filters, time per step and the score of each source."""
     with st.expander("Behind the scenes", expanded=False):  # closed by default, opened in the demo
         name, action = ROUTE_NAMES.get(result.route.label, (result.route.label, ""))
         confidence = f'<span class="pill">{result.route.prob:.0%} confident</span>' if result.route.prob else ""
@@ -65,13 +66,13 @@ def render_behind(result: AnswerResult) -> None:
             """)
 
 
+# a score with 3 decimals, or a dash when that search stage didn't score this source
 def _number(value) -> str:
-    """A score with 3 decimals, or a dash when that search stage didn't score this source."""
     return "—" if value is None else f"{value:.3f}"
 
 
+# one row of the scores table: the source, where it comes from and its 3 scores
 def _score_row(hit) -> str:
-    """One row of the scores table: the source, where it comes from and its 3 scores."""
     return (f'<tr><td><span class="tag label">{hit.label}</span></td>'
             f'<td>{html_lib.escape(hit.chunk.outline_path)}</td>'
             f'<td class="n">{_number(hit.score_dense)}</td>'  # ChromaDB similarity (meaning)

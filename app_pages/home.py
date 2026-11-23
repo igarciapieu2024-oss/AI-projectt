@@ -1,4 +1,4 @@
-"""Home: the landing page (owner: Irene). All texts come from app_content.py, all styles from assets/style.css."""
+# Home: the landing page. All texts come from app_content.py, all styles from assets/style.css.
 import html as html_lib  # escapes the texts before putting them in HTML
 
 import streamlit as st  # the library that builds the web app
@@ -12,14 +12,14 @@ esc = html_lib.escape  # a short name, used many times below
 #1 the hero: the pitch on the left, the real chat screen of the app on a laptop on the right
 
 
+# the headline with the words between <em> and </em> in blue; everything else is escaped
 def headline() -> str:
-    """The headline with the words between <em> and </em> in blue; everything else is escaped."""
     parts = content.TAGLINE.replace("</em>", "<em>").split("<em>")  # even pieces: normal text, odd pieces: blue
     return "".join(f"<em>{esc(p)}</em>" if i % 2 else esc(p) for i, p in enumerate(parts))
 
 
+# the laptop: a small copy of the Assistant page answering the demo question, with the cited parts highlighted
 def laptop() -> str:
-    """The laptop: a small copy of the Assistant page answering the demo question, with the cited parts highlighted."""
     answer = []
     for i, (text, cite) in enumerate(content.HERO_DEMO["answer"]):
         if cite:  # a cited part: highlighted, one after the other (the delay grows with each part)
@@ -29,7 +29,7 @@ def laptop() -> str:
     slips = "".join(f'<div class="slip"><span class="cite">{label}</span><b>{esc(where)}</b>{esc(section)}</div>'
                     for label, where, section in content.HERO_DEMO["sources"])  # one small card per source
     menu = "".join(f'<div class="{"on" if name == "Assistant" else ""}">{name}</div>'
-                   for name in ("Home", "Assistant", "Compare", "How it works"))  # the same pages as the real menu
+                   for name in ("Home", "Assistant", "Compare"))  # the same pages as the real menu
     n = len(content.HERO_DEMO["sources"])  # how many sources the demo answer cites
 
     # the 3 documents floating next to the laptop: what the assistant reads

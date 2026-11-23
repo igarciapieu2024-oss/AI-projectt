@@ -1,11 +1,10 @@
-"""
-Agreement between a judge and reference grades made by checking each answer against its sources.
-
-1. The reference grades in eval/reference_labels_dev.csv were made blind (answers of two configurations
-   shuffled together) by a second model that read the gold slide or syllabus section of every question.
-   They are not human grades; a sample is checked by hand and reported with them.
-2. Only dev runs are graded, so the judge can be chosen without looking at any test question.
-"""
+# Measure how often the automatic judge (eval/judge.py) agrees with the reference grades, which were made by
+# checking each answer against the source of its question.
+# The reference grades in eval/reference_labels_dev.csv were made blind (the answers of two configurations
+# shuffled together) by a second model that read the gold slide or syllabus section of every question. They
+# are not human grades; a sample is checked by hand and reported with them.
+# Only dev runs are compared, so the judge can be chosen without looking at any test question.
+#   python -m eval.judge_agreement
 
 from __future__ import annotations
 
@@ -14,8 +13,8 @@ import csv
 from pathlib import Path
 
 
+# Read one judge file: question_id -> score. Rows the judge could not score (status not "ok") are skipped.
 def load_scores(path: Path) -> dict[str, float]:
-    """3. question_id -> score of one judge file; rows the judge could not score are skipped."""
     scores = {}
     with path.open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
@@ -24,8 +23,10 @@ def load_scores(path: Path) -> dict[str, float]:
     return scores
 
 
+# Compare the judge with the reference on the answers both graded: how often they give the same score, how
+# often they agree on "fully correct or not", how many correct answers the judge marked lower (too strict)
+# or wrong answers it marked correct (too lenient), and the share of fully correct answers for each side.
 def agreement(reference: dict[tuple[str, str], float], judged: dict[tuple[str, str], float]) -> dict:
-    """4. Same score, same correct/not-correct decision, and how often each side calls an answer correct."""
     keys = [key for key in reference if key in judged]
     if not keys:
         return {"compared": 0}
@@ -44,17 +45,20 @@ def agreement(reference: dict[tuple[str, str], float], judged: dict[tuple[str, s
     }
 
 
+# Load the reference grades, then compare each judge version (v1, v2, v3 files) with them.
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--labels", type=Path, default=Path("eval/reference_labels_dev.csv"))
     parser.add_argument("--runs-dir", type=Path, default=Path("eval/runs"))
     args = parser.parse_args()
 
+    # (run_id, question_id) -> reference score, so the same question in two runs is kept apart.
     reference: dict[tuple[str, str], float] = {}
     with args.labels.open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             reference[(row["run_id"], row["question_id"])] = float(row["reference_score"])
 
+    # Only the runs that have reference grades.
     run_ids = sorted({run_id for run_id, _ in reference})
     for name in ("judge_questions.csv", "judge_questions_v2.csv", "judge_questions_v3.csv"):
         judged = {}
@@ -65,5 +69,6 @@ def main() -> None:
         print(name, agreement(reference, judged))
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     main()

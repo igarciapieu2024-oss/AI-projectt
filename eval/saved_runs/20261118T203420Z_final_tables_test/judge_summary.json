@@ -1,0 +1,14 @@
+{
+  "run_dir": "eval\\runs\\20261118T203420Z_final_tables_test",
+  "judge_model": "qwen2.5:7b",
+  "rubric": "v1",
+  "evaluated": 30,
+  "failed": 0,
+  "mean_correctness_score": 0.75,
+  "exact_correct_rate": 0.7333,
+  "methods": {
+    "deterministic": 7,
+    "llm": 22
+  },
+  "note": "Evaluates factual correctness. Retrieval and citations are scored separately."
+}

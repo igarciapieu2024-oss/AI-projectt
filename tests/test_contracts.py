@@ -42,7 +42,7 @@ def test_fake_answer_refuses_and_runs_without_rag():
 
     refused = fake.answer("When is the end-of-year party?")
     assert refused.refused and not refused.context_hits
-    bare = fake.answer("What is the final exam worth?", cfg=load_config("configs/b0_no_rag.yaml"))
+    bare = fake.answer("What is the final exam worth?", cfg=load_config("configs/baselines/b0_llm_only.yaml"))
     assert not bare.refused and not bare.context_hits
 
 
@@ -54,9 +54,9 @@ def test_fake_stream_ends_with_result():
 
 def test_configs_load_and_share_index():
     base = load_config("configs/base.yaml")
-    final = load_config("configs/final.yaml")
-    b0 = load_config("configs/b0_no_rag.yaml")
-    b1 = load_config("configs/b1_v1.yaml")
+    final = load_config("configs/baselines/v1_2_small_model.yaml")
+    b0 = load_config("configs/baselines/b0_llm_only.yaml")
+    b1 = load_config("configs/baselines/b1_first_version.yaml")
     assert final.kb_sig == base.kb_sig          # same knowledge base -> same index
     assert b0.kb_sig == base.kb_sig             # b0 only changes generation
     assert b1.kb_sig != base.kb_sig             # b1 changes the knowledge base

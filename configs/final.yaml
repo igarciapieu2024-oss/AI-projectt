@@ -1,4 +1,0 @@
-# Inherits from base.yaml, which contains the default values for all parameters.
-# Specifies no changes from base.yaml.
-
-extends: base.yaml

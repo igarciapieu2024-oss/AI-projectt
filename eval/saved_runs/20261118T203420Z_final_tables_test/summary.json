@@ -1,0 +1,14 @@
+{
+  "run_id": "20261118T203420Z_final_tables_test",
+  "config": "final_tables",
+  "config_file": "configs/final_tables.yaml",
+  "split": "test",
+  "kb_sig": "586a05db",
+  "requested": 30,
+  "completed": 30,
+  "failed": 0,
+  "mean_latency_ms": 26998.6,
+  "wall_time_s": 895.97,
+  "results_file": "eval\\runs\\20261118T203420Z_final_tables_test\\results.jsonl",
+  "metrics_status": "pending"
+}

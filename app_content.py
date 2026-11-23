@@ -1,9 +1,5 @@
-"""Every text and number the app shows that will change later (owner: Irene).
-
-The pages read from here, so when the real name, logo, survey numbers or results arrive,
-we only edit this file (and drop the images into assets/), never the pages.
-"XX" marks the values we still don't have.
-"""
+# Every text and number the app shows. The pages read them from here, so changing a text, a number or a result
+# means editing only this file (and the images in assets/), never the pages.
 
 # company (from the business case)
 COMPANY_NAME = "SyllabusAI"
@@ -76,7 +72,7 @@ FOR_UNIVERSITIES = ("Universities license SyllabusAI per year, by number of enro
 CLOSING = "Try it with a question from one of the 7 courses of the pilot."  # the dark band at the end of the landing page
 FOOTER = "SyllabusAI, a student project at IE University, 2026."
 
-# example questions: the starter cards of the chat and the Compare page (Elena confirms the 4 that work best on Sat 14)
+# example questions: the starter cards of the chat and the Compare page
 # one per route of the router, so the demo shows all 4 behaviours; all of them are answered in the real PDFs
 EXAMPLE_QUESTIONS = [
     "What is the final exam worth in Management Control?",  # course admin: Management Control syllabus, evaluation criteria
@@ -92,15 +88,3 @@ COURSE_DISPLAY_NAMES = {"ob": "Organizational Behaviour", "ai_ml": "Machine Lear
 
 # placeholder courses for the filter, used until data/manifest.csv has rows
 PLACEHOLDER_COURSES = {"c01": "Course 1", "c02": "Course 2"}
-
-# results for the How-it-works page: holdout 3, 30 new questions run once (eval/reference_labels_holdout3.csv)
-RESULTS_TITLE = "Results on 30 unseen questions"
-RESULTS = [  # (metric, bare LLM, our system)
-    ("Fully correct answers", "20%", "73%"),
-    ("Right source found in the top 5", "—", "83%"),
-    ("Answers that cite a source", "0%", "77%"),
-    ("Unanswerable questions refused", "83%", "100%"),
-]
-RESULTS_NOTE = ("Each answer checked against its source slide or syllabus section. On 90 unseen questions over three "
-                "sets the system is fully correct on 70%; method and confidence intervals in the documentation.")
-ARCHITECTURE_IMAGE = "assets/architecture.png"  # Sergio's architecture figure (Sat 14)

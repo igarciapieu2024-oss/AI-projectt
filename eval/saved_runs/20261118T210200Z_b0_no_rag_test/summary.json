@@ -1,0 +1,14 @@
+{
+  "run_id": "20261118T210200Z_b0_no_rag_test",
+  "config": "b0_no_rag",
+  "config_file": "configs/b0_no_rag.yaml",
+  "split": "test",
+  "kb_sig": "ec71346e",
+  "requested": 30,
+  "completed": 30,
+  "failed": 0,
+  "mean_latency_ms": 5735.6,
+  "wall_time_s": 191.31,
+  "results_file": "eval\\runs\\20261118T210200Z_b0_no_rag_test\\results.jsonl",
+  "metrics_status": "pending"
+}

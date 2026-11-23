@@ -1,51 +1,52 @@
-# Shared defaults (tell the group before changing this file).
+# Default settings shared by every version of the system.
+# Other configs start with `extends: base.yaml` and only list the settings they change,
+# so two versions can be compared knowing exactly what is different between them.
 
-# Every other config file starts with `extends: base.yaml` (they inherit the settings in base.yaml)
-# Every other config file can specify the settings they want to change.
+# kb: how the knowledge base is built (src/kb/). Changing anything here changes kb_sig,
+# so the variant gets its own chunks and indexes instead of overwriting the current ones.
+kb:
+  sources: [syllabi, slides]
+  use_ocr: true                # add the text read inside slide images (EasyOCR)
+  use_captions: true           # add the vision model's description of each useful image
+  chunk_strategy: slide        # not read by the current code; left from the first design
+  chunk_size: 800              # max characters per chunk, cut at sentence ends
+  chunk_overlap: 120           # last sentences repeated in the next chunk so no idea is split in half
+  embed_model: sentence-transformers/all-MiniLM-L6-v2   # small embedding model (384 dimensions) that runs on a CPU
+  dedup: true                  # remove near-duplicate slides repeated across decks
+  course_rows: true            # one clean summary chunk per course, built from the course table
 
-# Configuration (cfg) objects contain the settings loaded from this YAML
+# retrieval: how the chunks are searched (src/retrieval/)
+retrieval:
+  mode: hybrid                 # dense = vector search only; hybrid = vector search + BM25 keyword search
+  k_dense: 20                  # candidates from the vector search
+  k_bm25: 20                   # candidates from the keyword search
+  rrf_k: 60                    # constant of Reciprocal Rank Fusion; 60 is the usual value
+  rerank: true                 # reorder the candidates with a cross-encoder
+  reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_k: 5                     # sources given to the LLM
+  filters: true                # not read by the current code: course filters are always applied when there is a course
+  small_to_big: true           # not read by the current code; left from the first design
 
-kb:                            # "kb" = knowledge base, i.e., the vector database
-  sources: [syllabi, slides]      # course materials used as sources
-  use_ocr: true                   # "ocr" = Optical Character Recognition - so slide images are used
-  use_captions: true              # slide descriptions are also included
-  chunk_strategy: slide           # section | slide (no effect on code, not used)
-  chunk_size: 800                 # maximum size in character for chunks
-  chunk_overlap: 120              # overlap of 120 characters between chunks
-  embed_model: sentence-transformers/all-MiniLM-L6-v2 # selected embedding model
-  dedup: true                     # keeps track of chunks with repetitive information
-  course_rows: true               # add an extra searchable summary chunk per course containing course information
+# routing: the question classifier (src/retrieval/router.py)
+routing:
+  router: classifier           # decides who classifies the questions: none (not classified) | classifier (trained SVM) | llm (ask language model, which is slower)
+  min_prob: 0.6                # below this probability the LLM decides the class instead
 
-retrieval:                     # how the system searches and ranks chunks
-  mode: hybrid                    # hybrid means it uses both dense search (embedding) and BM25 keyword search
-  k_dense: 20                     # dense search returns at most 20 chunk candidates
-  k_bm25: 20                      # BM25 search returns at most 20 chunk candidates
-  rrf_k: 60                       # 60 is the conventional choice for the parameter that controls the contribution of rank positions (1/(k+60))
-  rerank: true                    # will do a rerank using the cross-encoder
-  reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2 # selected cross-encoder model
-  top_k: 5                        # top 5 chunks will be used for the answer
-  filters: true                   # course filters are applied when searching (no effect on code, not used)
-  small_to_big: true              # a type of retrieval (isnt used in the code)
+# generation: how the answer is written and checked (src/generation/)
+generation:
+  rag: true                    # false = the LLM answers alone, without sources (baseline B0)
+  llm_model: llama3.2:3b       # chosen for speed after the local latency benchmark; final_system switches to llama3.1:8b
+  vision_model: qwen2.5vl:7b   # classifies and describes slide images; qwen2.5vl:3b if the laptop runs out of memory
+  prompt_version: v2
+  temperature: 0.1             # low, so answers stay close to the sources
+  num_predict: 400             # max tokens per answer
+  query_num_predict: 96        # max tokens when rewriting or translating a question
+  translate_query: true        # non-English questions are translated to English before searching
+  rewrite: true                # follow-up questions are rewritten as standalone questions
+  selfcheck: true              # refuse when the best source is too weak
+  selfcheck_threshold: 0.2     # minimum reranker score of the best source, tuned on the dev questions
 
-routing:                       # for categorizing the type of question (course-admin, course-content, cross-course, or out-of-scope)
-  router: classifier              # uses the trained classifier of the project
-  min_prob: 0.6                   # if the confidence is below 0.6, will classify as a "fallback"
-
-generation:                    # how the question is prepared and how the answer is produced
-  rag: true                       # rag will be used
-  llm_model: llama3.2:3b          # selected model for writing the answer
-  vision_model: qwen2.5vl:7b      # selected model for analyzing slide images
-  prompt_version: v2              # type of instructions given to the LLM (v2 more strict with sticking to sources than v1)
-  temperature: 0.1                # how much the generated tokens vary (temperature = variation)
-  num_predict: 400                # the output is limited to 400 tokens
-  query_num_predict: 96           # the rewritten translated query is limited to 96 tokens
-  translate_query: true           # will translate non-English questions to English
-  rewrite: true                   # the system can rewrite the prompt using conversation history to be more clear
-  selfcheck: true                 # checks the retrieved chunks before generation
-  selfcheck_threshold: 0.2        # if the best chunk score is below 0.2, the system refuses
-
-# should vision_model be moved from generation to kb?
-
-eval:                          # for evaluating the accuracy of the system
-  judge_model: qwen2.5:7b         # model that compares prediction to the actual answer
-  split: dev                      # will use the development question set to evaluate
+# eval: evaluation settings
+eval:
+  judge_model: qwen2.5:7b      # LLM that grades the answers (only used in eval/)
+  split: dev                   # not read by the code: run_eval takes the split from --split

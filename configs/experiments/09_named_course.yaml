@@ -1,0 +1,16 @@
+# EXPERIMENT 9 (dev first, after the second holdout): experiment 5 plus two fixes from the holdout 2 errors.
+# - rewrite_guard: a follow-up rewrite that is not a question is replaced by the previous question plus the new one
+# - named_course_in_scope: a question that names a course is never refused by the router without a search
+# named_course_in_scope was not kept: it made the system answer a private question it should refuse.
+extends: ../base.yaml
+
+retrieval:
+  auto_course_filter: true
+
+generation:
+  llm_model: llama3.1:8b
+  course_split: true
+  rewrite_guard: true
+
+routing:
+  named_course_in_scope: true

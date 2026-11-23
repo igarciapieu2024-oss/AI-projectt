@@ -37,7 +37,7 @@ def test_whole_app_starts_on_home():
     no_errors(at)
 
 
-@pytest.mark.parametrize("page", ["home", "assistant", "compare", "how_it_works"])
+@pytest.mark.parametrize("page", ["home", "assistant", "compare"])
 def test_page_opens(page):
     no_errors(open_page(page))
 

@@ -1,17 +1,9 @@
-"""
-Validate the RAG evaluation question bank.
-
-Checks:
-- CSV format
-- Required fields
-- Gold IDs
-- Duplicate questions
-- Question types
-- Author quotas
-- Dev/test split
-
-Owner: Elena
-"""
+# Check the evaluation question bank (eval/questions.csv) before using it, so a typo in a question cannot
+# silently change the results. It checks the columns, the required fields, that every gold id exists in the
+# parsed slides and syllabus sections, repeated or almost repeated questions, the question types, the number
+# of questions of each type per author, and the dev/test split (40 dev and 60 test out of 100).
+#   python -m eval.validate_questions            (add --strict to also fail on warnings)
+# It only reads the files and prints the errors and warnings; it returns 1 if there are errors.
 
 from __future__ import annotations
 
@@ -25,6 +17,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 
+# The columns of the question file, in this order.
 COLUMNS = [
     "question_id",
     "split",
@@ -39,6 +32,8 @@ COLUMNS = [
     "author",
 ]
 
+# The question types: syllabus content, admin rules, across courses, answered by an image, follow-up of a
+# previous question (turn1), and questions the documents cannot answer.
 TYPES = {
     "content",
     "admin",
@@ -57,12 +52,12 @@ QUOTA = {
     "unanswerable": 4,
 }
 
-# Per-author category targets keep the question bank balanced, so a model
-# cannot appear strong simply because one easy question type dominates.
+# How many questions of each type every author writes (20 each). It keeps the bank balanced, so a system
+# cannot look strong only because one easy type of question dominates.
 
 
+# Read the ids (slide_id or section_id) of every record of a parsed file, to check the gold ids against them.
 def load_ids(path: Path, key: str) -> set[str]:
-    """Collect valid source identifiers from a JSONL knowledge-base file."""
 
     ids = set()
 
@@ -93,8 +88,9 @@ def load_ids(path: Path, key: str) -> set[str]:
     return ids
 
 
+# Lowercase the question and keep only letters and numbers, so two questions that differ only in punctuation
+# or spaces are compared as the same text.
 def normalized(value: str) -> str:
-    """Canonicalize question text for duplicate and similarity checks."""
 
     value = value.lower()
 
@@ -103,17 +99,14 @@ def normalized(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+# Run every check and print the result. Errors make the file unusable; warnings are things to look at (an
+# unfinished bank, similar questions). Returns 1 if there are errors (or warnings with strict), else 0.
 def validate(
     questions: Path,
     slides: Path,
     syllabus: Path,
     strict: bool = False,
 ) -> int:
-    """Check schema, ground-truth IDs, duplicates, quotas, and split rules.
-
-    Returns the validation status used by the command-line entry point;
-    warnings and errors are tracked separately.
-    """
 
     errors = []
     warnings = []
@@ -133,8 +126,8 @@ def validate(
     if not rows:
         errors.append("No questions found")
 
-    # Validate annotations against actual parsed source IDs, rather than
-    # accepting plausible-looking but nonexistent slide or section labels.
+    # The gold ids are checked against the ids that really exist in the parsed files, so an id that looks right
+    # but does not exist is caught.
     source_ids = (
         load_ids(slides, "slide_id")
         | load_ids(syllabus, "section_id")
@@ -142,8 +135,10 @@ def validate(
 
     seen = set()
 
+    # Number of questions of each type per author, for the quota check below.
     by_author = defaultdict(Counter)
 
+    # Check each row; the row number starts at 2 because row 1 of the file is the header.
     for index, row in enumerate(rows, start=2):
 
         label = f"Row {index}: {row.get('question_id', '?')}"
@@ -162,6 +157,7 @@ def validate(
 
         reference = (row.get("reference_answer") or "").strip()
 
+        # gold_ids can hold several ids separated by ";".
         gold = [
             item.strip()
             for item in (row.get("gold_ids") or "").split(";")
@@ -201,7 +197,7 @@ def validate(
         if split not in {"", "dev", "test"}:
             errors.append(f"{label}: invalid split")
 
-        # Answerable
+        # Answerable: 1 if the documents answer it, 0 if the system should refuse.
 
         if answerable not in {"0", "1"}:
             errors.append(f"{label}: invalid answerable value")
@@ -211,7 +207,7 @@ def validate(
                 f"{label}: unanswerable type must have answerable=0"
             )
 
-        # Gold IDs
+        # Gold IDs: an answerable question needs at least one, an unanswerable one has none.
 
         if answerable == "0" and gold:
             errors.append(
@@ -237,7 +233,7 @@ def validate(
                 f"{label}: missing reference answer"
             )
 
-    # Detect near-duplicate questions
+    # Near-duplicate questions: every pair is compared, and a similarity of 0.91 or more is reported.
 
     for i, left in enumerate(rows):
 
@@ -260,7 +256,7 @@ def validate(
                         f"{right['question_id']}"
                     )
 
-    # Check author quotas
+    # Author quotas: 20 questions per author, with the numbers of each type in QUOTA.
 
     for author, counts in sorted(by_author.items()):
 
@@ -279,7 +275,8 @@ def validate(
                     f"expected={expected}"
                 )
 
-    # Check dev/test split
+    # Dev/test split: until the 100 questions have a split it is only a warning; after that it must be 40 dev
+    # and 60 test.
 
     splits = Counter(
         (row.get("split") or "").strip().lower()
@@ -333,8 +330,8 @@ def validate(
     return 0
 
 
+# Command line: the paths of the question file and of the parsed slides and syllabus sections.
 def main() -> None:
-    """Run question-bank validation from command-line path arguments."""
 
     parser = argparse.ArgumentParser()
 
@@ -363,6 +360,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    # A missing or broken file stops with a short message instead of a traceback.
     try:
         result = validate(
             args.questions,
@@ -377,5 +375,6 @@ def main() -> None:
     raise SystemExit(result)
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     main()

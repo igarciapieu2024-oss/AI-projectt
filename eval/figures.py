@@ -1,14 +1,8 @@
-"""Generate held-out test figures for B0, B1, and Final v1.2.
-
-All values come from saved summary files; this module never reruns the
-generator or judge. B0 is omitted from the retrieval chart because a
-no-RAG model has no retrieval step (N/A, rather than zero recall).
-
-Usage:
-    python -m eval.figures
-
-Owner: Elena.
-"""
+# Draw four bar charts that compare three systems on the test questions: B0 (the LLM alone, no RAG), B1 (the
+# baseline RAG) and "Final v1.2" (the version of the final system on 16 November, before the changes of
+# 18 November). The values are read from the saved summary files of three fixed runs; nothing is run again.
+#   python -m eval.figures
+# The charts are saved in reports/figures/test/.
 
 from __future__ import annotations
 
@@ -19,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+# The three runs compared (folders written by eval/run_eval.py and eval/judge.py).
 B0_RUN = Path("eval/runs/20261116T193556Z_b0_no_rag_test")
 B1_RUN = Path("eval/runs/20261116T193243Z_b1_v1_test")
 FINAL_RUN = Path("eval/runs/20261116T192633Z_final_test")
@@ -26,12 +21,15 @@ FINAL_RUN = Path("eval/runs/20261116T192633Z_final_test")
 OUTPUT = Path("reports/figures/test")
 
 
+# Read one summary file of a run (metrics_summary.json or judge_summary.json).
 def load_json(path: Path) -> dict:
-    """Load the stored metric or judge summary for a fixed evaluation run."""
     with path.open(encoding="utf-8") as f:
         return json.load(f)
 
 
+# Draw one chart: a group of bars per metric, one bar per system, with its value written on top, and save it.
+# B0 is optional because the retrieval chart only compares the two RAG systems. Shares are shown as
+# percentages; the latency chart shows seconds.
 def grouped_chart(
     title: str,
     labels: list[str],
@@ -43,22 +41,19 @@ def grouped_chart(
     percentage: bool = True,
     higher_is_better: bool = True,
 ) -> None:
-    """Draw comparable bars for two or three systems and label their values.
-
-    B0 is optional so retrieval metrics can compare only RAG systems.
-    Fractions are formatted as percentages; latency uses seconds instead.
-    """
 
     x = np.arange(len(labels))
     fig, ax = plt.subplots(figsize=(9, 5))
 
     if b0_values is None:
-        # No-RAG has no meaningful Recall@K or MRR, so do not plot a zero.
+        # Two bars per group. The LLM alone has no search step, so it has no recall or MRR; plotting 0 would
+        # suggest it searched and failed.
         width = 0.33
         positions = [
             (x - width / 2, b1_values, "B1 Baseline", "#A9B8CC"),
             (x + width / 2, final_values, "Final v1.2", "#3977AD"),
         ]
+    # Three bars per group.
     else:
         width = 0.25
         positions = [
@@ -79,6 +74,7 @@ def grouped_chart(
         )
         bar_groups.append(bars)
 
+    # The height of the axis leaves room for the value labels above the bars.
     all_values = (b0_values or []) + b1_values + final_values
     maximum = max(all_values)
 
@@ -90,6 +86,7 @@ def grouped_chart(
     else:
         ax.set_ylim(0, maximum * 1.2 if maximum else 1)
 
+    # Write each value on top of its bar.
     for bars in bar_groups:
         for bar in bars:
             value = bar.get_height()
@@ -133,8 +130,8 @@ def grouped_chart(
     print("Saved:", OUTPUT / filename)
 
 
+# Read the summaries of the three runs and draw the retrieval, correctness, refusal and latency charts.
 def main() -> None:
-    """Build retrieval, correctness, refusal, and latency figures from test."""
     b0_metrics = load_json(B0_RUN / "metrics_summary.json")
     b0_judge = load_json(B0_RUN / "judge_summary.json")
     b1_metrics = load_json(B1_RUN / "metrics_summary.json")
@@ -143,7 +140,7 @@ def main() -> None:
     b1_judge = load_json(B1_RUN / "judge_summary.json")
     final_judge = load_json(FINAL_RUN / "judge_summary.json")
 
-    # Figure 1: Retrieval performance
+    # Figure 1: retrieval (B1 and the final system only).
 
     grouped_chart(
         title="Retrieval Performance",
@@ -159,7 +156,7 @@ def main() -> None:
         filename="retrieval_performance.png",
     )
 
-    # Figure 2: Answer correctness
+    # Figure 2: answer correctness from the judge (fully correct share and average score).
 
     grouped_chart(
         title="Answer Correctness",
@@ -179,7 +176,7 @@ def main() -> None:
         ],
     )
 
-    # Figure 3: Refusal performance (automatic metrics)
+    # Figure 3: refusals, from the automatic metrics.
 
     grouped_chart(
         title="Refusal Performance (Automatic Evaluation)",
@@ -202,7 +199,7 @@ def main() -> None:
         ],
     )
 
-    # Figure 4: Latency
+    # Figure 4: average time per answer, in seconds.
 
     grouped_chart(
         title="Mean Response Latency",
@@ -227,5 +224,6 @@ def main() -> None:
     print("======================================")
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     main()

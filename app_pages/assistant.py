@@ -1,4 +1,5 @@
-"""Assistant: the chat, the technical core of the app (owner: Irene)."""
+# Assistant: the chat, the technical core of the app. It runs the system chosen in app_components/engine.py
+# (final_system by default) and shows each answer word by word, with its sources and the behind-the-scenes panel.
 import html as html_lib  # escapes the texts before putting them in HTML
 
 import streamlit as st  # the library that builds the page
@@ -10,8 +11,6 @@ from app_components.engine import MAIN_CONFIG, config, courses  # the settings, 
 from app_components.sources import render_sources  # the source cards
 from app_components.theme import html, image_data_uri  # our HTML helper and the logo loader
 from src.schemas import AnswerResult, Filters  # the agreed answer format and the filters format
-
-# Takes the user's question and course selection.
 
 #1 a narrower page, like a chat app: the conversation in the middle of the screen
 html("""<style>
@@ -36,8 +35,8 @@ with st.container(key="toolbar"):
 #3 the conversation so far
 
 
+# everything under an answer: the refusal note, the source cards and the panel
 def show_result(result: AnswerResult) -> None:
-    """Everything under an answer: the refusal note, the source cards and the panel."""
     if result.refused:  # refusals in their own style, so the demo shows the system knows when to stop
         refusal_notice()
     render_sources(result.context_hits, result.answer_text)

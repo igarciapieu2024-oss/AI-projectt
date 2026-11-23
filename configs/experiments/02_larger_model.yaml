@@ -1,0 +1,6 @@
+# EXPERIMENT 2 (dev only, after the test evaluation): a larger model.
+# Main change vs base.yaml: llama3.1:8b writes the answers (and the translations and follow-up rewrites). Kept.
+extends: ../base.yaml
+
+generation:
+  llm_model: llama3.1:8b

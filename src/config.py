@@ -1,16 +1,9 @@
-"""Settings and paths (owner: Francesca; base.yaml is shared - tell the group before changing it).
-
-Every system variant is one YAML file in configs/ that starts with `extends: base.yaml`
-and changes only what differs. Load it with:
-
-    from src.config import load_config, PATHS
-    cfg = load_config("configs/final.yaml")
-    cfg.retrieval["top_k"], cfg.kb_sig
-
-`kb_sig` is a short hash of the `kb` group: configs that change only retrieval or
-generation share one index; a config that changes the knowledge base gets its own
-ChromaDB collection `kb_<kb_sig>` and its own chunk files.
-"""
+# Settings and file paths shared by the whole project.
+# Every version of the system is one YAML file in configs/ that starts with "extends:" and lists only what it
+# changes; load_config() reads it and fills in the rest from the file it extends (base.yaml).
+# kb_sig is a short code calculated from the kb group of the settings: configurations that only change the
+# search or the answers share one knowledge base, and a configuration that changes the knowledge base gets
+# its own ChromaDB collection (kb_<kb_sig>) and its own chunk files, so no version overwrites another.
 from __future__ import annotations
 
 import hashlib
@@ -21,8 +14,12 @@ from typing import Any
 
 import yaml
 
+# The repository folder (two levels above this file), so every path works on every laptop.
 ROOT = Path(__file__).resolve().parent.parent
 
+# Every file and folder the project reads or writes, in one place. Some entries (raw_syllabi, raw_slides,
+# image_labels, image_classes, image_clf, questions, runs) are not used by the current code: they come from
+# the first plan of the project (for example the image classifier that was replaced by the vision model).
 PATHS = {
     "root": ROOT,
     "configs": ROOT / "configs",
@@ -51,47 +48,59 @@ PATHS = {
     "runs": ROOT / "eval" / "runs",
     "reports": ROOT / "reports",
     "figures": ROOT / "docs" / "figures",
-} # defining file paths
+}
 
 
-def chunks_path(kb_sig: str) -> Path: # builds path for saved chunk records belonging to KB version
+# The files of one knowledge base, named with its kb_sig: the chunks, the parents (saved but not used by the
+# answer phase) and the BM25 index.
+def chunks_path(kb_sig: str) -> Path:
     return PATHS["processed"] / f"chunks__{kb_sig}.jsonl"
 
 
-def parents_path(kb_sig: str) -> Path: # builds path for saved chunk parent records
+def parents_path(kb_sig: str) -> Path:
     return PATHS["processed"] / f"parents__{kb_sig}.jsonl"
 
 
-def bm25_path(kb_sig: str) -> Path: # builds path for saved chunk BM25 keyword index
+def bm25_path(kb_sig: str) -> Path:
     return PATHS["processed"] / f"bm25__{kb_sig}.pkl"
 
 
-GROUPS = ("kb", "retrieval", "routing", "generation", "eval") # list of YAML sections
+# The five groups of settings a config can have: kb (how the knowledge base is built), retrieval (how it is
+# searched), routing (the question classifier), generation (how the answer is written and checked) and
+# eval (the judge model).
+GROUPS = ("kb", "retrieval", "routing", "generation", "eval")
 
 
-@dataclass # automatically creates __init__ for fields below
-class Config: # declaring the shape of a "Config" object (instances will hold configurations)
-    name: str                                                   # required field (name will be text)
-    path: Path                                                  # required field (holds the path to the config file)
-    kb: dict[str, Any] = field(default_factory=dict)            # field for kb settings of YAML (creates a new dictionary if none provided)
-    retrieval: dict[str, Any] = field(default_factory=dict)     # same as above but for retrieval  settings
-    routing: dict[str, Any] = field(default_factory=dict)       # same as above but for routing    settings
-    generation: dict[str, Any] = field(default_factory=dict)    # same as above but for generation settings
-    eval: dict[str, Any] = field(default_factory=dict)          # same as above but for eval       settings
+# One loaded configuration: its name (the file name without .yaml), its path and its five groups.
+@dataclass
+class Config:
+    name: str
+    path: Path
+    kb: dict[str, Any] = field(default_factory=dict)
+    retrieval: dict[str, Any] = field(default_factory=dict)
+    routing: dict[str, Any] = field(default_factory=dict)
+    generation: dict[str, Any] = field(default_factory=dict)
+    eval: dict[str, Any] = field(default_factory=dict)
 
-    @property # makes the method below have attribute behavior (ex: cfg.kb_sig , not cgf.kb_sig() )
-    def kb_sig(self) -> str: # result of the config is intended as text
-        blob = json.dumps(self.kb, sort_keys=True, default=str)         # takes kb dictionary of config and converts to a string in JSON format
-        return hashlib.sha1(blob.encode("utf-8")).hexdigest()[:8]       # turns the string into bytes
+    # The code of the knowledge base: the first 8 characters of a hash of the kb group. The settings are
+    # written in a fixed order (sort_keys), so the same settings always give the same code.
+    @property
+    def kb_sig(self) -> str:
+        blob = json.dumps(self.kb, sort_keys=True, default=str)
+        return hashlib.sha1(blob.encode("utf-8")).hexdigest()[:8]
 
-    @property # attribute behavior
+    # The name of the ChromaDB collection of this knowledge base.
+    @property
     def collection_name(self) -> str:
-        return f"kb_{self.kb_sig}"     # adds "kb_" to the string output of kb_sig (above) 
+        return f"kb_{self.kb_sig}"
 
 
-def _merge(base: dict, override: dict) -> dict: # combines inherited settings with overrides
+# Combine two sets of settings: the values of override replace those of base, group by group, so a config
+# only has to list what it changes.
+def _merge(base: dict, override: dict) -> dict:
     out = dict(base)
     for key, value in override.items():
+        # Inside a group, only the listed settings are replaced; the others keep their base value.
         if isinstance(value, dict) and isinstance(out.get(key), dict):
             out[key] = _merge(out[key], value)
         else:
@@ -99,7 +108,9 @@ def _merge(base: dict, override: dict) -> dict: # combines inherited settings wi
     return out
 
 
-def _load_raw(path: Path) -> dict: # reads a YAML file
+# Read a YAML file and, if it starts with "extends:", first read the file it extends (which can extend
+# another one) and apply this file's settings on top.
+def _load_raw(path: Path) -> dict:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     parent = data.pop("extends", None)
     if parent:
@@ -107,11 +118,14 @@ def _load_raw(path: Path) -> dict: # reads a YAML file
     return data
 
 
-def load_config(path: str | Path = "configs/base.yaml") -> Config: # callable function for loading a Config object from a YAML file
+# Load a configuration by its path (relative to the repository or absolute). Used by every part of the
+# project: the build, answer(), the app and the evaluation.
+def load_config(path: str | Path = "configs/base.yaml") -> Config:
     path = Path(path)
     if not path.is_absolute():
         path = ROOT / path
     data = _load_raw(path)
+    # A group name that is not one of the five is a typo in the YAML: stop instead of ignoring it.
     unknown = set(data) - set(GROUPS)
     if unknown:
         raise ValueError(f"{path.name}: unknown config groups {sorted(unknown)}")
