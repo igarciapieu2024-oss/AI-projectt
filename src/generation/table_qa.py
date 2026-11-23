@@ -15,7 +15,6 @@ from src.retrieval.filters import mentioned_course_codes
 from src.schemas import Chunk, CourseRow, Hit
 from src.utils.io import read_csv
 
-
 # The key of one version of the file (path, modification time, size), so a rebuilt table is read again.
 def _file_key(path: Path) -> tuple[str, int, int]:
     stat = path.stat()

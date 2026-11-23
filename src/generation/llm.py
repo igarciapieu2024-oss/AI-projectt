@@ -7,7 +7,6 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from typing import Any
 
-
 # The reply text, which behaves like a normal string but also keeps Ollama's done_reason ("stop", or
 # "length" when the answer was cut by num_predict). answer.py uses it to trim a cut answer to its last
 # complete sentence.

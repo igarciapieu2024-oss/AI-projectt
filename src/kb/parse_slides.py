@@ -15,7 +15,6 @@ from src.schemas import SlideRecord
 from src.utils.ids import slide_id
 from src.utils.io import read_csv, write_jsonl
 
-
 # ---------------------------------------------------------------------------
 # Text processing helpers
 
