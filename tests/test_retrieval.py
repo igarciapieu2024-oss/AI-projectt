@@ -1,3 +1,5 @@
+# Tests of the search modules (src/retrieval/): embeddings, dense search, BM25, RRF fusion and reranker, with fake
+# models and indexes.
 import math
 import pickle
 import sys
@@ -17,6 +19,7 @@ from src.schemas import Chunk, Filters, Hit
 from src.utils.io import write_jsonl
 
 
+# A small fake chunk for the tests.
 def _chunk(chunk_id, text, *, course_code="c01", sessions=None):
     return Chunk(
         chunk_id=chunk_id,
@@ -34,6 +37,7 @@ def _chunk(chunk_id, text, *, course_code="c01", sessions=None):
     )
 
 
+# A fake BM25 scorer that returns fixed scores.
 class _Scorer:
     def __init__(self, scores):
         self.scores = scores
@@ -43,11 +47,13 @@ class _Scorer:
         return self.scores
 
 
+# A fake vector with the tolist() method the search uses.
 class _Vector:
     def tolist(self):
         return [0.1, 0.2]
 
 
+# The embedding model is loaded once, from local files, and gives normalised vectors.
 def test_embed_uses_cached_local_model_and_normalized_vectors(monkeypatch):
     calls = []
 
@@ -76,6 +82,7 @@ def test_embed_uses_cached_local_model_and_normalized_vectors(monkeypatch):
         embed_module._model.cache_clear()
 
 
+# The dense search returns whole chunks and applies the session filter.
 def test_dense_search_hydrates_chunks_and_applies_exact_session_filter(tmp_path, monkeypatch):
     chunks = [
         _chunk("session_2", "Second session", sessions=[2]),
@@ -127,6 +134,7 @@ def test_dense_search_hydrates_chunks_and_applies_exact_session_filter(tmp_path,
     assert calls[0]["n_results"] == 3
 
 
+# A missing ChromaDB collection gives a clear error.
 def test_dense_search_reports_missing_index(tmp_path, monkeypatch):
     class Client:
         def list_collections(self):
@@ -147,6 +155,7 @@ def test_dense_search_reports_missing_index(tmp_path, monkeypatch):
         dense_module.search("query", cfg, None, 2)
 
 
+# The chunks and the BM25 index are read once and reused.
 def test_index_cache_reuses_chunks_and_bm25_artifacts(tmp_path, monkeypatch):
     chunk_file = tmp_path / "chunks.jsonl"
     write_jsonl(chunk_file, [_chunk("cached", "Cached chunk")])
@@ -176,6 +185,7 @@ def test_index_cache_reuses_chunks_and_bm25_artifacts(tmp_path, monkeypatch):
         index_cache.clear_caches()
 
 
+# The ChromaDB connection is opened once.
 def test_chroma_client_is_reused_between_collection_lookups(tmp_path, monkeypatch):
     client_instances = []
 
@@ -206,6 +216,7 @@ def test_chroma_client_is_reused_between_collection_lookups(tmp_path, monkeypatc
         index_cache.clear_caches()
 
 
+# The BM25 search scores the chunks and applies the filters.
 def test_bm25_search_loads_index_scores_and_filters_chunks(tmp_path, monkeypatch):
     chunks = [
         _chunk("course_a", "Final exam is 40 percent.", sessions=[2], course_code="c01"),
@@ -230,6 +241,7 @@ def test_bm25_search_loads_index_scores_and_filters_chunks(tmp_path, monkeypatch
     assert [(hit.chunk.chunk_id, hit.score_bm25) for hit in hits] == [("course_a", 1.5)]
 
 
+# A BM25 index of another knowledge base is rejected.
 def test_bm25_rejects_an_index_for_another_kb(tmp_path, monkeypatch):
     index_file = tmp_path / "bm25.pkl"
     with index_file.open("wb") as stream:
@@ -244,6 +256,7 @@ def test_bm25_rejects_an_index_for_another_kb(tmp_path, monkeypatch):
         bm25_module.search("query", SimpleNamespace(kb_sig="testkb00"), None, 1)
 
 
+# Chunks that share no word with the question aren't returned.
 def test_bm25_does_not_return_zero_score_unmatched_chunks(tmp_path, monkeypatch):
     chunk_file = tmp_path / "chunks.jsonl"
     index_file = tmp_path / "bm25.pkl"
@@ -261,6 +274,7 @@ def test_bm25_does_not_return_zero_score_unmatched_chunks(tmp_path, monkeypatch)
     assert bm25_module.search("unrelated", SimpleNamespace(kb_sig="testkb00"), None, 3) == []
 
 
+# RRF merges the two lists and doesn't change them.
 def test_rrf_combines_ranked_lists_without_mutating_inputs():
     first = Hit(chunk=_chunk("a", "A"), rank=1, score_dense=0.9)
     second = Hit(chunk=_chunk("b", "B"), rank=2, score_dense=0.8)
@@ -276,6 +290,7 @@ def test_rrf_combines_ranked_lists_without_mutating_inputs():
     assert first.score_rrf is None
 
 
+# The reranker sorts by its score and keeps the scores of the searches.
 def test_rerank_sorts_cross_encoder_scores_and_preserves_retrieval_scores(monkeypatch):
     calls = []
 
@@ -310,6 +325,7 @@ def test_rerank_sorts_cross_encoder_scores_and_preserves_retrieval_scores(monkey
         rerank_module._model.cache_clear()
 
 
+# In hybrid mode, the answer phase fuses both searches and reranks.
 def test_answer_hybrid_retrieval_fuses_and_reranks(monkeypatch):
     dense_hit = Hit(chunk=_chunk("dense", "Dense hit"), rank=1, score_dense=0.8)
     bm25_hit = Hit(chunk=_chunk("keyword", "Keyword hit"), rank=1, score_bm25=2.0)
@@ -343,6 +359,7 @@ def test_answer_hybrid_retrieval_fuses_and_reranks(monkeypatch):
     assert result.timings_ms["rerank"] >= 0
 
 
+# In dense mode, BM25 isn't used.
 def test_dense_only_mode_skips_keyword_search(monkeypatch):
     dense_hit = Hit(chunk=_chunk("dense", "Dense hit"), rank=1, score_dense=0.8)
     monkeypatch.setattr(answer_module.dense, "search", lambda *args: [dense_hit])
@@ -358,6 +375,7 @@ def test_dense_only_mode_skips_keyword_search(monkeypatch):
     assert answer_module._build_hits("query", cfg, None) == [dense_hit]
 
 
+# A course is found with British or American spelling.
 def test_course_names_match_british_and_american_spelling():
     from src.retrieval.filters import mentioned_course_codes
 

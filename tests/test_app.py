@@ -32,11 +32,13 @@ def no_errors(at: AppTest) -> None:
 
 #2 every page opens without errors
 
+# The app starts and opens on the Home page.
 def test_whole_app_starts_on_home():
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=TIMEOUT).run()  # the entry point with the menu
     no_errors(at)
 
 
+# Every page opens without errors.
 @pytest.mark.parametrize("page", ["home", "assistant", "compare"])
 def test_page_opens(page):
     no_errors(open_page(page))
@@ -44,6 +46,7 @@ def test_page_opens(page):
 
 #3 the chat: a question gets an answer with sources, and an out-of-scope one is refused
 
+# An example question gets an answer with citations.
 def test_example_question_gets_cited_answer():
     at = open_page("assistant")
     at.button(key="start_0").click().run()  # clicks the first example question card
@@ -54,6 +57,7 @@ def test_example_question_gets_cited_answer():
     assert result.context_hits and "[S" in result.answer_text  # sources, and the answer cites them
 
 
+# An out-of-scope question shows the refusal.
 def test_out_of_scope_question_is_refused():
     at = open_page("assistant")
     at.chat_input[0].set_value(content.EXAMPLE_QUESTIONS[-1]).run()  # "When is the end-of-year party?"
@@ -61,6 +65,7 @@ def test_out_of_scope_question_is_refused():
     assert at.session_state.messages[-1]["result"].refused  # the system says it can't answer instead of guessing
 
 
+# A follow-up question is sent with the conversation so far.
 def test_follow_up_sends_history():
     at = open_page("assistant")
     at.chat_input[0].set_value(content.EXAMPLE_QUESTIONS[0]).run()
@@ -71,6 +76,7 @@ def test_follow_up_sends_history():
 
 #4 when the engine fails, the page explains it instead of crashing
 
+# If the engine fails, the page shows a readable message instead of a Python error.
 def test_engine_failure_shows_a_readable_message(monkeypatch):
     import app_components.answer_view as view
 
@@ -85,6 +91,7 @@ def test_engine_failure_shows_a_readable_message(monkeypatch):
     assert at.session_state.messages[-1].get("error")  # saved as a failed turn, so it doesn't retry on every click
 
 
+# Each error message says how to fix the problem.
 def test_error_messages_say_how_to_fix():
     from app_components.answer_view import explain_error
 
@@ -95,6 +102,7 @@ def test_error_messages_say_how_to_fix():
 
 #5 compare: both answers appear, and only ours has sources
 
+# The Compare page shows the two answers.
 def test_compare_shows_both_answers():
     at = open_page("compare")
     at.button[0].click().run()  # the "Compare" button

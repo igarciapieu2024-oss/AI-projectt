@@ -1,3 +1,4 @@
+# Tests of the near-duplicate marking (src/kb/dedup.py), with fake vectors.
 import sys
 import types
 from types import SimpleNamespace
@@ -9,6 +10,7 @@ from src.schemas import Chunk
 from src.utils.io import read_jsonl, write_jsonl
 
 
+# A small fake chunk for the tests.
 def _chunk(chunk_id, strategy="slide", doc_type="slide", duplicate_of=None):
     return Chunk(
         chunk_id=chunk_id, kb_sig="testkb00", strategy=strategy, doc_type=doc_type,
@@ -18,6 +20,7 @@ def _chunk(chunk_id, strategy="slide", doc_type="slide", duplicate_of=None):
     )
 
 
+# Copies are marked, while chunks without a copy and syllabus chunks stay unmarked.
 def test_dedup_marks_cluster_leaves_noise_and_syllabus_unchanged(tmp_path, monkeypatch):
     source = tmp_path / "chunks.jsonl"
     report = tmp_path / "dedup_report__testkb00.csv"
@@ -56,6 +59,7 @@ def test_dedup_marks_cluster_leaves_noise_and_syllabus_unchanged(tmp_path, monke
     assert "slide__a,slide__b" in report_lines[1]
 
 
+# With fewer than two slide chunks, the embedding model isn't even loaded.
 def test_dedup_with_fewer_than_two_slide_chunks_does_not_load_model(tmp_path, monkeypatch):
     source = tmp_path / "chunks.jsonl"
     write_jsonl(source, [_chunk("slide__one")])
@@ -67,6 +71,7 @@ def test_dedup_with_fewer_than_two_slide_chunks_does_not_load_model(tmp_path, mo
     assert (tmp_path / "dedup_report__testkb00.csv").exists()
 
 
+# In a chain of neighbours, only the chunks close to the kept one are marked.
 def test_dedup_chaining_only_marks_members_close_to_representative(tmp_path, monkeypatch):
     source = tmp_path / "chunks.jsonl"
     rows = [_chunk("slide__c"), _chunk("slide__b"), _chunk("slide__a")]
@@ -99,6 +104,7 @@ def test_dedup_chaining_only_marks_members_close_to_representative(tmp_path, mon
     assert distance <= 0.05
 
 
+# Wrong settings raise an error.
 def test_dedup_rejects_invalid_parameters():
     cfg = SimpleNamespace(kb_sig="testkb00", kb={"dedup_eps": 0})
     try:

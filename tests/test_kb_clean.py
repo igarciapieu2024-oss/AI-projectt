@@ -1,9 +1,11 @@
+# Tests of the removal of repeated footers (src/kb/clean.py), with made-up slides.
 from dataclasses import asdict
 
 from src.kb import clean, parse_slides
 from src.schemas import SlideRecord
 
 
+# A made-up slide for the tests.
 def _slide(index, course_code="course_a", text=None, title=None):
     source_id = f"{course_code}_s{index + 1:02d}"
     return SlideRecord(
@@ -22,6 +24,7 @@ def _slide(index, course_code="course_a", text=None, title=None):
     )
 
 
+# A group of slides where some share the same footer line.
 def _slides_with_footer(count, footer, indices, course_code="course_a"):
     return [
         _slide(
@@ -33,6 +36,7 @@ def _slides_with_footer(count, footer, indices, course_code="course_a"):
     ]
 
 
+# A line on exactly 15% of the slides isn't a footer yet.
 def test_footer_at_exactly_fifteen_percent_remains():
     slides = _slides_with_footer(20, "Course footer © 2025", {0, 1, 2})
 
@@ -41,6 +45,7 @@ def test_footer_at_exactly_fifteen_percent_remains():
     assert all("Course footer © 2025" in slide.text for slide in cleaned[:3])
 
 
+# A line on more than 15% of the slides is removed.
 def test_footer_above_fifteen_percent_is_removed():
     slides = _slides_with_footer(20, "Course footer © 2025", {0, 1, 2, 3})
 
@@ -49,6 +54,7 @@ def test_footer_above_fifteen_percent_is_removed():
     assert all("Course footer © 2025" not in slide.text for slide in cleaned[:4])
 
 
+# A footer in the third line from the bottom is still found.
 def test_repeated_footer_in_third_from_bottom_position_is_removed():
     slides = [
         _slide(
@@ -71,6 +77,7 @@ def test_repeated_footer_in_third_from_bottom_position_is_removed():
     assert "Meaningful content for slide 0." in cleaned[0].text
 
 
+# A line repeated inside one slide counts once.
 def test_repeated_occurrences_within_one_slide_count_once():
     slides = [_slide(i) for i in range(20)]
     slides[0].text = "Content one.\nFooter © 2025\nFooter © 2025\nFooter © 2025\nFooter © 2025"
@@ -82,12 +89,14 @@ def test_repeated_occurrences_within_one_slide_count_once():
     assert "Footer © 2025" in cleaned[1].text
 
 
+# Empty lines and page numbers are never footers.
 def test_empty_and_numeric_only_lines_are_not_footer_candidates():
     pages = [["", "2025"], ["   ", "2025"], ["!!!", ""]]
 
     assert clean.find_boilerplate(pages) == set()
 
 
+# Small differences in punctuation, capitals or spaces don't hide a footer.
 def test_punctuation_case_and_whitespace_variants_match():
     variants = {
         0: "ACME, Inc. — All Rights Reserved © 2025",
@@ -106,6 +115,7 @@ def test_punctuation_case_and_whitespace_variants_match():
     assert all(f"Distinct content {i}." in cleaned[i].text for i in variants)
 
 
+# The share is calculated course by course.
 def test_footer_frequency_is_calculated_independently_per_course():
     course_a = _slides_with_footer(10, "Shared footer © 2025", {0, 1}, "course_a")
     course_b = _slides_with_footer(10, "Shared footer © 2025", {0}, "course_b")
@@ -116,6 +126,7 @@ def test_footer_frequency_is_calculated_independently_per_course():
     assert "Shared footer © 2025" in cleaned[10].text
 
 
+# Real content and repeated slide titles are kept.
 def test_meaningful_content_and_repeated_slide_titles_are_preserved():
     slides = [
         _slide(i, text=f"Conclusion\nUnique useful content {i}.", title="Conclusion")
@@ -127,6 +138,7 @@ def test_meaningful_content_and_repeated_slide_titles_are_preserved():
     assert all(slide.text == slides[i].text for i, slide in enumerate(cleaned))
 
 
+# Only the text changes: the ids and the other fields stay the same.
 def test_slide_ids_and_metadata_are_unchanged():
     slides = _slides_with_footer(20, "Footer © 2025", {0, 1, 2, 3})
 
@@ -141,6 +153,7 @@ def test_slide_ids_and_metadata_are_unchanged():
         assert after_data == before_data
 
 
+# The footers are removed after reading all the decks, not deck by deck.
 def test_parser_cleans_after_collecting_slides_from_all_decks(tmp_path, monkeypatch):
     rows = [
         {"doc_type": "slides", "file": f"deck_{i}.pdf", "source_id": f"course_a_s{i + 1:02d}",

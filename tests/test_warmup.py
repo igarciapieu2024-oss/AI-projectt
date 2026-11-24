@@ -1,3 +1,4 @@
+# Tests of the warm-up that loads the models and the indexes when the app starts (src/warmup.py).
 from types import SimpleNamespace
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 import src.warmup as warmup
 
 
+# The warm-up loads the indexes and the models the config uses.
 def test_warm_up_loads_enabled_retrieval_models(monkeypatch):
     from src.config import PATHS, bm25_path, chunks_path
 
@@ -53,6 +55,7 @@ def test_warm_up_loads_enabled_retrieval_models(monkeypatch):
     ]
 
 
+# Without an embedding model in the config, it raises an error.
 def test_warm_up_requires_configured_embedder(monkeypatch):
     cfg = SimpleNamespace(kb={}, retrieval={}, routing={})
 

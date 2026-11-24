@@ -10,6 +10,7 @@ from src.schemas import CONTRACT_FILES, AnswerResult
 from src.utils import ids
 
 
+# Every data file that exists has exactly the fields of its record class.
 @pytest.mark.parametrize("rel_path,record", sorted(CONTRACT_FILES.items()))
 def test_file_matches_contract(rel_path, record):
     path = PATHS["root"] / rel_path
@@ -28,6 +29,7 @@ def test_file_matches_contract(rel_path, record):
                     record.from_dict(data)
 
 
+# The fake answer has the same format as the real one.
 def test_fake_answer_matches_contract():
     result = fake.answer("What is the final exam worth?")
     assert isinstance(result, AnswerResult)
@@ -37,6 +39,7 @@ def test_fake_answer_matches_contract():
     assert "total" in result.timings_ms
 
 
+# The fake engine also covers the refusal and the no-RAG case.
 def test_fake_answer_refuses_and_runs_without_rag():
     from src.config import load_config
 
@@ -46,12 +49,14 @@ def test_fake_answer_refuses_and_runs_without_rag():
     assert not bare.refused and not bare.context_hits
 
 
+# The fake streaming ends with the full result, like the real one.
 def test_fake_stream_ends_with_result():
     pieces = list(fake.answer_stream("hello"))
     assert isinstance(pieces[-1], AnswerResult)
     assert all(isinstance(p, str) for p in pieces[:-1])
 
 
+# The configs load, and configs with the same kb settings share one knowledge base.
 def test_configs_load_and_share_index():
     base = load_config("configs/base.yaml")
     final = load_config("configs/baselines/v1_2_small_model.yaml")
@@ -63,6 +68,7 @@ def test_configs_load_and_share_index():
     assert b0.generation["rag"] is False
 
 
+# The id builders give the expected formats.
 def test_ids():
     src_id = ids.source_id("c01", "slides", [5, 6])
     assert src_id == "c01_s05-06"

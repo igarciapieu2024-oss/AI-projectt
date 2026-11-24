@@ -1,3 +1,4 @@
+# Tests of the course table (src/kb/course_table.py), built from small made-up syllabus sections.
 import csv
 import json
 
@@ -7,6 +8,7 @@ from src.schemas import CourseRow, SyllabusSection
 from src.utils.io import read_csv, write_jsonl
 
 
+# A made-up syllabus section for the tests.
 def _section(
     course_code,
     section_id,
@@ -27,6 +29,7 @@ def _section(
     )
 
 
+# Write a small manifest in a temporary folder.
 def _write_manifest(path, courses):
     fields = ["source_id", "course_code", "course_name", "doc_type", "sessions", "file", "language"]
     with path.open("w", newline="", encoding="utf-8") as file:
@@ -44,6 +47,7 @@ def _write_manifest(path, courses):
             })
 
 
+# The components split across sections and the other facts of the course are read correctly.
 def test_build_course_table_parses_split_components_and_metadata(monkeypatch, tmp_path):
     manifest_path = tmp_path / "manifest.csv"
     sections_path = tmp_path / "syllabus_sections.jsonl"
@@ -117,6 +121,7 @@ def test_build_course_table_parses_split_components_and_metadata(monkeypatch, tm
     assert list(row) == CourseRow.field_names()
 
 
+# A component that is only in the text is added, without counting the final exam twice.
 def test_text_adds_missing_evaluation_component_without_duplicate_final(monkeypatch, tmp_path):
     manifest_path = tmp_path / "manifest.csv"
     sections_path = tmp_path / "syllabus_sections.jsonl"
@@ -161,6 +166,7 @@ def test_text_adds_missing_evaluation_component_without_duplicate_final(monkeypa
     assert row["evidence_section_ids"] == "strategies_syl_sec05"
 
 
+# Components found only in the text are kept, and missing values stay empty.
 def test_text_only_components_and_missing_values_are_not_invented(monkeypatch, tmp_path):
     manifest_path = tmp_path / "manifest.csv"
     sections_path = tmp_path / "syllabus_sections.jsonl"
@@ -203,6 +209,7 @@ def test_text_only_components_and_missing_values_are_not_invented(monkeypatch, t
     assert empty["evidence_section_ids"] == ""
 
 
+# The components of each course add up to 100%.
 def test_components_sum_to_100_for_each_expected_course(monkeypatch, tmp_path):
     manifest_path = tmp_path / "manifest.csv"
     sections_path = tmp_path / "syllabus_sections.jsonl"
@@ -283,6 +290,7 @@ def test_components_sum_to_100_for_each_expected_course(monkeypatch, tmp_path):
         assert sum(item["weight"] for item in actual) == 100
 
 
+# In Strategies, participation appears in the text and in a split table and is counted once.
 def test_strategies_text_and_split_table_participation_are_not_double_counted(monkeypatch, tmp_path):
     manifest_path = tmp_path / "manifest.csv"
     sections_path = tmp_path / "syllabus_sections.jsonl"
@@ -336,6 +344,7 @@ def test_strategies_text_and_split_table_participation_are_not_double_counted(mo
     assert sum(item["weight"] for item in components) == 100
 
 
+# The re-sit policy keeps the first full sentences and drops the title line.
 def test_retake_policy_uses_first_full_sentences_and_skips_title():
     from src.kb.course_table import _retake_policy
 
@@ -359,6 +368,7 @@ def test_retake_policy_uses_first_full_sentences_and_skips_title():
     assert section_id == section.section_id
 
 
+# A percentage inside a rule (not a component) isn't taken as a component.
 def test_non_component_narrative_weight_is_rejected():
     from src.kb.course_table import _text_components
 
