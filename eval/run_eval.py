@@ -1,57 +1,68 @@
 # Run the system on a set of evaluation questions and save every answer with its sources, so the metrics
-# (eval/metrics.py) and the judge (eval/judge.py) can be computed afterwards without asking the LLM again.
+# (eval/metrics.py) and the judge (eval/judge.py) can be calculated afterwards without asking the LLM again.
 #   python -m eval.run_eval --config configs/final_system.yaml --split dev --limit 2
-#   python -m eval.run_eval --config configs/final_tables.yaml --questions eval/questions_holdout3.csv --split test --allow-test
-# Each run gets its own folder eval/runs/<time>_<config>_<split>/ with results.jsonl (one record per question)
-# and summary.json. The test questions need --allow-test, so they are not run by mistake while the system is
-# still being changed. main() is the real evaluation; evaluate() is a smaller version used by the tests.
+#   python -m eval.run_eval --config configs/final_system.yaml --questions eval/questions_holdout3.csv --split test
+# --allow-test
+# Each run gets its own folder eval/runs/<time>_<config>_<split>/ with results.jsonl (one record per question) and
+# summary.json. The test questions need --allow-test, so we don't run them by mistake while the system is still being
+# changed. main() is the real evaluation; evaluate() is a smaller version used by the tests.
 
 from __future__ import annotations
 
+# argparse reads the options, csv reads the questions, json writes the results, math checks the numbers and time
+# measures the run.
 import argparse
 import csv
 import json
 import math
 import time
 
+# asdict turns a result into a dictionary, and datetime gives the date and time of the run for the folder name.
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+# The config reader, the folders of the project and the answer phase itself.
 from src.config import load_config, PATHS
 from src.generation.answer import answer
 
 
-# Turn the result of the answer phase (dataclasses with lists, paths and numbers inside) into plain
-# dictionaries and lists that can be written as JSON. NaN or infinite numbers become null, because JSON
-# cannot store them.
+# Turn the result of the answer phase (dataclasses with lists, paths and numbers inside) into plain dictionaries and
+# lists that can be written as JSON. NaN or infinite numbers become null, because JSON can't store them.
 def make_jsonable(value):
 
+    # A record (dataclass): turned into a dictionary first, and then its values are converted too.
     if hasattr(value, "__dataclass_fields__"):
         return make_jsonable(asdict(value))
 
+    # A dictionary: its keys become text and its values are converted.
     if isinstance(value, dict):
         return {
             str(key): make_jsonable(item)
             for key, item in value.items()
         }
 
+    # A list or a tuple: each item is converted.
     if isinstance(value, (list, tuple)):
         return [make_jsonable(item) for item in value]
 
+    # A path becomes text.
     if isinstance(value, Path):
         return str(value)
 
+    # A number that isn't finite (NaN or infinity) becomes None, which JSON writes as null.
     if isinstance(value, float) and not math.isfinite(value):
         return None
 
+    # Anything else (text, numbers, true/false) is already fine.
     return value
 
 
-# Read the question file and keep only the questions of the requested split (dev or test). utf-8-sig also
-# accepts files saved by Excel.
+# Read the question file and keep only the questions of the requested split (dev or test). utf-8-sig also accepts
+# files saved by Excel.
 def read_questions(path: Path, split: str):
 
+    # Read every row of the file.
     with path.open(
         encoding="utf-8-sig",
         newline=""
@@ -59,12 +70,14 @@ def read_questions(path: Path, split: str):
 
         rows = list(csv.DictReader(file))
 
+    # Keep the rows of the requested split.
     selected = [
         row
         for row in rows
         if row.get("split", "").strip() == split
     ]
 
+    # No question in that split is a mistake in the command.
     if not selected:
         raise ValueError(
             f"No questions assigned to split={split}"
@@ -73,10 +86,11 @@ def read_questions(path: Path, split: str):
     return selected
 
 
-# Add one result at the end of results.jsonl as soon as it is ready, so the answers already given are kept
-# if the run stops halfway.
+# Add one result at the end of results.jsonl as soon as it's ready, so the answers already given are kept if the run
+# stops halfway.
 def save_jsonl(path: Path, record: dict):
 
+    # Mode "a" adds to the end of the file; default=str writes anything JSON doesn't know as text.
     with path.open("a", encoding="utf-8") as file:
 
         file.write(
@@ -86,9 +100,9 @@ def save_jsonl(path: Path, record: dict):
                 default=str
             ) + "\n"
         )
-# A smaller evaluation used by tests/test_run_eval.py. With use_fake it answers with src/generation/fake.py
-# (no models), so the tests are fast and always give the same result. It only accepts the dev split; the
-# real runs, including the test questions, use main() below.
+# A smaller evaluation used by tests/test_run_eval.py. With use_fake it answers with src/generation/fake.py (no
+# models), so the tests are fast and always give the same result. It only accepts the dev split; the real runs,
+# including the test questions, use main() below.
 def evaluate(
     config_path="configs/final_system.yaml",
     split="dev",
@@ -98,12 +112,14 @@ def evaluate(
     judge_fn=None,
 ):
 
+    # This small version only runs the dev questions.
     if split == "test":
         raise ValueError("The test split is locked")
 
     if split != "dev":
         raise ValueError(f"Unsupported split: {split}")
 
+    # The configuration, and the question file (eval/questions.csv by default).
     cfg = load_config(config_path)
 
     if questions_path is None:
@@ -122,10 +138,12 @@ def evaluate(
             "src.generation.answer"
         ).answer
 
+    # The judge is only loaded when it is asked for.
     if use_judge and judge_fn is None:
         from eval.judge import judge_answer
         judge_fn = judge_answer
 
+    # The folder of the run, named with the time, the config and the split.
     timestamp = datetime.now(timezone.utc).strftime(
         "%Y%m%dT%H%M%S%fZ"
     )
@@ -139,17 +157,20 @@ def evaluate(
 
     run_dir.mkdir(parents=True, exist_ok=False)
 
+    # This small version saves all the results together, in one JSON file.
     output_path = run_dir / "results.json"
 
     results = []
 
+    # Go through the questions.
     for row in selected:
         question = row["question"]
 
+        # No conversation unless the question is a follow-up.
         history = None
         first_turn = (row.get("turn1") or "").strip()
 
-        # A follow-up question: the first question is answered first, and both are passed as the conversation.
+        # A follow-up question: we answer the first question first, and pass both as the conversation.
         if first_turn:
             first_result = answer_fn(first_turn, cfg=cfg)
 
@@ -164,12 +185,14 @@ def evaluate(
                 },
             ]
 
+        # The answer to the question itself.
         result = answer_fn(
             question,
             history=history,
             cfg=cfg,
         )
 
+        # The gold ids of the question.
         gold = {
             item.strip()
             for item in row.get("gold_ids", "").split(";")
@@ -187,6 +210,7 @@ def evaluate(
         for source in retrieved[:5]:
             found.update(source)
 
+        # Whether the question can be answered, and whether the search found a gold source.
         answerable = row["answerable"] == "1"
 
         retrieval_hit = bool(gold & found)
@@ -197,6 +221,7 @@ def evaluate(
             else None
         )
 
+        # The record of this question.
         record = {
             "question_id": row["question_id"],
             "question": question,
@@ -211,7 +236,7 @@ def evaluate(
             "latency_ms": result.timings_ms.get("total", 0),
         }
 
-        # Optionally grade the answer with the judge, giving it the sources the system used.
+        # Optionally we grade the answer with the judge, giving it the sources the system used.
         if use_judge:
             sources = [
                 {
@@ -231,6 +256,7 @@ def evaluate(
 
         results.append(record)
 
+    # Write all the records.
     output_path.write_text(
         json.dumps(results, indent=2, ensure_ascii=False),
         encoding="utf-8",
@@ -249,9 +275,11 @@ def evaluate(
         if "judge" in row
     ]
 
+    # The mean of a list, or None when the list is empty.
     def mean_or_none(values):
         return sum(values) / len(values) if values else None
 
+    # The hallucination rates the judge gave, when there are any.
     hallucination_scores = [
         row["hallucination_rate"]
         for row in judged
@@ -279,11 +307,13 @@ def evaluate(
         ),
     }
 
+    # Save the summary in the folder of the run.
     (run_dir / "summary.json").write_text(
         json.dumps(summary, indent=2),
         encoding="utf-8",
     )
 
+    # The report file in reports/, with one row per run.
     reports_dir = PATHS["root"] / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
 
@@ -293,7 +323,7 @@ def evaluate(
 
     previous_rows = []
 
-    # The rows already in the report are kept and the new run is added at the end.
+    # The rows already in the report are kept, and the new run is added at the end.
     if report_path.exists():
         with report_path.open(
             encoding="utf-8",
@@ -301,6 +331,7 @@ def evaluate(
         ) as f:
             previous_rows = list(csv.DictReader(f))
 
+    # Write the report again: the header, the old rows and the new one.
     with report_path.open(
         "w",
         encoding="utf-8",
@@ -321,13 +352,15 @@ def evaluate(
 
         writer.writerow(summary)
 
+    # The path of the results file.
     return output_path
 
-# The real evaluation: run one config on one question split and save each answer as soon as it is ready.
-# A follow-up question is run in two turns: first its first question, then the follow-up with the first
-# answer as the conversation, as in the app.
+# The real evaluation: run one config on one set of questions and save each answer as soon as it's ready. A follow-up
+# question is run in two turns: first its first question, and then the follow-up with the first answer as the
+# conversation, as in the app.
 def main():
 
+    # The options of the command.
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -367,7 +400,7 @@ def main():
 
     args = parser.parse_args()
 
-    # Protect the test set: the test questions are run only on purpose, once the system is fixed.
+    # Protect the test set: the test questions are only run on purpose, once the system is fixed.
 
     if args.split == "test" and not args.allow_test:
 
@@ -376,6 +409,7 @@ def main():
             "Use --allow-test for the final evaluation."
         )
 
+    # --limit has to be at least 1.
     if args.limit is not None and args.limit < 1:
 
         parser.error(
@@ -393,10 +427,11 @@ def main():
         args.split
     )
 
+    # With --limit, only the first questions.
     if args.limit is not None:
         selected = selected[:args.limit]
 
-    # Create the run folder: the time, the config and the split, so no run overwrites another one.
+    # Create the folder of the run: the time, the config and the split, so no run overwrites another one.
 
     timestamp = datetime.now(
         timezone.utc
@@ -413,8 +448,10 @@ def main():
         exist_ok=False
     )
 
+    # The file where each answer is saved.
     results_path = folder / "results.jsonl"
 
+    # The start time, and the counters of the run.
     started = time.perf_counter()
 
     successes = 0
@@ -422,6 +459,7 @@ def main():
 
     latencies = []
 
+    # Print what is about to run.
     print(
         f"Run: {run_id}"
     )
@@ -442,6 +480,7 @@ def main():
 
     for number, row in enumerate(selected, start=1):
 
+        # The id and the text of the question; print it so we can follow the run.
         qid = row["question_id"]
 
         question = row["question"]
@@ -454,6 +493,7 @@ def main():
 
         try:
 
+            # No conversation unless the question is a follow-up.
             history = None
 
             first_turn = (
@@ -462,7 +502,7 @@ def main():
 
             first_turn_result = None
 
-            # Follow-up questions: answer the first question and keep it as the conversation history.
+            # Follow-up questions: we answer the first question and keep it as the conversation.
 
             if first_turn:
 
@@ -494,8 +534,8 @@ def main():
                 cfg=cfg
             )
 
-            # Everything the metrics and the judge need: the question with its gold ids and reference answer,
-            # and the full result of the system (answer, citations, the chunks it used, timings).
+            # Everything the metrics and the judge need: the question with its gold ids and its reference answer, and
+            # the full result of the system (the answer, the citations, the chunks it used and the times).
 
             payload = {
                 "question_id": qid,
@@ -522,6 +562,7 @@ def main():
                 "result": make_jsonable(result)
             }
 
+            # The time this answer took.
             latency = float(
                 result.timings_ms.get("total", 0)
             )
@@ -530,7 +571,7 @@ def main():
 
             successes += 1
 
-        # A question that fails is saved with its error and the run goes on with the next one.
+        # A question that fails is saved with its error, and the run goes on with the next one.
         except Exception as exc:
 
             failures += 1
@@ -549,15 +590,16 @@ def main():
                 flush=True
             )
 
-        # Write each result immediately
+        # Write each result straight away.
 
         save_jsonl(
             results_path,
             payload
         )
 
-    # Summary of the run. metrics_status "pending" means eval/metrics.py has not been run on it yet.
+    # The summary of the run. metrics_status "pending" means eval/metrics.py hasn't been run on it yet.
 
+    # The average time per answer (None if no question worked).
     if latencies:
 
         mean_latency = round(
@@ -569,6 +611,7 @@ def main():
 
         mean_latency = None
 
+    # The summary of the run.
     summary = {
         "run_id": run_id,
         "config": cfg.name,
@@ -587,6 +630,7 @@ def main():
         "metrics_status": "pending"
     }
 
+    # Save it as summary.json and print it.
     summary_path = folder / "summary.json"
 
     summary_path.write_text(
@@ -609,7 +653,7 @@ def main():
 
     print("========================================")
 
-    # Exit with an error code if any question failed, so it is not missed.
+    # Leave with an error code if any question failed, so it isn't missed.
     if failures:
         raise SystemExit(1)
 
