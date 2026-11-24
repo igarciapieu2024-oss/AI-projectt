@@ -4,6 +4,7 @@
 # Ollama runs on the laptop (http://127.0.0.1:11434), so no question or source leaves the computer.
 from __future__ import annotations
 
+# The types we use in the signatures: a stream of pieces (Iterator), a dictionary-like object (Mapping) and Any.
 from collections.abc import Iterator, Mapping
 from typing import Any
 
@@ -13,6 +14,7 @@ from typing import Any
 # complete sentence.
 class ChatText(str):
 
+    # A string can't be changed after it is created, so we attach done_reason while creating it (__new__).
     def __new__(cls, content: str, done_reason: str | None):
         response = super().__new__(cls, content)
         response.done_reason = done_reason
@@ -23,20 +25,25 @@ class ChatText(str):
 # the done_reason of the last piece.
 class ChatStream(Iterator[str]):
 
+    # We keep the stream that Ollama gives us; done_reason isn't known until the last piece arrives.
     def __init__(self, response):
         self._response = iter(response)
         self.done_reason: str | None = None
 
+    # The object is its own iterator, so the app can simply write `for piece in stream`.
     def __iter__(self) -> ChatStream:
         return self
 
     # Return the next piece of text; pieces without text (such as the final status message) are skipped.
     def __next__(self) -> str:
         while True:
+            # Take the next message from Ollama; when there are no more, next() ends the loop for us.
             chunk = next(self._response)
+            # Only the last message carries done_reason, so we keep it when it appears.
             done_reason = _done_reason(chunk)
             if done_reason is not None:
                 self.done_reason = done_reason
+            # The text of this message; an empty one is skipped and we wait for the next.
             piece = _message_content(chunk)
             if piece:
                 return piece
@@ -45,13 +52,16 @@ class ChatStream(Iterator[str]):
 # Get the text of a reply. Newer versions of the ollama library return an object and older ones a
 # dictionary, so both are read.
 def _message_content(response: Any) -> str:
+    # A dictionary (older versions of the library): the text is in response["message"]["content"].
     if isinstance(response, Mapping):
         message = response.get("message")
         content = message.get("content") if isinstance(message, Mapping) else None
+    # An object (newer versions): the text is in response.message.content.
     else:
         message = getattr(response, "message", None)
         content = getattr(message, "content", None)
 
+    # A reply without text means something went wrong in Ollama.
     if not isinstance(content, str):
         raise ValueError("Ollama returned a response without message content")
     return content
@@ -76,9 +86,11 @@ def chat(
     json: bool = False,
     num_predict: int | None = None,
 ) -> ChatText | Iterator[str]:
+    # Without any message there is nothing to send.
     if not messages:
         raise ValueError("messages must contain at least one chat message")
 
+    # The model that writes the reply (llama3.1:8b in final_system.yaml).
     try:
         model = cfg.generation["llm_model"]
     except (AttributeError, KeyError) as error:
@@ -100,6 +112,7 @@ def chat(
     configured_limit = cfg.generation.get("num_predict")
     token_limit = num_predict if num_predict is not None else configured_limit
     if token_limit is not None:
+        # The limit has to be a whole number of at least 1; the error says which setting was wrong.
         if isinstance(token_limit, bool) or not isinstance(token_limit, int) or token_limit < 1:
             setting = "num_predict" if num_predict is not None else "generation.num_predict"
             raise ValueError(
@@ -107,13 +120,16 @@ def chat(
             )
         options["num_predict"] = token_limit
 
+    # The request for Ollama: the model, the messages and whether we want the reply in pieces.
     request: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "stream": stream,
     }
+    # The options are only sent when there is at least one.
     if options:
         request["options"] = options
+    # format "json" makes Ollama return valid JSON, which the judge needs to read the grade.
     if json:
         request["format"] = "json"
 
@@ -123,6 +139,7 @@ def chat(
     # The local Ollama server; follow_redirects=False so the request can never be sent anywhere else.
     client = ollama.Client(host="http://127.0.0.1:11434", follow_redirects=False)
     response = client.chat(**request)
+    # Without streaming we return the whole text with its done_reason; with streaming, the pieces one by one.
     if not stream:
         return ChatText(_message_content(response), _done_reason(response))
     return ChatStream(response)

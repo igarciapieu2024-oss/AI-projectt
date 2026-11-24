@@ -8,9 +8,11 @@
 # when the config has generation.rag = false (baselines/b0_llm_only.yaml).
 from __future__ import annotations
 
+# time is used to measure the fake answer and to pause between words in the streaming version.
 import time
 from typing import Iterator
 
+# The same formats as the real engine, so the app can't tell the difference.
 from src.schemas import REFUSAL, AnswerResult, Chunk, Citation, Filters, Hit, RouteDecision
 
 # Words that make the fake answer refuse, so the app can show what a refusal looks like.
@@ -48,10 +50,13 @@ _SOURCES = [
 
 # Return a made-up AnswerResult for the question, with the same fields and timings the real one has.
 def answer(question: str, history: list[dict] | None = None, filters: Filters | None = None, cfg=None) -> AnswerResult:
+    # Start the clock, as the real answer() does.
     start = time.perf_counter()
     # baselines/b0_llm_only.yaml sets rag to false.
     rag = True if cfg is None else bool(cfg.generation.get("rag", True))
+    # The question is out of scope when it contains one of the words above.
     out_of_scope = any(w in question.lower() for w in _OUT_OF_SCOPE_WORDS)
+    # With a conversation, we pretend the question was rewritten.
     rewritten = question if not history else f"{question} (rewritten with the previous question)"
 
     # The LLM alone: no search, no sources, and a confident answer that is not checked against the material.
@@ -78,6 +83,7 @@ def answer(question: str, history: list[dict] | None = None, filters: Filters | 
     total = (time.perf_counter() - start) * 1000
     timings = {"rewrite": 0.0 if not history else 310.0, "route": 4.0, "retrieve": 120.0 if rag else 0.0,
                "rerank": 380.0 if rag else 0.0, "generate": 5200.0, "total": round(total + 6014.0, 1)}
+    # The same result format as the real engine. Here every source counts as cited.
     return AnswerResult(
         question=question,
         rewritten_question=rewritten,
@@ -96,9 +102,11 @@ def answer(question: str, history: list[dict] | None = None, filters: Filters | 
 # The streaming version for the app: the answer word by word, then the complete result as the last item,
 # exactly like answer_stream() in answer.py.
 def answer_stream(question: str, history: list[dict] | None = None, filters: Filters | None = None, cfg=None) -> Iterator[str | AnswerResult]:
+    # Build the whole fake answer first, then send it word by word.
     result = answer(question, history, filters, cfg)
     for word in result.answer_text.split(" "):
         # A small pause between words, so the app shows the text appearing as with the real LLM.
         time.sleep(0.02)
         yield word + " "
+    # The last item is the full result, which the app uses to show the sources.
     yield result
