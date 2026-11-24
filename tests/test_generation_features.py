@@ -1,3 +1,4 @@
+# Tests of the steps around the answer: course filters, follow-up rewriting, translation and the self-check.
 import math
 from types import SimpleNamespace
 
@@ -10,6 +11,7 @@ from src.retrieval.filters import extract_filters
 from src.schemas import Chunk, Filters, Hit, RouteDecision
 
 
+# A small fake chunk for the tests.
 def _chunk():
     return Chunk(
         chunk_id="chunk_a",
@@ -27,6 +29,7 @@ def _chunk():
     )
 
 
+# Courses are found by name or code, and sessions by number.
 def test_extract_filters_matches_course_names_codes_and_sessions():
     courses = [
         {"course_code": "mc", "course_name": "Management Control"},
@@ -42,6 +45,7 @@ def test_extract_filters_matches_course_names_codes_and_sessions():
     assert extract_filters("Question about mc, session 4", courses).course_code == "mc"
 
 
+# With two courses named, no course is chosen.
 def test_extract_filters_does_not_guess_between_multiple_courses():
     courses = [
         {"course_code": "c01", "course_name": "Course One"},
@@ -51,6 +55,7 @@ def test_extract_filters_does_not_guess_between_multiple_courses():
     assert extract_filters("Compare Course One and Course Two", courses).course_code is None
 
 
+# A follow-up is rewritten with the conversation, and only the question comes back.
 def test_rewrite_uses_history_and_returns_only_standalone_question(monkeypatch):
     calls = []
 
@@ -72,6 +77,7 @@ def test_rewrite_uses_history_and_returns_only_standalone_question(monkeypatch):
     assert calls[0][1:] == history + [{"role": "user", "content": "And what is the minimum grade?"}]
 
 
+# A follow-up in another language is rewritten and translated in one call.
 def test_rewrite_can_resolve_and_translate_a_follow_up(monkeypatch):
     calls = []
 
@@ -98,6 +104,7 @@ def test_rewrite_can_resolve_and_translate_a_follow_up(monkeypatch):
     assert calls[0][-1]["content"] == "¿Y en Management Control?"
 
 
+# Without a conversation the model isn't called, and an empty rewrite is an error.
 def test_rewrite_skips_model_without_history_and_rejects_empty_response(monkeypatch):
     monkeypatch.setattr(
         rewrite_module,
@@ -113,10 +120,12 @@ def test_rewrite_skips_model_without_history_and_rejects_empty_response(monkeypa
         rewrite_module.rewrite("Question", [{"role": "user", "content": "Earlier"}], object())
 
 
+# A Spanish question is detected as Spanish.
 def test_language_detection_recognizes_spanish():
     assert rewrite_module.detect_language("¿Quién da la asignatura de Strategies?") == "es"
 
 
+# English questions aren't translated; Spanish ones are.
 def test_translation_helper_skips_english_and_translates_spanish(monkeypatch):
     calls = []
 
@@ -135,6 +144,7 @@ def test_translation_helper_skips_english_and_translates_spanish(monkeypatch):
     assert calls == ["¿Quién da la asignatura de Strategies?"]
 
 
+# The search uses the translated question, but the model answers the original one.
 def test_answer_translates_search_query_but_keeps_original_question_for_generation(monkeypatch):
     original_question = "¿Cuánto vale el examen final de Management Control?"
     search_question = "What is the final exam worth in Management Control?"
@@ -183,6 +193,7 @@ def test_answer_translates_search_query_but_keeps_original_question_for_generati
     assert result.answer_text == "El examen final vale el 40%. [S1]"
 
 
+# The self-check looks at the best reranker score, and needs the scores to exist.
 def test_selfcheck_uses_best_reranker_score_and_requires_scores():
     cfg = SimpleNamespace(generation={"selfcheck_threshold": 0.2})
     assert selfcheck_module.is_weak([], cfg)
@@ -192,6 +203,7 @@ def test_selfcheck_uses_best_reranker_score_and_requires_scores():
         selfcheck_module.is_weak([Hit(chunk=_chunk(), rank=1)], cfg)
 
 
+# The threshold is compared with the 0-to-1 confidence, not with the raw score.
 def test_selfcheck_threshold_uses_probability_scale_for_negative_raw_logits():
     cfg = SimpleNamespace(generation={"selfcheck_threshold": 0.2})
     raw_logit = -0.5
@@ -203,6 +215,7 @@ def test_selfcheck_threshold_uses_probability_scale_for_negative_raw_logits():
     )
 
 
+# The prompt keeps the question in its original language.
 def test_rag_answer_prompt_preserves_the_question_language():
     from src.generation.prompts import build_messages
 
@@ -215,6 +228,7 @@ def test_rag_answer_prompt_preserves_the_question_language():
     assert "1 to 3 sentences" in messages[0]["content"]
 
 
+# The question is rewritten before searching, and weak sources lead to a refusal.
 def test_answer_rewrites_before_retrieval_and_refuses_weak_evidence(monkeypatch):
     calls = []
     hit = Hit(chunk=_chunk(), rank=1, score_rerank=0.1)
@@ -266,6 +280,7 @@ def test_answer_rewrites_before_retrieval_and_refuses_weak_evidence(monkeypatch)
     assert result.context_hits[0].label == "S1"
 
 
+# A question that isn't a follow-up stays as it is, even with a conversation.
 def test_rewrite_keeps_a_standalone_question_even_with_history(monkeypatch):
     from src.generation import rewrite as rewrite_module
 
@@ -282,6 +297,7 @@ def test_rewrite_keeps_a_standalone_question_even_with_history(monkeypatch):
     assert rewrite_module.looks_like_follow_up("¿Y la asistencia mínima?")
 
 
+# With rewrite_guard, a rewrite that is an answer is replaced by the previous question plus the new one.
 def test_rewrite_guard_replaces_an_answer_with_the_previous_question(monkeypatch):
     # 1. the model answered the follow-up (and invented the price); with the guard the two questions are joined
     monkeypatch.setattr(
@@ -300,6 +316,7 @@ def test_rewrite_guard_replaces_an_answer_with_the_previous_question(monkeypatch
     )
 
 
+# A real question passes the guard, and the guard is off by default.
 def test_rewrite_guard_keeps_a_real_question_and_is_off_by_default(monkeypatch):
     # 2. a proper rewrite passes the guard; without the option an answer-like rewrite is kept as before
     history = [{"role": "user", "content": "Who teaches Strategy?"}]
@@ -310,6 +327,7 @@ def test_rewrite_guard_keeps_a_real_question_and_is_off_by_default(monkeypatch):
     assert rewrite_module.rewrite("And this term?", history, SimpleNamespace(generation={})) == "The professor is X [S1]."
 
 
+# What counts as a question: one line, ending in "?", with no source labels.
 def test_looks_like_question():
     # 3. one line, a question mark at the end and no source labels
     assert rewrite_module.looks_like_question("What is the passing grade in OB?")

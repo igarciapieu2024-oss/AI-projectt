@@ -1,18 +1,22 @@
+# Tests of the cleaning of the image descriptions in the chunking step (src/kb/chunking.py).
 from src.kb import chunking
 
 
+# "The image shows" is removed from the start of a description.
 def test_image_shows_filler_is_removed():
     assert chunking._strip_description_filler(
         "The image shows a line chart of sales."
     ) == "a line chart of sales."
 
 
+# "The chart shows" is removed too.
 def test_chart_shows_filler_is_removed():
     assert chunking._strip_description_filler(
         "The chart shows revenue over time."
     ) == "revenue over time."
 
 
+# It works with other capitals, spaces in front and punctuation after it.
 def test_filler_removal_handles_capitalization_leading_space_and_punctuation():
     assert chunking._strip_description_filler(
         "  tHe ChArT ShOwS: — Quarterly revenue."
@@ -22,6 +26,7 @@ def test_filler_removal_handles_capitalization_leading_space_and_punctuation():
     ) == "A scatter plot."
 
 
+# The other common openings are removed as well.
 def test_frequent_generic_opening_variants_are_removed():
     assert chunking._strip_description_filler(
         "The image is a schematic of the process."
@@ -34,30 +39,35 @@ def test_frequent_generic_opening_variants_are_removed():
     ) == "inflation by year."
 
 
+# "The chart is" with other capitals and punctuation.
 def test_chart_is_filler_handles_capitalization_and_punctuation():
     assert chunking._strip_description_filler(
         "  tHe ChArT iS: — Showing annual sales."
     ) == "Showing annual sales."
 
 
+# "The image illustrates" with other capitals and punctuation.
 def test_image_illustrates_filler_handles_capitalization_and_punctuation():
     assert chunking._strip_description_filler(
         "THE IMAGE ILLUSTRATES... A data flow."
     ) == "A data flow."
 
 
+# A description without a generic opening doesn't change.
 def test_description_without_filler_is_unchanged():
     description = "  A scatter plot compares two variables.  "
 
     assert chunking._strip_description_filler(description) == description
 
 
+# The same words in the middle of a description are kept.
 def test_filler_phrase_in_middle_is_unchanged():
     description = "Overview: The image shows a chart, then a table follows."
 
     assert chunking._strip_description_filler(description) == description
 
 
+# The OCR text isn't touched when the description is cleaned.
 def test_ocr_is_unchanged_when_description_filler_is_removed(tmp_path, monkeypatch):
     image_texts_path = tmp_path / "image_texts.jsonl"
     image_texts_path.write_text("", encoding="utf-8")

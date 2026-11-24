@@ -1,19 +1,23 @@
+# Tests of the question router (src/retrieval/router.py), with a fake classifier and a fake LLM.
 from types import ModuleType, SimpleNamespace
 
 import src.retrieval.router as router_module
 from src.schemas import RouteDecision
 
 
+# A test configuration with the routing settings.
 def _cfg(**routing):
     return SimpleNamespace(routing=routing, generation={"llm_model": "test"})
 
 
+# With the router off, the question gets no label.
 def test_none_mode_returns_none_decision():
     decision = router_module.route("Question", _cfg(router="none"))
 
     assert decision == RouteDecision(label="none", prob=0.0, source="none")
 
 
+# In classifier mode, the label comes from the saved model.
 def test_classifier_mode_uses_cached_model_prediction(monkeypatch, tmp_path):
     model_path = tmp_path / "router.joblib"
     model_path.touch()
@@ -31,6 +35,7 @@ def test_classifier_mode_uses_cached_model_prediction(monkeypatch, tmp_path):
     assert decision == RouteDecision(label="course_admin", prob=0.9, source="classifier")
 
 
+# When the classifier isn't sure, the LLM decides.
 def test_classifier_low_probability_falls_back_to_llm(monkeypatch, tmp_path):
     model_path = tmp_path / "router.joblib"
     model_path.touch()
@@ -51,6 +56,7 @@ def test_classifier_low_probability_falls_back_to_llm(monkeypatch, tmp_path):
     assert decision == RouteDecision(label="cross_course", prob=1.0, source="llm")
 
 
+# Without the model file, the question gets no label instead of an error.
 def test_missing_classifier_model_returns_none(monkeypatch, tmp_path):
     monkeypatch.setitem(router_module.PATHS, "router_model", tmp_path / "missing.joblib")
 
@@ -60,6 +66,7 @@ def test_missing_classifier_model_returns_none(monkeypatch, tmp_path):
     assert decision.source == "none"
 
 
+# The warm-up only logs a missing model.
 def test_router_warm_up_keeps_missing_model_as_logged_fallback(monkeypatch, tmp_path, caplog):
     monkeypatch.setitem(router_module.PATHS, "router_model", tmp_path / "missing.joblib")
 
@@ -68,6 +75,7 @@ def test_router_warm_up_keeps_missing_model_as_logged_fallback(monkeypatch, tmp_
     assert "Router model is missing" in caplog.text
 
 
+# The warm-up logs a loading error and carries on.
 def test_router_warm_up_logs_load_errors_and_continues(monkeypatch, tmp_path, caplog):
     model_path = tmp_path / "router.joblib"
     model_path.touch()

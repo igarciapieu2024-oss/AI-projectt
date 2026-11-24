@@ -1,3 +1,5 @@
+# Tests of the answer phase (src/generation/answer.py). The searches and the LLM are replaced by fakes, so the tests
+# run without models or indexes.
 import re
 from types import SimpleNamespace
 
@@ -8,6 +10,7 @@ from src.generation.llm import ChatText
 from src.schemas import AnswerResult, Chunk, Filters, Hit, RouteDecision
 
 
+# A small fake chunk for the tests.
 def _chunk(
     chunk_id: str,
     text: str,
@@ -31,6 +34,7 @@ def _chunk(
     )
 
 
+# A small test configuration: hybrid search, no reranker and prompt v2.
 def _config(top_k: int = 5):
     return SimpleNamespace(
         name="test",
@@ -47,6 +51,7 @@ def _config(top_k: int = 5):
     )
 
 
+# Fake search results, so no index is needed.
 def _mock_hits(chunks, question, cfg, filters=None):
     query_tokens = set(re.findall(r"\w+%?", question.casefold()))
     candidates = []
@@ -66,6 +71,7 @@ def _mock_hits(chunks, question, cfg, filters=None):
     ]
 
 
+# Every test of this file uses a fake LLM that returns a fixed answer.
 @pytest.fixture(autouse=True)
 def _mock_chat(monkeypatch):
     calls = []
@@ -80,6 +86,7 @@ def _mock_chat(monkeypatch):
     return calls
 
 
+# The answer gets only top_k sources and cites the ones it used.
 def test_answer_respects_top_k_and_cites_used_evidence(monkeypatch):
     chunks = [
         _chunk("chunk_a", "Exam weight is 40 percent."),
@@ -102,6 +109,7 @@ def test_answer_respects_top_k_and_cites_used_evidence(monkeypatch):
     assert result.timings_ms["total"] >= result.timings_ms["retrieve"]
 
 
+# Only the sources the model cited appear as citations.
 def test_citations_only_include_sources_used_by_the_model(monkeypatch):
     chunks = [
         _chunk("chunk_a", "Exam weight is 40 percent."),
@@ -121,6 +129,7 @@ def test_citations_only_include_sources_used_by_the_model(monkeypatch):
     assert len(result.context_hits) == 2
 
 
+# The course and session filters reach the search.
 def test_answer_applies_course_and_session_filters(monkeypatch):
     chunks = [
         _chunk("wrong_course", "Capstone project.", course_code="c02", sessions=[2]),
@@ -138,6 +147,7 @@ def test_answer_applies_course_and_session_filters(monkeypatch):
     assert [hit.chunk.chunk_id for hit in result.context_hits] == ["matching"]
 
 
+# When the search finds nothing, the answer is the refusal message.
 def test_no_matching_chunks_is_a_refusal(monkeypatch):
     chunks = [
         _chunk("unrelated", "Attendance is required.")
@@ -152,6 +162,7 @@ def test_no_matching_chunks_is_a_refusal(monkeypatch):
     assert result.answer_text == "This isn't covered in the course material I have."
 
 
+# An empty question or a wrong top_k raises an error.
 def test_invalid_question_and_top_k_are_rejected(monkeypatch):
     with pytest.raises(ValueError, match="must not be empty"):
         answer_module.answer("  ", cfg=_config())
@@ -159,6 +170,7 @@ def test_invalid_question_and_top_k_are_rejected(monkeypatch):
         answer_module.answer("Question", cfg=_config(top_k=0))
 
 
+# With rag off, the model is called without searching.
 def test_no_rag_config_calls_model_without_retrieval(monkeypatch, _mock_chat):
     cfg = _config()
     cfg.generation = {"rag": False}
@@ -188,6 +200,7 @@ def test_no_rag_config_calls_model_without_retrieval(monkeypatch, _mock_chat):
     assert "No course materials were provided" in messages_seen[0][0]["content"]
 
 
+# The sources go into the prompt, and an answer that cites a label that doesn't exist is refused.
 def test_rag_answer_uses_prompt_context_and_refuses_unknown_citations(monkeypatch):
     chunks = [
         _chunk("chunk_a", "Exam weight is 40 percent.")
@@ -214,6 +227,7 @@ def test_rag_answer_uses_prompt_context_and_refuses_unknown_citations(monkeypatc
     assert result.citations == []
 
 
+# An answer without any valid citation is refused.
 def test_rag_answer_without_a_valid_citation_is_refused(monkeypatch):
     chunks = [
         _chunk("chunk_a", "Exam weight is 40 percent.")
@@ -228,6 +242,7 @@ def test_rag_answer_without_a_valid_citation_is_refused(monkeypatch):
     assert result.citations == []
 
 
+# An answer cut by the token limit keeps only its complete cited sentences.
 def test_length_truncated_answer_keeps_only_last_complete_cited_sentence(monkeypatch):
     hit = _chunk("chunk_a", "Exam weight is 40 percent.")
     monkeypatch.setattr(
@@ -250,6 +265,7 @@ def test_length_truncated_answer_keeps_only_last_complete_cited_sentence(monkeyp
     assert [citation.label for citation in result.citations] == ["S1"]
 
 
+# The same when the citation comes before the full stop.
 def test_length_truncated_citation_before_period_keeps_completed_sentences(monkeypatch):
     hits = [
         Hit(chunk=_chunk("chunk_a", "Final exam is worth 40%."), rank=1),
@@ -279,6 +295,7 @@ def test_length_truncated_citation_before_period_keeps_completed_sentences(monke
     assert [citation.label for citation in result.citations] == ["S1", "S2"]
 
 
+# A cut answer with no complete cited sentence is refused.
 def test_length_truncated_answer_without_complete_citation_is_refused(monkeypatch):
     hit = _chunk("chunk_a", "Exam weight is 40 percent.")
     monkeypatch.setattr(
@@ -298,6 +315,7 @@ def test_length_truncated_answer_without_complete_citation_is_refused(monkeypatc
     assert result.answer_text == "This isn't covered in the course material I have."
 
 
+# Without RAG, a cut answer keeps its complete sentences.
 def test_length_truncated_no_rag_answer_keeps_last_complete_sentence(monkeypatch):
     cfg = _config()
     cfg.generation = {"rag": False}
@@ -315,6 +333,7 @@ def test_length_truncated_no_rag_answer_keeps_last_complete_sentence(monkeypatch
     assert result.answer_text == "A general answer is complete."
 
 
+# The streaming version gives the same text and ends with the full result.
 def test_stream_preserves_answer_text_and_finishes_with_result(monkeypatch):
     chunks = [
         _chunk("chunk_a", "Exam weight is 40 percent.")
@@ -327,6 +346,7 @@ def test_stream_preserves_answer_text_and_finishes_with_result(monkeypatch):
     assert "".join(pieces[:-1]) == pieces[-1].answer_text
 
 
+# The streaming version never shows a sentence cut by the token limit.
 def test_answer_stream_never_yields_incomplete_length_truncated_sentence(monkeypatch):
     hit = _chunk("chunk_a", "Exam weight is 40 percent.")
     monkeypatch.setattr(
@@ -359,6 +379,7 @@ def test_answer_stream_never_yields_incomplete_length_truncated_sentence(monkeyp
     assert pieces[-1].answer_text == "The exam is worth 40%. [S1]"
 
 
+# A sentence with its citation before the full stop is sent as soon as it's complete.
 def test_answer_stream_emits_citation_before_period_sentences_promptly(monkeypatch):
     hits = [
         Hit(chunk=_chunk("chunk_a", "Final exam is worth 40%."), rank=1),
@@ -412,6 +433,7 @@ def test_answer_stream_emits_citation_before_period_sentences_promptly(monkeypat
     )
 
 
+# An out-of-scope question is refused without searching.
 def test_out_of_scope_route_skips_retrieval(monkeypatch):
     monkeypatch.setattr(
         answer_module,
@@ -432,6 +454,7 @@ def test_out_of_scope_route_skips_retrieval(monkeypatch):
     assert result.context_hits == []
 
 
+# A cross-course question takes its sources from the course table.
 def test_cross_course_route_uses_course_table(monkeypatch):
     hit = Hit(chunk=_chunk("course_row", "Management Control (c01)"), rank=1, label="S1")
     monkeypatch.setattr(
@@ -460,6 +483,7 @@ def test_cross_course_route_uses_course_table(monkeypatch):
 
 
 
+# A ranking question is answered with the ranking line, without calling the model.
 def test_comparison_question_is_answered_with_the_ranking_line_without_the_model(monkeypatch):
     # 1. The 3B model merged the first two groups of the ranking, so the line is returned as it is
     ranking_text = "Highest final exam weight: Strategies (45%). Then: Management Control (40%)."
@@ -482,6 +506,7 @@ def test_comparison_question_is_answered_with_the_ranking_line_without_the_model
     assert pieces[0] == ranking_text + " [S1]"
     assert isinstance(pieces[-1], AnswerResult)
 
+# Without a course table, a cross-course question is searched normally.
 def test_cross_course_route_falls_back_when_course_table_is_empty(monkeypatch):
     hit = Hit(chunk=_chunk("retrieved", "Exam weight is 40 percent."), rank=1)
     monkeypatch.setattr(
@@ -497,6 +522,7 @@ def test_cross_course_route_falls_back_when_course_table_is_empty(monkeypatch):
     assert result.context_hits[0].chunk.chunk_id == "retrieved"
 
 
+# The Management Control exam example: the evidence found reaches the model.
 def test_management_control_exam_evidence_is_passed_to_the_model(monkeypatch):
     from src.config import chunks_path, load_config
     chromadb = pytest.importorskip("chromadb")
@@ -531,6 +557,7 @@ def test_management_control_exam_evidence_is_passed_to_the_model(monkeypatch):
     assert any("40%" in hit.chunk.text for hit in result.context_hits)
 
 
+# Cross-course questions the table can't answer also get search results.
 def test_cross_course_questions_the_table_cannot_answer_also_get_search_results(monkeypatch):
     # 1. the table rows come first, then the best search result of each named course
     rows = [
@@ -566,12 +593,14 @@ def test_cross_course_questions_the_table_cannot_answer_also_get_search_results(
     assert [citation.label for citation in result.citations] == ["S3", "S4"]
 
 
+# A configuration with course_split switched on.
 def _split_config(**generation):
     cfg = _config()
     cfg.generation = {**cfg.generation, **generation}
     return cfg
 
 
+# With course_split, each named course is answered with its own sources.
 def test_course_split_answers_each_named_course_with_its_own_sources(monkeypatch):
     # 1. two courses named, not a ranking: one search per course, and the second part's labels are renumbered
     monkeypatch.setattr(answer_module.table_qa, "course_rows", lambda: [
@@ -609,6 +638,7 @@ def test_course_split_answers_each_named_course_with_its_own_sources(monkeypatch
     assert not result.refused
 
 
+# course_split is off unless the config switches it on.
 def test_course_split_is_off_by_default(monkeypatch):
     monkeypatch.setattr(answer_module.table_qa, "course_rows", lambda: [
         {"course_code": "macro", "course_name": "Macroeconomics"},
@@ -617,6 +647,7 @@ def test_course_split_is_off_by_default(monkeypatch):
     assert answer_module._split_by_course("Midterm in Macroeconomics and Time Series?", None, None, _config()) is None
 
 
+# With auto_course_filter, a question that names one course only searches that course.
 def test_auto_course_filter_searches_only_the_one_course_named(monkeypatch):
     # 1. one course named and the option on: the search gets that course as filter
     monkeypatch.setattr(answer_module.table_qa, "course_rows", lambda: [
@@ -643,6 +674,7 @@ def test_auto_course_filter_searches_only_the_one_course_named(monkeypatch):
     assert result.filters_used.course_code == "strategies"
 
 
+# With out_of_scope_search, an out-of-scope question is searched and the self-check decides.
 def test_out_of_scope_search_lets_the_self_check_decide(monkeypatch):
     # 1. with the option on, an "out of scope" label still searches; a strong source gets an answer
     monkeypatch.setattr(
@@ -664,6 +696,7 @@ def test_out_of_scope_search_lets_the_self_check_decide(monkeypatch):
     assert searched and not result.refused
 
 
+# With prompt v4, only the text after "Answer:" is shown.
 def test_prompt_v4_shows_only_the_answer_part(monkeypatch):
     # 1. the model writes the copied evidence first; only what follows "Answer:" is kept and validated
     monkeypatch.setattr(
@@ -688,6 +721,7 @@ def test_prompt_v4_shows_only_the_answer_part(monkeypatch):
     assert [c.label for c in result.citations] == ["S1"]
 
 
+# With named_course_in_scope, a question that names a course is never sent out of scope.
 def test_named_course_is_never_out_of_scope(monkeypatch):
     # 1. the router said out_of_scope, but the question names Strategy, so it is searched and answered
     monkeypatch.setattr(
@@ -709,6 +743,7 @@ def test_named_course_is_never_out_of_scope(monkeypatch):
     assert searched and not result.refused
 
 
+# That rule doesn't change questions that name no course: they are still refused.
 def test_named_course_rule_keeps_refusing_questions_without_a_course(monkeypatch):
     # 2. no course named: the out_of_scope label still refuses without a search
     monkeypatch.setattr(

@@ -4,6 +4,7 @@ from src.generation.prompts import build_messages
 from src.schemas import Chunk, Hit
 
 
+# One fake source for the prompt.
 def _hit():
     chunk = Chunk(chunk_id="c1", kb_sig="x", strategy="section", doc_type="course_row", course_code="mc",
                   sessions=[], source_id="mc_syl", covers=["mc_syl_sec08"], parent_id="p1",
@@ -12,6 +13,7 @@ def _hit():
     return Hit(chunk=chunk, rank=1, label="S1")
 
 
+# The v2 prompt ends with the citation reminder.
 def test_v2_prompt_ends_with_the_citation_rule():
     cfg = load_config("configs/baselines/v1_2_small_model.yaml")
     content = build_messages("What is the final exam worth?", [_hit()], cfg)[-1]["content"]
@@ -20,12 +22,14 @@ def test_v2_prompt_ends_with_the_citation_rule():
     assert "in square brackets" in content
 
 
+# The v1 prompt has no reminder, as in the first version.
 def test_v1_prompt_is_unchanged():
     cfg = load_config("configs/baselines/b1_first_version.yaml")
     content = build_messages("What is the final exam worth?", [_hit()], cfg)[-1]["content"]
     assert "in square brackets" not in content  # the baseline keeps its original prompt
 
 
+# The v3 prompt writes the course of each source and includes its extra rules.
 def test_v3_prompt_names_the_course_of_each_source_and_has_the_rules():
     # 1. the source header starts with the course name, taken from the searched text
     hit = Hit(

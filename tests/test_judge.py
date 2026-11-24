@@ -165,6 +165,7 @@ def test_judge_messages(sources):
     assert "c01_syl_sec04" in messages[1]["content"]
 
 
+# "Not in the material" counts as a correct refusal only for unanswerable questions.
 def test_semantic_refusal_counts_only_for_unanswerable_questions():
     from eval.judge import judge_one, says_not_in_material
 
@@ -180,6 +181,7 @@ def test_semantic_refusal_counts_only_for_unanswerable_questions():
     assert not says_not_in_material("The final exam is worth 40% of the final grade. [S1]")
 
 
+# Rubric v2 uses its own instructions, which judge what the question asks.
 def test_rubric_v2_judges_what_the_question_asks(monkeypatch):
     import sys
     import types
@@ -202,6 +204,7 @@ def test_rubric_v2_judges_what_the_question_asks(monkeypatch):
     assert sent["system"] == judge.SYSTEM
 
 
+# The agreement counts when the judge is stricter and when it is more lenient.
 def test_judge_agreement_counts_strict_and_lenient_decisions():
     # 1. one answer the judge failed although it was right, one it passed although it was half right
     from eval.judge_agreement import agreement
@@ -214,6 +217,7 @@ def test_judge_agreement_counts_strict_and_lenient_decisions():
     assert result["same_correct_decision"] == round(1 / 3, 4)
 
 
+# Several gold sources are joined into one text for the judge.
 def test_gold_source_text_joins_several_sources(monkeypatch):
     # 2. a cross-course question has two gold sections; both reach the v3 judge
     import eval.judge as judge_module

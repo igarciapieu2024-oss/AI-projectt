@@ -1,6 +1,8 @@
+# Tests of the speed benchmark of the local models (eval/benchmark_llm.py), with a fake chat function.
 from eval import benchmark_llm
 
 
+# Each run keeps the answer and the time it took.
 def test_benchmark_model_records_response_and_elapsed_time(monkeypatch):
     class Config:
         generation = {"llm_model": "initial-model"}
@@ -16,6 +18,7 @@ def test_benchmark_model_records_response_and_elapsed_time(monkeypatch):
     assert all(result.response == "answer from test-model" for result in results)
 
 
+# The models within the time target are reported, and the exit code is 0.
 def test_main_reports_models_that_meet_the_time_target(monkeypatch, capsys):
     monkeypatch.setattr(
         benchmark_llm,
@@ -31,6 +34,7 @@ def test_main_reports_models_that_meet_the_time_target(monkeypatch, capsys):
     assert "test-model" in output
 
 
+# When every model is over the target, the exit code is 1.
 def test_main_returns_failure_when_all_models_exceed_target(monkeypatch, capsys):
     monkeypatch.setattr(
         benchmark_llm,

@@ -1,3 +1,4 @@
+# Tests of the index building (src/kb/build_indexes.py), with fake embeddings and temporary folders.
 import pickle
 import sys
 import types
@@ -11,6 +12,7 @@ from src.schemas import Chunk
 from src.utils.io import write_jsonl
 
 
+# A small fake chunk for the tests.
 def _chunk(chunk_id, text, duplicate_of=None, sessions=None):
     return Chunk(
         chunk_id=chunk_id, kb_sig="testkb00", strategy="slide", doc_type="slide",
@@ -21,6 +23,7 @@ def _chunk(chunk_id, text, duplicate_of=None, sessions=None):
     )
 
 
+# Fake vectors, so no embedding model is loaded.
 def _fake_embeddings(monkeypatch):
     class FakeModel:
         def __init__(self, name):
@@ -35,11 +38,13 @@ def _fake_embeddings(monkeypatch):
     monkeypatch.setitem(sys.modules, "sentence_transformers", types.SimpleNamespace(SentenceTransformer=FakeModel))
 
 
+# The tokenizer keeps words, numbers and the % sign.
 def test_tokenize_words_numbers_and_percentages():
     assert build_indexes.tokenize("GDP is 12.5% (UP 3!)") == ["gdp", "is", "12", "5", "%", "up", "3"]
     assert build_indexes.tokenize("") == []
 
 
+# Duplicates are left out, both indexes are saved, and a rebuild replaces the old data.
 def test_build_indexes_excludes_duplicates_persists_and_replaces_stale_data(tmp_path, monkeypatch):
     import chromadb
 
@@ -94,6 +99,7 @@ def test_build_indexes_excludes_duplicates_persists_and_replaces_stale_data(tmp_
     assert second_index["chunk_ids"] == ["new__only"]
 
 
+# With no chunk to index, the build stops with an error.
 def test_build_indexes_requires_at_least_one_indexable_chunk(tmp_path, monkeypatch):
     chunk_file = tmp_path / "chunks.jsonl"
     write_jsonl(chunk_file, [_chunk("duplicate", "same", duplicate_of="canonical")])
@@ -104,6 +110,7 @@ def test_build_indexes_requires_at_least_one_indexable_chunk(tmp_path, monkeypat
         build_indexes.build_indexes(cfg)
 
 
+# If building the new indexes fails, the old ones stay as they were.
 def test_staging_failures_preserve_previous_working_indexes(tmp_path, monkeypatch):
     import chromadb
 
@@ -153,6 +160,7 @@ def test_staging_failures_preserve_previous_working_indexes(tmp_path, monkeypatc
     assert_old_indexes_remain()
 
 
+# If the BM25 swap fails, ChromaDB is put back and the old BM25 file is kept.
 def test_bm25_promotion_failure_rolls_back_chroma_and_preserves_pickle(tmp_path, monkeypatch):
     import chromadb
 

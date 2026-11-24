@@ -1,8 +1,10 @@
+# Tests of the answers from the course table (src/generation/table_qa.py), with a small made-up table.
 import csv
 
 from src.generation import table_qa
 
 
+# Write a small course table in a temporary folder.
 def _write_table(path):
     fields = [
         "course_code", "course_name", "final_exam_weight", "components",
@@ -40,12 +42,14 @@ def _write_table(path):
         })
 
 
+# Without the course table there are no table sources.
 def test_missing_course_table_returns_no_hits(monkeypatch, tmp_path):
     monkeypatch.setitem(table_qa.PATHS, "course_table", tmp_path / "missing.csv")
 
     assert table_qa.answer_from_table("Compare courses", object()) == []
 
 
+# Each course row becomes a source, and a named course selects only its row.
 def test_course_rows_become_hits_and_named_course_is_selected(monkeypatch, tmp_path):
     path = tmp_path / "course_table.csv"
     _write_table(path)
@@ -69,6 +73,7 @@ def test_course_rows_become_hits_and_named_course_is_selected(monkeypatch, tmp_p
     assert "retake: One retake" in all_hits[1].chunk.text
 
 
+# For a comparison, the rows come sorted by the compared column.
 def test_comparison_questions_get_the_rows_in_order():
     from src.generation.table_qa import _ordered_for
     rows = [
@@ -84,6 +89,7 @@ def test_comparison_questions_get_the_rows_in_order():
     assert codes("Tell me about my courses") == ["mc", "ma", "st", "os"]  # nothing to compare: order kept
 
 
+# For a ranking question, the first source is the ranking written out.
 def test_comparison_questions_start_with_the_ranking_written_out():
     from src.generation.table_qa import _ranking_text
     rows = [
@@ -104,6 +110,7 @@ def test_comparison_questions_start_with_the_ranking_written_out():
     assert _ranking_text("What is the final exam worth?", rows[:1]) is None  # one course: nothing to rank
 
 
+# The ranking line only appears when the question asks to order courses.
 def test_ranking_line_only_for_questions_that_ask_to_order_courses():
     from src.generation.table_qa import _ranking_text
 
@@ -120,6 +127,7 @@ def test_ranking_line_only_for_questions_that_ask_to_order_courses():
     assert _ranking_text("In Strategies and Operating Systems, what happens if a student falls below the 80% attendance requirement?", rows) is None
 
 
+# There is no ranking line when the question asks for something else.
 def test_no_ranking_line_when_the_question_asks_for_another_field():
     from src.generation.table_qa import _ranking_text
 

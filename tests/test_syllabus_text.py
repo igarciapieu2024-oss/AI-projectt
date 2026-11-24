@@ -22,6 +22,7 @@ WORKLOAD_TABLE = (
 )
 
 
+# The evaluation table becomes one line per component.
 def test_evaluation_table_becomes_one_line_per_component():
     text = table_to_text(EVALUATION_TABLE)
     lines = text.splitlines()
@@ -31,6 +32,7 @@ def test_evaluation_table_becomes_one_line_per_component():
     assert "organizations" not in text
 
 
+# The decimal points lost by the PDF reader are put back.
 def test_lost_decimals_come_back():
     text = table_to_text(WORKLOAD_TABLE)
     assert "- Lectures: 13.3% of the time, 20.0 hours" in text
@@ -38,6 +40,7 @@ def test_lost_decimals_come_back():
     assert "Estimated" not in text  # the header row is not repeated as a line
 
 
+# Glued words are split (when wordninja is installed).
 def test_glued_words_are_split_when_the_word_list_is_installed():
     pytest.importorskip("wordninja")
     text = table_to_text(EVALUATION_TABLE)
@@ -45,6 +48,7 @@ def test_glued_words_are_split_when_the_word_list_is_installed():
     assert "A minimum grade of 4.5 is required on the final exam" in text
 
 
+# Real long words aren't split.
 def test_real_long_words_are_not_split():
     pytest.importorskip("wordninja")
     assert clean_cell("Macroeconomics") == "Macroeconomics"
@@ -52,6 +56,7 @@ def test_real_long_words_are_not_split():
     assert clean_cell("Discussions") == "Discussions"
 
 
+# The text of a section keeps its body and adds the cleaned table.
 def test_section_text_keeps_the_body_and_adds_the_clean_table():
     section = {"text": "EVALUATION CRITERIA body", "tables": [EVALUATION_TABLE]}
     text = section_text(section)
@@ -59,6 +64,7 @@ def test_section_text_keeps_the_body_and_adds_the_clean_table():
     assert section_text({"text": "no tables", "tables": []}) == "no tables"
 
 
+# Write a small course table in a temporary folder.
 def _write_table(path, rows):
     fields = list(rows[0])
     lines = [",".join(fields)]
@@ -67,6 +73,7 @@ def _write_table(path, rows):
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+# One summary chunk per course is built from the course table.
 def test_course_summary_chunks_from_the_course_table(tmp_path, monkeypatch):
     table = tmp_path / "course_table.csv"
     _write_table(table, [
@@ -95,11 +102,13 @@ def test_course_summary_chunks_from_the_course_table(tmp_path, monkeypatch):
     assert [p.parent_id for p in parents] == ["parent__course_row__mc", "parent__course_row__ma"]
 
 
+# Without the course table there are no summary chunks.
 def test_no_course_table_means_no_summary_chunks(tmp_path, monkeypatch):
     monkeypatch.setitem(syllabus_text.PATHS, "course_table", tmp_path / "missing.csv")
     assert course_summary_chunks("abc123") == ([], [])
 
 
+# The heading of a section is its real title, not the generic label.
 def test_section_heading_uses_the_real_title():
     from src.kb.syllabus_text import section_heading
     assert section_heading({"section_id": "x_syl_sec03", "section_name": "OTHER", "text": "SUBJECT DESCRIPTION\nThis course..."}) == "Subject Description"
@@ -109,12 +118,14 @@ def test_section_heading_uses_the_real_title():
     assert section_heading({"section_id": "x_syl_sec02", "section_name": "PROFESSOR", "text": "Professor: ANA PEREZ\n..."}) == "Professor"
 
 
+# The searched text starts with the course name.
 def test_with_course_puts_the_course_name_first():
     from src.kb.syllabus_text import with_course
     assert with_course("Management Control", "Session 3 › Introduction", "text") == "Management Control › Session 3 › Introduction\ntext"
     assert with_course("", "Session 3", "text") == "Session 3\ntext"
 
 
+# Closing lines, page numbers and symbols are detected as noise.
 def test_noise_pieces_are_detected():
     from src.kb.syllabus_text import is_noise
     for text in ["THANK YOU", "THANK YOU!\n21", "31", "→\n→\n→", "≈"]:
@@ -124,6 +135,7 @@ def test_noise_pieces_are_detected():
     assert not is_noise("31", has_image_text=True)  # the image text can carry the content
 
 
+# The course summary includes the professor, the syllabus title and the books.
 def test_course_summary_has_teacher_wording_title_and_books(tmp_path, monkeypatch):
     table = tmp_path / "course_table.csv"
     _write_table(table, [
@@ -151,6 +163,7 @@ def test_course_summary_has_teacher_wording_title_and_books(tmp_path, monkeypatc
     assert chunk.covers == ["ob_syl_sec08", "ob_syl_sec01", "ob_syl_sec10"]
 
 
+# Chunks are cut at sentence ends, never inside a word.
 def test_chunks_are_cut_at_sentence_ends_not_inside_words():
     from src.kb.syllabus_text import split_into_chunks
     # 1. the PDF breaks sentences at the end of each printed line: they are joined back before cutting
@@ -163,12 +176,14 @@ def test_chunks_are_cut_at_sentence_ends_not_inside_words():
         assert len(chunk) <= 100 and not chunk.startswith(" ")
 
 
+# The overlap repeats the last sentence in the next chunk.
 def test_overlap_repeats_the_last_sentence():
     from src.kb.syllabus_text import split_into_chunks
     chunks = split_into_chunks("One two three. Four five six. Seven eight nine.", 35, 15)
     assert chunks == ["One two three. Four five six.", "Four five six. Seven eight nine."]  # carried over
 
 
+# Table lines stay as separate units.
 def test_table_lines_stay_separate_units():
     from src.kb.syllabus_text import split_into_chunks
     text = "Body text.\n\n- Final Exam: 40%. Comment.\n- Class Participation: 10%."
@@ -176,6 +191,7 @@ def test_table_lines_stay_separate_units():
     assert split_into_chunks(text, 30, 0) == ["Body text.", "- Final Exam: 40%. Comment.", "- Class Participation: 10%."]
 
 
+# Programme chunks hold whole sessions and keep their session numbers.
 def test_programme_chunks_hold_whole_sessions_and_know_their_numbers():
     from src.kb.syllabus_text import session_numbers, split_into_chunks
     text = "PROGRAM SESSION 1 (LIVE) Topic one. SESSION 2 (LIVE) Topic two. SESSIONS 9-10-11 Case. SESSIONS 29 - 30 Review."
@@ -187,12 +203,14 @@ def test_programme_chunks_hold_whole_sessions_and_know_their_numbers():
     assert session_numbers("continues the case study", [4, 5]) == [5]  # a continuation keeps the last session
 
 
+# Words split by a hyphen at a line end are joined again.
 def test_broken_hyphens_are_joined():
     from src.kb.syllabus_text import fix_broken_hyphens
     assert fix_broken_hyphens("exams (re-\nsits) and (re- sits)") == "exams (re-sits) and (re-sits)"
     assert fix_broken_hyphens("short- and long-term") == "short- and long-term"
 
 
+# A course row says explicitly when there is no final exam.
 def test_cross_course_rows_say_when_there_is_no_final_exam():
     from src.generation.table_qa import _row_text
     from src.schemas import CourseRow

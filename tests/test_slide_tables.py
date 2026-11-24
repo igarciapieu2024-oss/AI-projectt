@@ -1,8 +1,10 @@
+# Tests of the slide tables (src/kb/slide_tables.py), on small PDF pages made inside the test.
 import pymupdf
 
 from src.kb import slide_tables
 
 
+# A PDF page with a small table without lines.
 def _page_with_aligned_table():
     # 1. a table without lines: three hotels as columns, numbers right-aligned under each name
     document = pymupdf.open()
@@ -23,6 +25,7 @@ def _page_with_aligned_table():
     return document, page
 
 
+# Each value of the table stays with its column header.
 def test_aligned_table_keeps_each_value_with_its_column():
     document, page = _page_with_aligned_table()
     text = "\n".join(slide_tables.page_tables(page))
@@ -30,6 +33,7 @@ def test_aligned_table_keeps_each_value_with_its_column():
     assert "Gross LT Assets: San Francisco 1.400.000; Chicago 2.100.000; New Orleans 2.730.000" in text
 
 
+# A page without a table gives no table text.
 def test_page_without_table_gives_nothing():
     # 2. a bullet slide with one number per line is not a table
     document = pymupdf.open()
@@ -40,6 +44,7 @@ def test_page_without_table_gives_nothing():
     document.close()
 
 
+# A table without row names is written with its header next to every cell.
 def test_ruled_rendering_names_every_cell():
     # 3. two-column tables without row labels keep both headers
     text = slide_tables._render_ruled(["Most Important", "Less Important"], [["Persistence", "Teamwork"]])

@@ -17,6 +17,7 @@ MODULES = sorted(
     - STREAMLIT_PAGES  # minus the streamlit pages
 )
 
+# Each module of the project can be imported.
 @pytest.mark.parametrize("name", MODULES)
 def test_module_imports(name):
     importlib.import_module(name)
