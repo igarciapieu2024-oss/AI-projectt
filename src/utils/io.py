@@ -3,8 +3,10 @@
 # written and read the same way (UTF-8, one record per line or row).
 from __future__ import annotations
 
+# The standard modules for CSV and JSON files.
 import csv
 import json
+# asdict() turns a record into a dictionary, and is_dataclass() tells us whether a row is a record.
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Type, TypeVar
@@ -24,6 +26,7 @@ def _as_dict(row: Any) -> dict:
 # line is turned into that record, which also checks that its fields are the expected
 # ones (see Record.from_dict in src/schemas.py); otherwise plain dictionaries are returned.
 def read_jsonl(path: str | Path, record: Type[T] | None = None) -> list[T] | list[dict]:
+    # Open the file as UTF-8 and read it line by line.
     rows = []
     with Path(path).open(encoding="utf-8") as f:
         for line in f:
@@ -37,8 +40,10 @@ def read_jsonl(path: str | Path, record: Type[T] | None = None) -> list[T] | lis
 # Write rows to a JSONL file, replacing it, and return how many were written.
 # The folder is created if it does not exist yet.
 def write_jsonl(path: str | Path, rows: Iterable[Any]) -> int:
+    # Make sure the folder exists before writing.
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Count the rows as we write them.
     n = 0
     with path.open("w", encoding="utf-8") as f:
         for row in rows:
@@ -51,6 +56,7 @@ def write_jsonl(path: str | Path, rows: Iterable[Any]) -> int:
 # Add one row at the end of a JSONL file without rewriting it, so results already
 # saved are kept if the program stops halfway.
 def append_jsonl(path: str | Path, row: Any) -> None:
+    # Make sure the folder exists; mode "a" adds to the end of the file instead of replacing it.
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
@@ -60,6 +66,7 @@ def append_jsonl(path: str | Path, row: Any) -> None:
 # Read a CSV file into a list of dictionaries, one per row, keyed by the header.
 # All values are read as text.
 def read_csv(path: str | Path) -> list[dict[str, str]]:
+    # DictReader uses the first row as the names of the columns.
     with Path(path).open(encoding="utf-8", newline="") as f:
         return list(csv.DictReader(f))
 
@@ -67,12 +74,14 @@ def read_csv(path: str | Path) -> list[dict[str, str]]:
 # Write rows to a CSV file with the given column order, replacing it, and return
 # how many rows were written.
 def write_csv(path: str | Path, rows: Iterable[Any], fieldnames: list[str]) -> int:
+    # Make sure the folder exists before writing.
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     n = 0
     # newline="" lets the csv module control line endings, which avoids blank
     # lines between rows on Windows.
     with path.open("w", encoding="utf-8", newline="") as f:
+        # Write the header first, then one line per row.
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for row in rows:

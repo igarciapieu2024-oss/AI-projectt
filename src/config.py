@@ -6,12 +6,15 @@
 # its own ChromaDB collection (kb_<kb_sig>) and its own chunk files, so no version overwrites another.
 from __future__ import annotations
 
+# hashlib and json are used to calculate kb_sig from the settings.
 import hashlib
 import json
+# dataclass builds the Config class from its list of fields.
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+# The library that reads YAML files.
 import yaml
 
 # The repository folder (two levels above this file), so every path works on every laptop.
@@ -51,16 +54,17 @@ PATHS = {
 }
 
 
-# The files of one knowledge base, named with its kb_sig: the chunks, the parents (saved but not used by the
-# answer phase) and the BM25 index.
+# The files of one knowledge base, named with its kb_sig. First the chunks.
 def chunks_path(kb_sig: str) -> Path:
     return PATHS["processed"] / f"chunks__{kb_sig}.jsonl"
 
 
+# The parents: the whole section or slide each chunk was cut from (saved, but the answer phase doesn't use them).
 def parents_path(kb_sig: str) -> Path:
     return PATHS["processed"] / f"parents__{kb_sig}.jsonl"
 
 
+# The BM25 index.
 def bm25_path(kb_sig: str) -> Path:
     return PATHS["processed"] / f"bm25__{kb_sig}.pkl"
 
@@ -86,7 +90,9 @@ class Config:
     # written in a fixed order (sort_keys), so the same settings always give the same code.
     @property
     def kb_sig(self) -> str:
+        # Write the kb settings as text, always in the same order.
         blob = json.dumps(self.kb, sort_keys=True, default=str)
+        # Hash that text and keep the first 8 characters.
         return hashlib.sha1(blob.encode("utf-8")).hexdigest()[:8]
 
     # The name of the ChromaDB collection of this knowledge base.
@@ -98,6 +104,7 @@ class Config:
 # Combine two sets of settings: the values of override replace those of base, group by group, so a config
 # only has to list what it changes.
 def _merge(base: dict, override: dict) -> dict:
+    # Start from a copy of the base settings.
     out = dict(base)
     for key, value in override.items():
         # Inside a group, only the listed settings are replaced; the others keep their base value.
@@ -111,7 +118,9 @@ def _merge(base: dict, override: dict) -> dict:
 # Read a YAML file and, if it starts with "extends:", first read the file it extends (which can extend
 # another one) and apply this file's settings on top.
 def _load_raw(path: Path) -> dict:
+    # Read the YAML file as a dictionary (an empty file gives an empty dictionary).
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    # Take "extends" out of the settings; it only says which file comes first.
     parent = data.pop("extends", None)
     if parent:
         data = _merge(_load_raw(path.parent / parent), data)
@@ -121,12 +130,15 @@ def _load_raw(path: Path) -> dict:
 # Load a configuration by its path (relative to the repository or absolute). Used by every part of the
 # project: the build, answer(), the app and the evaluation.
 def load_config(path: str | Path = "configs/base.yaml") -> Config:
+    # A relative path is read from the repository folder.
     path = Path(path)
     if not path.is_absolute():
         path = ROOT / path
+    # The settings of this file, already merged with the files it extends.
     data = _load_raw(path)
     # A group name that is not one of the five is a typo in the YAML: stop instead of ignoring it.
     unknown = set(data) - set(GROUPS)
     if unknown:
         raise ValueError(f"{path.name}: unknown config groups {sorted(unknown)}")
+    # Build the Config: its name is the file name without .yaml, and a missing group is left empty.
     return Config(name=path.stem, path=path, **{g: data.get(g, {}) for g in GROUPS})
