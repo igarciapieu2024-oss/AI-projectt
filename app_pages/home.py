@@ -1,38 +1,50 @@
 # Home: the landing page. All texts come from app_content.py, all styles from assets/style.css.
-import html as html_lib  # escapes the texts before putting them in HTML
+# Escapes the texts before putting them in HTML.
+import html as html_lib
 
-import streamlit as st  # the library that builds the web app
+# The library that builds the web app.
+import streamlit as st
 
-import app_content as content  # name, pitch, features, survey numbers, steps
-from app_components.engine import USING_FAKE, knowledge_base_stats  # fake-engine note and the real counts
-from app_components.theme import html, icon, image_data_uri  # our HTML helper, the icons and the logo loader
+# Name, pitch, features, survey numbers, steps.
+import app_content as content
+# fake-engine note and the real counts.
+from app_components.engine import USING_FAKE, knowledge_base_stats
+# Our HTML helper, the icons and the logo loader.
+from app_components.theme import html, icon, image_data_uri
 
-esc = html_lib.escape  # a short name, used many times below
+# A short name, used many times below.
+esc = html_lib.escape
 
-#1 the hero: the pitch on the left, the real chat screen of the app on a laptop on the right
+# 1. The hero: the pitch on the left, the real chat screen of the app on a laptop on the right
 
 
-# the headline with the words between <em> and </em> in blue; everything else is escaped
+# The headline with the words between <em> and </em> in blue; everything else is escaped.
 def headline() -> str:
-    parts = content.TAGLINE.replace("</em>", "<em>").split("<em>")  # even pieces: normal text, odd pieces: blue
+    # Even pieces: normal text, odd pieces: blue.
+    parts = content.TAGLINE.replace("</em>", "<em>").split("<em>")
     return "".join(f"<em>{esc(p)}</em>" if i % 2 else esc(p) for i, p in enumerate(parts))
 
 
-# the laptop: a small copy of the Assistant page answering the demo question, with the cited parts highlighted
+# The laptop: a small copy of the Assistant page answering the demo question, with the cited parts highlighted.
 def laptop() -> str:
     answer = []
     for i, (text, cite) in enumerate(content.HERO_DEMO["answer"]):
-        if cite:  # a cited part: highlighted, one after the other (the delay grows with each part)
+        # A cited part: highlighted, one after the other (the delay grows with each part).
+        if cite:
             answer.append(f'<span class="hl" style="--d:{0.6 + 0.8 * i:.1f}s">{esc(text)}</span><span class="cite">{cite}</span>')
-        else:  # plain text, e.g. the final full stop
+        # Plain text, e.g. the final full stop.
+        else:
             answer.append(esc(text))
     slips = "".join(f'<div class="slip"><span class="cite">{label}</span><b>{esc(where)}</b>{esc(section)}</div>'
-                    for label, where, section in content.HERO_DEMO["sources"])  # one small card per source
+                    # One small card per source.
+                    for label, where, section in content.HERO_DEMO["sources"])
     menu = "".join(f'<div class="{"on" if name == "Assistant" else ""}">{name}</div>'
-                   for name in ("Home", "Assistant", "Compare"))  # the same pages as the real menu
-    n = len(content.HERO_DEMO["sources"])  # how many sources the demo answer cites
+                   # The same pages as the real menu.
+                   for name in ("Home", "Assistant", "Compare"))
+    # How many sources the demo answer cites.
+    n = len(content.HERO_DEMO["sources"])
 
-    # the 3 documents floating next to the laptop: what the assistant reads
+    # The 3 documents floating next to the laptop: what the assistant reads.
     docs = "".join(f'<div class="doc {cls}"><div class="doc-icon">{icon(ic, 16)}</div>{esc(name)}<i></i><i></i></div>'
                    for cls, ic, name in (("d1", "page", "Syllabus"), ("d2", "slides", "Lecture slides"), ("d3", "image", "Diagrams")))
     return f"""
@@ -51,24 +63,29 @@ def laptop() -> str:
     """
 
 
-with st.container(key="hero"):  # the key gives the container a CSS class (.st-key-hero) so we can style it
-    left, right = st.columns([1, 1.05], gap="large", vertical_alignment="center")  # text on the left, laptop on the right
+# The key gives the container a CSS class (.st-key-hero) so we can style it.
+with st.container(key="hero"):
+    # Text on the left, laptop on the right.
+    left, right = st.columns([1, 1.05], gap="large", vertical_alignment="center")
     with left:
         html(f"""
             <div class="hero-pill">{icon("offline", 16)}{esc(content.HERO_PILL)}</div>
             <h1 class="hero-title">{headline()}</h1>
             <p class="hero-pitch">{esc(content.PITCH)}</p>
         """)
-        if st.button("Ask a question", type="primary", key="cta_top", icon=":material/chat_bubble:"):  # straight to the chat
+        # Straight to the chat.
+        if st.button("Ask a question", type="primary", key="cta_top", icon=":material/chat_bubble:"):
             st.switch_page("app_pages/assistant.py")
     with right:
         html(laptop())
 
-#2 what it does: 4 cards, then the strip with the 3 guarantees (with the real size of the knowledge base)
+# 2. What it does: 4 cards, then the strip with the 3 guarantees (with the real size of the knowledge base)
 features = "".join(f'<div class="feature"><div class="feature-icon">{icon(ic, 26)}</div><b>{esc(t)}</b><span>{esc(d)}</span></div>'
                    for ic, t, d in content.FEATURES)
-stats = knowledge_base_stats()  # counted from the real files on this laptop
-counts = {k: f"{v:,}" if v else "—" for k, v in stats.items()}  # 2622 -> "2,622"; missing -> "—"
+# Counted from the real files on this laptop.
+stats = knowledge_base_stats()
+# 2622 -> "2,622"; missing -> "—".
+counts = {k: f"{v:,}" if v else "—" for k, v in stats.items()}
 trust = "".join(f'<div>{icon(ic, 30)}<div><b>{esc(t)}</b><span>{esc(d.format(**counts))}</span></div></div>'
                 for ic, t, d in content.TRUST)
 html(f"""
@@ -77,18 +94,18 @@ html(f"""
     <div class="trust">{trust}</div>
 """)
 
-#3 the problem, with the numbers of the business plan and their sources
+# 3. The problem, with the numbers of the business plan and their sources
 problem = "".join(f'<div class="stat"><div class="stat-n">{esc(n)}</div><div class="stat-l">{esc(t)}</div></div>'
                   for n, t in content.PROBLEM_STATS)
 html(f'<h2 class="section-title">{esc(content.PROBLEM_TITLE)}</h2><div class="stats">{problem}</div>'
      f'<div class="source-note">{esc(content.PROBLEM_SOURCE)}</div>')
 
-#4 how it works, in 4 numbered steps (they are a real sequence, so the numbers mean something)
+# 4. How it works, in 4 numbered steps (they are a real sequence, so the numbers mean something)
 steps = "".join(f'<div class="step"><div class="step-n">{i}</div><b>{esc(t)}</b><span>{esc(d)}</span></div>'
                 for i, (t, d) in enumerate(content.STEPS, start=1))
 html(f'<h2 class="section-title">From question to cited answer</h2><div class="steps">{steps}</div>')
 
-#5 who it is for (students, professors, programme office) and the mission, vision and licence of the business plan
+# 5. Who it is for (students, professors, programme office) and the mission, vision and licence of the business plan
 audience = "".join(f'<div class="feature"><div class="feature-icon">{icon(ic, 26)}</div><b>{esc(t)}</b><span>{esc(d)}</span></div>'
                    for ic, t, d in content.AUDIENCE)
 html(f"""
@@ -101,7 +118,7 @@ html(f"""
     </div>
 """)
 
-#6 the closing band: a second button, for whoever scrolled to the end
+# 6. The closing band: a second button, for whoever scrolled to the end
 with st.container(key="closing"):
     text_col, button_col = st.columns([3, 1], vertical_alignment="center")
     with text_col:
@@ -110,6 +127,7 @@ with st.container(key="closing"):
         if st.button("Ask a question", type="primary", key="cta_bottom"):
             st.switch_page("app_pages/assistant.py")
 
-#7 footer
-note = " Demo mode: answers come from the fake engine." if USING_FAKE else ""  # so nobody thinks the fake answers are real
+# 7. Footer
+# So nobody thinks the fake answers are real.
+note = " Demo mode: answers come from the fake engine." if USING_FAKE else ""
 html(f'<div class="footer">{esc(content.FOOTER)}{note}</div>')
