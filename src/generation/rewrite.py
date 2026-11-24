@@ -6,9 +6,11 @@
 # the history when it writes the answer.
 from __future__ import annotations
 
+# Regular expressions, to recognise a follow-up and a source label.
 import re
 from typing import Any
 
+# chat() sends the messages to the local LLM (llm.py).
 from src.generation.llm import chat
 
 
@@ -19,6 +21,7 @@ from src.generation.llm import chat
 
 # Return the language code of the question ("en" for English), detected with the langid library.
 def detect_language(question: str) -> str:
+    # An empty question has no language to detect.
     if not isinstance(question, str) or not question.strip():
         raise ValueError("question must not be empty")
     # Imported here so the library is only loaded when a language has to be detected.
@@ -31,6 +34,7 @@ def detect_language(question: str) -> str:
 
 # Translate a question into English with the LLM, only to search with it; the model is told not to answer.
 def translate_to_english(question: str, cfg) -> str:
+    # An empty question can't be translated.
     question = question.strip()
     if not question:
         raise ValueError("question must not be empty")
@@ -94,6 +98,7 @@ def rewrite(
     *,
     translate_to_english: bool = False,
 ) -> str:
+    # An empty question can't be rewritten.
     question = question.strip()
     if not question:
         raise ValueError("question must not be empty")
@@ -132,6 +137,7 @@ def rewrite(
     messages.append({"role": "user", "content": question})
     # A short token limit (query_num_predict), since the result is only one question.
     result = chat(messages, cfg, num_predict=_query_token_limit(cfg))
+    # chat() returns text when it isn't streaming; anything else is an error.
     if not isinstance(result, str):
         raise TypeError("chat() must return text when stream=False")
     # Remove spaces and quotation marks around the rewritten question.
@@ -153,6 +159,7 @@ _CITATION = re.compile(r"\[S\d+\]")
 # True when the rewrite can be used as a question: one line, ending with a question mark and without
 # source labels. Used by the rewrite_guard check above.
 def looks_like_question(text: str) -> bool:
+    # One line, ending in a question mark, and with no source labels.
     text = text.strip()
     return bool(text) and "\n" not in text and text.endswith("?") and not _CITATION.search(text)
 
@@ -160,6 +167,7 @@ def looks_like_question(text: str) -> bool:
 # The last user question and the follow-up joined together, used when the rewrite is discarded, so the
 # search still sees the topic of the conversation.
 def _join_with_previous(question: str, history: list[dict[str, Any]]) -> str:
+    # The questions the student asked before, in order.
     previous = [item["content"].strip() for item in history if item.get("role") == "user"]
     # Without a previous user question, the follow-up is searched as it is.
     if not previous:

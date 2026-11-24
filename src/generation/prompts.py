@@ -4,8 +4,10 @@
 # versions belong to the configurations we compared.
 from __future__ import annotations
 
+# Any is used in the type of the conversation history.
 from typing import Any
 
+# The format of a search result: each source in the prompt is one Hit.
 from src.schemas import Hit
 
 # The system instructions of each prompt version (generation.prompt_version in the config).
@@ -89,6 +91,7 @@ _NO_RAG_SYSTEM = (
 # course; in the other versions it is the outline path. The outline alone does not say which course a source
 # comes from, so in questions about several courses the model gave one course's fact for all of them.
 def _source_header(hit: Hit, version: str) -> str:
+    # In v3 we take the first line of embed_text, which is "course › position".
     if version == "v3" and hit.chunk.embed_text:
         return hit.chunk.embed_text.split("\n", 1)[0]
     return hit.chunk.outline_path
@@ -102,6 +105,7 @@ def build_messages(
     cfg,
     history: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, str]]:
+    # An empty question can't be answered.
     if not isinstance(question, str) or not question.strip():
         raise ValueError("question must not be empty")
 
@@ -109,6 +113,7 @@ def build_messages(
     rag_enabled = cfg.generation.get("rag", True)
     if rag_enabled:
         version = cfg.generation.get("prompt_version", "v2")
+        # The version has to be one of the four above; anything else is a mistake in the config.
         if not isinstance(version, str) or version not in _RAG_SYSTEM:
             raise ValueError(f"unsupported generation.prompt_version: {version!r}")
         system = _RAG_SYSTEM[version]
@@ -116,8 +121,10 @@ def build_messages(
         system = _NO_RAG_SYSTEM
 
     # The previous turns of the conversation go before the new question, so the model can answer follow-ups.
+    # The first message is always the system instruction.
     messages = [{"role": "system", "content": system}]
     for item in history or []:
+        # Every message of the history has to be a user or assistant message with text.
         if (
             not isinstance(item, dict)
             or item.get("role") not in {"user", "assistant"}
@@ -126,8 +133,10 @@ def build_messages(
             raise ValueError("history entries must have user/assistant roles and string content")
         messages.append({"role": item["role"], "content": item["content"]})
 
+    # The user message starts with the question.
     content = f"Question:\n{question.strip()}"
     if rag_enabled:
+        # With RAG there has to be at least one source: answer.py never builds a prompt without sources.
         if not hits:
             raise ValueError("RAG prompts require at least one evidence hit")
         # Each source as "[S1] header" followed by its text (the chunk text, not embed_text). The label is the
@@ -137,11 +146,14 @@ def build_messages(
             for hit in hits
             if hit.chunk.text.strip()
         )
+        # If every source was empty there is nothing to cite, so we stop.
         if not sources:
             raise ValueError("RAG prompts require non-empty evidence")
+        # The sources go right after the question.
         content = f"{content}\n\nCourse sources:\n{sources}"
         # The citation reminder at the end (v4 does not need it: it has its own two-step format).
         if version in ("v2", "v3"):
             content += f"\n\n{_CITE_REMINDER}"
+    # The last message is the question with its sources; the list is what chat() in llm.py sends to the model.
     messages.append({"role": "user", "content": content})
     return messages

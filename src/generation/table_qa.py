@@ -5,11 +5,16 @@
 # course_rows() and asks_for_ranking() are also used by answer.py for the course filter and the per-course answers.
 from __future__ import annotations
 
+# json reads the evaluation components, which are stored as JSON text inside the CSV.
 import json
+# Regular expressions, to find which column a question compares and whether it asks for a ranking.
 import re
+# lru_cache keeps the table in memory, so the CSV is only read once.
 from functools import lru_cache
 from pathlib import Path
 
+# Where the course table is saved, the function that finds the courses a question names, the shared
+# formats and the CSV reader.
 from src.config import PATHS
 from src.retrieval.filters import mentioned_course_codes
 from src.schemas import Chunk, CourseRow, Hit
@@ -33,12 +38,14 @@ def _load_rows(path: str, modified_ns: int, size: int) -> tuple[dict[str, str], 
 
 # The evaluation components of a row, stored as JSON text in the CSV, as a list of {"name", "weight"}.
 def _components(value: str) -> list[dict]:
+    # An empty cell means the course has no components listed.
     if not value:
         return []
     try:
         components = json.loads(value)
     except json.JSONDecodeError as exc:
         raise ValueError(f"course table has invalid components JSON: {value!r}") from exc
+    # The JSON has to be a list of objects, one per component.
     if not isinstance(components, list) or any(not isinstance(item, dict) for item in components):
         raise ValueError("course table components must be a JSON list of objects")
     return components
@@ -66,12 +73,14 @@ def _optional_int(value: str) -> int | None:
 
 # Write one course row as one line of text, the source text the LLM reads and cites.
 def _row_text(row: CourseRow) -> str:
+    # Every row starts with the course name and its code.
     parts = [f"{row.course_name} ({row.course_code})"]
     if row.final_exam_weight is not None:
         parts.append(f"final exam {row.final_exam_weight:g}%")
     else:
         # Said explicitly: without it the model read another component as the final exam.
         parts.append("no final exam")
+    # The components with their weights, written as "name: weight%".
     components = _components(row.components)
     if components:
         formatted = ", ".join(
@@ -81,6 +90,7 @@ def _row_text(row: CourseRow) -> str:
         )
         if formatted:
             parts.append(f"components: {formatted}")
+    # The other facts are only added when the table has them.
     if row.attendance_limit_pct is not None:
         parts.append(f"attendance limit {row.attendance_limit_pct:g}%")
     if row.retake_policy:
@@ -91,6 +101,7 @@ def _row_text(row: CourseRow) -> str:
         parts.append(f"{row.n_sessions} sessions")
     if row.language:
         parts.append(f"language: {row.language}")
+    # All the parts joined into one line.
     return "; ".join(parts)
 
 
@@ -138,24 +149,32 @@ def _compared_field(question: str) -> str | None:
 # enough: the small local model skipped the first row or merged rows with different values. Returns None when
 # the question is not a ranking question. The rows arrive already sorted by _ordered_for().
 def _ranking_text(question: str, rows: list[dict[str, str]]) -> str | None:
+    # The column the question compares.
     field = _compared_field(question)
+    # It is only a ranking question when it compares a column, there are at least two courses, it uses a
+    # ranking word and it doesn't ask for anything else.
     if field is None or len(rows) < 2 or not _RANKING.search(question) or _OTHER_ASK.search(question):
         return None
+    # How the column is named in the answer, its unit and what to write for a course without a value.
     label, unit, missing = _FIELD_WORDS[field]
+    # Whether the question asks for the lowest instead of the highest.
     lowest = bool(_ASCENDING.search(question))
     # Groups of courses with the same value, in order; courses without a value are listed apart.
     groups: list[tuple[float, list[str]]] = []
     without = []
     for row in rows:
+        # The value of this course in the compared column; a course without a value goes to the separate list.
         try:
             value = float(row.get(field) or "")
         except ValueError:
             without.append(row["course_name"])
             continue
+        # The same value as the previous course: it joins that group. Otherwise it starts a new group.
         if groups and groups[-1][0] == value:
             groups[-1][1].append(row["course_name"])
         else:
             groups.append((value, [row["course_name"]]))
+    # No course has a value, so there is nothing to rank.
     if not groups:
         return None
 
@@ -163,10 +182,13 @@ def _ranking_text(question: str, rows: list[dict[str, str]]) -> str | None:
     def names(group):
         return " and ".join(group[1]) if len(group[1]) == 2 else ", ".join(group[1])
 
+    # The first group is the answer: the highest (or the lowest) value.
     top = groups[0]
     text = f"{'Lowest' if lowest else 'Highest'} {label}: {names(top)} ({top[0]:g}{unit})."
+    # The other groups follow in order after "Then:".
     if len(groups) > 1:
         text += " Then: " + "; ".join(f"{names(g)} ({g[0]:g}{unit})" for g in groups[1:]) + "."
+    # The courses without a value are named at the end.
     if without:
         text += f" {', '.join(without)}: {missing}."
     return text
@@ -179,8 +201,10 @@ def _ordered_for(question: str, rows: list[dict[str, str]]) -> list[dict[str, st
     field = _compared_field(question)
     if field is None:
         return rows
+    # Lowest first when the question asks for the lowest; highest first otherwise.
     ascending = bool(_ASCENDING.search(question))
 
+    # The sorting key of a row: rows with a value first, ordered by that value.
     def key(row):
         try:
             value = float(row.get(field) or "")
@@ -202,15 +226,20 @@ def answer_from_table(question: str, cfg) -> list[Hit]:
     # Without the table there are no table sources; answer.py then searches normally.
     if not path.is_file():
         return []
+    # All the rows of the table, read once and kept in memory.
     rows = list(_load_rows(*_file_key(path)))
+    # The courses the question names; when it names none, every course is kept.
     named_codes = set(mentioned_course_codes(question, rows))
     selected = [row for row in rows if not named_codes or row["course_code"] in named_codes]
+    # Sort them by the column the question compares.
     selected = _ordered_for(question, selected)
     hits = []
+    # The ranking line, when the question is a ranking question.
     ranking = _ranking_text(question, selected)
     if ranking:
         # S1 is the ranking already written out; the course rows follow as S2, S3... for details and citations.
         # answer.py returns this line as the answer without calling the model (_ranking_answer()).
+        # The ranking line covers the syllabus sections behind every row it uses.
         covers = sorted({value for row in selected for value in row.get("evidence_section_ids", "").split(";") if value})
         chunk = Chunk(
             chunk_id="course_ranking", kb_sig=cfg.kb_sig, strategy="section", doc_type="course_row",
@@ -220,6 +249,7 @@ def answer_from_table(question: str, cfg) -> list[Hit]:
         hits.append(Hit(chunk=chunk, rank=1, label="S1"))
     # One source per course, built from its row.
     for row in selected:
+        # Turn the CSV row (all text) into a CourseRow with real numbers, so it can be written as text.
         components = _components(row.get("components", ""))
         course = CourseRow(
             course_code=row["course_code"],
@@ -234,8 +264,11 @@ def answer_from_table(question: str, cfg) -> list[Hit]:
             evidence_section_ids=row.get("evidence_section_ids", ""),
             human_checked=row.get("human_checked", "").strip().lower() in {"true", "1", "yes"},
         )
+        # The label follows the sources already added: S1 if there is no ranking line, S2 otherwise.
         rank = len(hits) + 1
+        # The syllabus sections this row's facts came from, stored in the CSV separated by ";".
         covers = [value for value in course.evidence_section_ids.split(";") if value]
+        # The line of text the model reads for this course.
         text = _row_text(course)
         # The same chunk_id as the course summary chunk of the knowledge base, so the app shows both the same way.
         chunk = Chunk(
