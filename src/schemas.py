@@ -1,5 +1,4 @@
-# Shared data formats: every record that one step writes and another step reads is
-# defined here, once. This is done so the
+# The shared data formats: every record that one step writes and another step reads is defined here, once, so the
 # field names always match across the project.
 #
 # Record           File                                    Written by -> read by
@@ -15,31 +14,36 @@
 #   AnswerResult     returned by answer()                    answer.py -> app, evaluation
 from __future__ import annotations
 
+# dataclass builds each record class from its list of fields; asdict and fields let us turn a record into a dictionary
+# and list its field names.
 from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Optional
 
 
-# Base class of every record: converts it to and from a dictionary, the form used
-# to save it as one line of JSON or one row of CSV.
+# The base class of every record: it turns the record into a dictionary and back, which is the form we use to save it
+# as one line of JSON or one row of CSV.
 class Record:
 
+    # The record as a dictionary.
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)  # type: ignore[arg-type]
 
+    # The names of the fields of this record, in order (used as the column names of the CSV files).
     @classmethod
     def field_names(cls) -> list[str]:
         return [f.name for f in fields(cls)]  # type: ignore[arg-type]
 
-    # Build a record from a dictionary. With strict=True, a field that the class
-    # does not define raises an error, so a renamed or misspelled field in a file
-    # is detected at once instead of being silently ignored.
+    # Build a record from a dictionary. With strict=True, a field that the class doesn't define raises an error, so a
+    # renamed or misspelled field in a file is found at once instead of being silently ignored.
     @classmethod
     def from_dict(cls, data: dict[str, Any], strict: bool = True):
+        # The fields this record defines.
         names = set(cls.field_names())
         if strict:
             extra = set(data) - names
             if extra:
                 raise ValueError(f"{cls.__name__}: unknown fields {sorted(extra)}")
+        # Build the record from the fields it defines.
         return cls(**{k: v for k, v in data.items() if k in names})  # type: ignore[call-arg]
 
 
@@ -87,8 +91,8 @@ class SlideRecord(Record):
     n_images: int
 
 
-# The text obtained from one image of a slide: the OCR text and, for useful
-# images, the class and description given by the vision model.
+# The text we get from one image of a slide: the OCR text and, for useful images, the class and the description given
+# by the vision model.
 @dataclass
 class ImageText(Record):
     image_id: str           # "<slide_id>_img<NN>" or "<slide_id>_full"
@@ -104,9 +108,8 @@ class ImageText(Record):
     human_checked: bool = False
 
 
-# One searchable piece of text. text is what the language model reads;
-# embed_text adds the course name and position in front and is what gets embedded
-# and searched.
+# One searchable piece of text. text is what the language model reads; embed_text adds the course name and the
+# position in front, and is what we embed and search.
 @dataclass
 class Chunk(Record):
     chunk_id: str           # "<strategy>__<first covered id>__<NN>"
@@ -134,8 +137,7 @@ class Parent(Record):
     text: str
 
 
-# One row of the course table: the admin facts of one course,
-# taken from its syllabus.
+# One row of the course table: the admin facts of one course, taken from its syllabus.
 @dataclass
 class CourseRow(Record):
     course_code: str
@@ -181,7 +183,7 @@ class Question(Record):
 
 # ---------------------------------------------------------------- answer() contract
 
-# Restricts the search to one course and, optionally, to some sessions.
+# Limits the search to one course and, optionally, to some sessions.
 @dataclass
 class Filters(Record):
     course_code: Optional[str] = None
@@ -208,9 +210,10 @@ class Hit(Record):
     label: str = ""         # "S1", "S2", ... as cited in the answer
     thumbnail_path: str = ""
 
-    # The chunk is stored as a nested dictionary, so it is rebuilt as a Chunk first.
+    # The chunk is stored as a nested dictionary, so we rebuild it as a Chunk first.
     @classmethod
     def from_dict(cls, data: dict[str, Any], strict: bool = True):
+        # Work on a copy, so the dictionary we received isn't changed.
         data = dict(data)
         if isinstance(data.get("chunk"), dict):
             data["chunk"] = Chunk.from_dict(data["chunk"], strict=strict)
@@ -225,7 +228,7 @@ class Citation(Record):
     covers: list[str]
 
 
-# What answer() returns. The app and the evaluation read only these fields.
+# What answer() returns. The app and the evaluation only read these fields.
 @dataclass
 class AnswerResult(Record):
     question: str
@@ -240,10 +243,11 @@ class AnswerResult(Record):
     config_name: str
     kb_sig: str
 
-    # The nested records (route, filters, sources, citations) are rebuilt
-    # from their dictionaries before the result itself.
+    # The nested records (route, filters, sources, citations) are rebuilt from their dictionaries before the result
+    # itself.
     @classmethod
     def from_dict(cls, data: dict[str, Any], strict: bool = True):
+        # Work on a copy, so the dictionary we received isn't changed.
         data = dict(data)
         data["route"] = RouteDecision.from_dict(data["route"], strict=strict)
         data["filters_used"] = Filters.from_dict(data["filters_used"], strict=strict)
@@ -252,10 +256,10 @@ class AnswerResult(Record):
         return super().from_dict(data, strict=strict)
 
 
-# The fixed answer given when the material does not support an answer.
+# The fixed answer we give when the material doesn't support an answer.
 REFUSAL = "This isn't covered in the course material I have."
 
-# file is the record class, used by tests/test_contracts.py to check every file's fields
+# Each file with its record class; tests/test_contracts.py uses it to check the fields of every file.
 CONTRACT_FILES = {
     "data/manifest.csv": ManifestRow,
     "data/interim/syllabus_sections.jsonl": SyllabusSection,

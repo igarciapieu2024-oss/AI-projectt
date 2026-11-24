@@ -1,11 +1,9 @@
-# Classify and describe every slide image with a local vision model (qwen2.5vl:7b in Ollama), in one step.
-# The vision model decides the type of each image and writes its description in the same call, so no
-# separate image classifier is needed. So we have one model, one decision, and less noise in the knowledge base.
-# This file reads data/image_texts.jsonl (written by run_vision.py, one row per image with its OCR text),
-# adds a class and a description to each row and saves the file again. chunking.py then adds the OCR
-# text and the description of the useful images to the chunk of their slide, and skips photos and
-# decorations.
-#
+# Classify and describe every slide image with a local vision model (qwen2.5vl:7b in Ollama), in one step. The vision
+# model decides the type of each image and writes its description in the same call, so we don't need a separate image
+# classifier: one model, one decision, and less noise in the knowledge base.
+# This file reads data/image_texts.jsonl (written by run_vision.py, one row per image with its OCR text), adds a class
+# and a description to each row and saves the file again. chunking.py then adds the OCR text and the description of
+# the useful images to the chunk of their slide, and skips photos and decorations.
 # How to run it from the repo folder (Ollama must be open):
 #   python -m src.vision.describe --limit 5                        try it on 5 images first
 #   python -m src.vision.describe --limit 5 --model qwen2.5vl:3b   try another vision model without editing the config
@@ -14,6 +12,8 @@
 #   python -m src.vision.describe --apply-review                   save the corrections and count the results
 from __future__ import annotations
 
+# argparse reads the options from the terminal, csv writes the review spreadsheet, json reads the model's answer,
+# random picks the review sample and time measures the speed.
 import argparse
 import csv
 import json
@@ -22,6 +22,7 @@ import sys
 import time
 from pathlib import Path
 
+# The folders of the project, the config reader, the format of an image row and the JSONL reader and writer.
 from src.config import PATHS, load_config
 from src.schemas import ImageText
 from src.utils.io import read_jsonl, write_jsonl
@@ -29,29 +30,30 @@ from src.utils.io import read_jsonl, write_jsonl
 # ----------------------------------------------------------------------
 # Settings
 
-# The 6 classes the vision model can choose from. They are the same names used in src/schemas.py,
-# so every file of the project understands the class written here.
+# The 6 classes the vision model can choose from. They're the same names we use in src/schemas.py, so every file of
+# the project understands the class written here.
 CLASSES = ["diagram", "chart", "formula", "table", "photo", "decoration"]
 # Only these 4 classes carry course content. Photos and decorations (logos, icons, backgrounds) get a
 # class but no description, and chunking.py leaves them out of the knowledge base.
 USEFUL_CLASSES = {"diagram", "chart", "formula", "table"}
-# Maximum length of a description. It is added to the chunk of its slide, so it has to be short enough
-# not to push out the text of the slide itself (a chunk holds at most 800 characters).
+# The maximum length of a description. We add it to the chunk of its slide, so it has to be short enough not to push
+# out the text of the slide itself (a chunk holds at most 800 characters).
 MAX_WORDS = 120
 # The vision model reads the image at its own resolution, so a large image takes minutes. Shrinking it to
 # 768 pixels on its longest side keeps the labels readable and makes each image much faster.
 MAX_SIDE = 768
-# Spreadsheet used for the check by hand (data/labels/description_review.csv). The first 5 columns are
-# filled by the script; the last 3 are filled by the person who checks the images.
+# The spreadsheet we use for the check by hand (data/labels/description_review.csv). The script fills the first 5
+# columns, and the person who checks the images fills the last 3.
+# The file and its columns.
 REVIEW_FILE = PATHS["labels"] / "description_review.csv"
 REVIEW_FIELDS = ["image_id", "image_class", "image_path", "ocr_text", "description", "correct", "fixed_description", "error_type"]
 
-# The instruction sent to the vision model with every image. It is the text the
-# model receives. {max_words} and {ocr_text} are filled in for each image, and the double braces {{ }}
-# are written so that Python leaves single braces in the final text. Each part has a reason:
+# The instruction we send to the vision model with every image. {max_words} and {ocr_text} are filled in for each
+# image, and the double braces {{ }} are there so that Python leaves single braces in the final text. Each part has a
+# reason:
 #   - the classes are listed with examples, because logos and university branding are the main noise;
-#   - photos and decorations get an empty description, so the model itself filters what is not worth storing;
-#   - "describe only what is visible", because small vision models tend to add knowledge not in the image;
+#   - photos and decorations get an empty description, so the model itself filters what isn't worth storing;
+#   - "describe only what is visible", because small vision models tend to add knowledge that isn't in the image;
 #   - labels in their order, because those are the words students type when they search;
 #   - the OCR text is included, because the vision model often misreads small words;
 #   - JSON only, so the program can read the class and the description without guessing.
@@ -82,16 +84,17 @@ Answer with JSON only, in this exact format:
 # ----------------------------------------------------------------------
 # Classify and describe one image
 
-# Return a smaller copy of the image as PNG bytes, ready to send to the model. The copy is made in
-# memory, so the image file on disk is never changed.
+# Return a smaller copy of the image as PNG bytes, ready to send to the model. We make the copy in memory, so the
+# image file on disk never changes.
 def shrink(path: str) -> bytes:
     # Imported here because only this function needs them.
     from io import BytesIO
     from PIL import Image
 
+    # Open the image; the `with` block closes the file when we finish.
     with Image.open(path) as im:
-        # Many formulas are black text on a transparent background. Converting them straight to RGB turns
-        # the transparent parts black and hides the text, so the transparent parts are painted white first.
+        # Many formulas are black text on a transparent background. Converting them straight to RGB turns the
+        # transparent parts black and hides the text, so we paint the transparent parts white first.
         if im.mode in ("RGBA", "LA") or "transparency" in im.info:
             im = im.convert("RGBA")
             white = Image.new("RGB", im.size, "white")
@@ -99,11 +102,12 @@ def shrink(path: str) -> bytes:
             im = white
         # The same colour format for every image.
         im = im.convert("RGB")
-        # Shrink keeping the proportions; images already smaller than MAX_SIDE are not enlarged.
+        # Shrink it keeping the proportions; images already smaller than MAX_SIDE aren't enlarged.
         im.thumbnail((MAX_SIDE, MAX_SIDE))
         # Save the copy into a buffer in memory instead of a file.
         buffer = BytesIO()
         im.save(buffer, format="PNG")
+    # The bytes of the PNG copy.
     return buffer.getvalue()
 
 
@@ -113,32 +117,33 @@ def classify_and_describe(path: str, ocr_text: str, model: str) -> tuple[str, st
     # Imported here so the rest of the project works on a laptop without the ollama library.
     import ollama
 
-    # Fill the prompt for this image. The OCR text is cut at 1,500 characters, so a very long one
-    # does not fill the prompt and push out the instructions.
+    # Fill the prompt for this image. We cut the OCR text at 1,500 characters, so a very long one doesn't fill the
+    # prompt and push out the instructions.
     prompt = PROMPT.format(max_words=MAX_WORDS, ocr_text=(ocr_text or "")[:1500])
     # The request to Ollama, which runs the model on this laptop.
     reply = ollama.chat(
         model=model,
         # The prompt and the smaller copy of the image go in the same message.
         messages=[{"role": "user", "content": prompt, "images": [shrink(path)]}],
-        # Forces the model to answer with JSON, so the class and the description can always be read.
+        # This forces the model to answer with JSON, so we can always read the class and the description.
         format="json",
         # temperature 0: no randomness, the same image always gets the same answer.
         # num_predict 400: stops the answer at about 400 tokens; 120 words fit easily.
         # repeat_penalty 1.15: stops the model from listing the same label again and again.
         options={"temperature": 0, "num_predict": 400, "repeat_penalty": 1.15},
-        # Keeps the model loaded for 30 minutes, so it is not reloaded for every image.
+        # This keeps the model loaded for 30 minutes, so it isn't reloaded for every image.
         keep_alive="30m",
     )
-    # Newer versions of the ollama library return an object and older ones a dictionary; this reads both.
+    # Newer versions of the ollama library return an object and older ones a dictionary; this line reads both.
     text = reply["message"]["content"] if isinstance(reply, dict) else reply.message.content
     try:
         # Turn the JSON text into a Python dictionary.
         data = json.loads(text)
     except json.JSONDecodeError:
-        # The answer was cut before the JSON closed (the 400-token limit was reached). Instead of losing
-        # the image, the class and the description are recovered from the text that did arrive.
+        # The answer was cut before the JSON closed (it reached the 400-token limit). Instead of losing the image, we
+        # recover the class and the description from the text that did arrive.
         import re
+        # Find the class and the start of the description in the text, even without the closing brace.
         found_class = re.search(r'"image_class"\s*:\s*"([a-zA-Z]+)', text)
         found_desc = re.search(r'"description"\s*:\s*"(.*)', text, re.S)
         data = {"image_class": found_class.group(1) if found_class else "",
@@ -146,13 +151,14 @@ def classify_and_describe(path: str, ocr_text: str, model: str) -> tuple[str, st
 
     # Clean the class: lower case, and only the class name when the model wrote more.
     image_class = str(data.get("image_class", "")).strip().lower()
+    # If the answer starts with one of the 6 class names, we keep just that name.
     image_class = next((c for c in CLASSES if image_class.startswith(c)), image_class)
-    # A class that is not one of the 6 raises an error: the row stays unclassified and is retried
-    # in the next run, instead of saving a wrong class.
+    # A class that isn't one of the 6 raises an error: the row stays unclassified and we try it again in the next run,
+    # instead of saving a wrong class.
     if image_class not in CLASSES:
         raise ValueError(f"unknown class from the model: {image_class!r}")
-    # Photos and decorations get no description, even if the model wrote one. This is what keeps
-    # logos and pictures out of the knowledge base.
+    # Photos and decorations get no description, even if the model wrote one. This is what keeps logos and pictures
+    # out of the knowledge base.
     if image_class not in USEFUL_CLASSES:
         return image_class, ""
 
@@ -164,9 +170,8 @@ def classify_and_describe(path: str, ocr_text: str, model: str) -> tuple[str, st
 # ----------------------------------------------------------------------
 # Read the image rows and decide which ones are pending
 
-# Read data/image_texts.jsonl: one row per image with its id, slide, file and OCR text.
-# ImageText (src/schemas.py) checks that every row has the agreed fields, so a wrong field fails here
-# and not later in the chunking.
+# Read data/image_texts.jsonl: one row per image with its id, slide, file and OCR text. ImageText (src/schemas.py)
+# checks that every row has the agreed fields, so a wrong field fails here and not later in the chunking.
 def load_rows() -> list[ImageText]:
     path = PATHS["image_texts"]
     # The file is written by run_vision.py; without it there is nothing to describe.
@@ -175,13 +180,13 @@ def load_rows() -> list[ImageText]:
     return read_jsonl(path, ImageText)  # type: ignore[return-value]
 
 
-# True if the image still has to go through the vision model. This is what lets the run be stopped
-# and continued later without repeating the images already done.
+# True if the image still has to go through the vision model. This is what lets us stop the run and continue later
+# without repeating the images already done.
 def needs_work(row: ImageText, force: bool) -> bool:
-    # Rows corrected by hand are never sent again, not even with --force, so a correction is never lost.
+    # Rows corrected by hand are never sent again, not even with --force, so we never lose a correction.
     if row.human_checked:
         return False
-    # --force: redo every image that was not corrected by hand.
+    # --force: redo every image that wasn't corrected by hand.
     if force:
         return True
     # Never classified.
@@ -194,15 +199,16 @@ def needs_work(row: ImageText, force: bool) -> bool:
 # ----------------------------------------------------------------------
 # Classify and describe all the pending images
 
-# Add a class to every pending image and a description to the useful ones, saving the file as it goes.
-# Returns how many images were processed. Called by main().
+# Add a class to every pending image and a description to the useful ones, saving the file as it goes. It returns how
+# many images were processed. main() calls it.
 def describe_all(cfg, limit: int | None = None, force: bool = False, model: str | None = None) -> int:
+    # All the image rows, with their OCR text.
     rows = load_rows()
-    # The vision model comes from the config (generation.vision_model in base.yaml); --model replaces it,
-    # to compare models without editing the YAML.
+    # The vision model comes from the config (generation.vision_model in base.yaml); --model replaces it, so we can
+    # compare models without editing the YAML.
     model = model or cfg.generation["vision_model"]
 
-    # The images still to process; --limit keeps only the first ones, to try the step quickly.
+    # The images we still have to process; --limit keeps only the first ones, to try the step quickly.
     todo = [r for r in rows if needs_work(r, force)]
     if limit:
         todo = todo[:limit]
@@ -211,36 +217,37 @@ def describe_all(cfg, limit: int | None = None, force: bool = False, model: str 
     # Counter and start time, to show the speed and estimate how long the whole run will take.
     done, start = 0, time.perf_counter()
     for row in todo:
-        # Paths are stored relative to the repo so they work on every laptop; the repo folder is added in front.
+        # The paths are stored relative to the repo so they work on every laptop; we add the repo folder in front.
         path = Path(row.image_path)
         if not path.is_absolute():
             path = PATHS["root"] / path
-        # The image is listed but not on this laptop: skip it.
+        # The image is listed but it isn't on this laptop, so we skip it.
         if not path.exists():
             print(f"  missing image file: {row.image_path}")
             continue
-        # Errors are caught image by image, so one bad image does not stop the whole run.
+        # We catch the errors image by image, so one bad image doesn't stop the whole run.
         try:
             row.image_class, row.description = classify_and_describe(str(path), row.ocr_text, model)
             # The vision model gives no probability; 1.0 marks "decided by the vision model".
             row.class_prob = 1.0
-            # Which model decided, so the documentation can say it.
+            # Which model decided, so we can say it in the documentation.
             row.vision_model = model
         except Exception as exc:  # noqa: BLE001
-            # Bad JSON, unknown class or Ollama error: the row stays empty and is retried in the next run.
+            # Bad JSON, unknown class or an Ollama error: the row stays empty and we try it again in the next run.
             print(f"  {row.image_id}: {type(exc).__name__}: {exc}")
             continue
+        # One more image done; print the progress and the average seconds per image so far.
         done += 1
         elapsed = time.perf_counter() - start
         print(f"  {done}/{len(todo)} {row.image_id} -> {row.image_class} ({elapsed / done:.1f} s/image)")
-        # Save every 10 images: if the laptop sleeps or Ollama closes, at most 10 images are lost,
-        # and the next run continues from there.
+        # We save every 10 images: if the laptop sleeps or Ollama closes, we lose at most 10 images, and the next run
+        # continues from there.
         if done % 10 == 0:
             write_jsonl(PATHS["image_texts"], rows)
     # Final save, with all the rows (processed or not), so no row is lost.
     write_jsonl(PATHS["image_texts"], rows)
 
-    # Number of images in each class, the figures used in the documentation.
+    # The number of images in each class, the figures we use in the documentation.
     counts = {c: sum(r.image_class == c for r in rows) for c in CLASSES}
     print(f"Processed {done} images -> {PATHS['image_texts'].relative_to(PATHS['root'])}")
     print("Images per class:", counts)
@@ -250,20 +257,21 @@ def describe_all(cfg, limit: int | None = None, force: bool = False, model: str 
 # ----------------------------------------------------------------------
 # Check by hand: random descriptions, corrected and counted
 
-# First half of the check: write n random descriptions to a spreadsheet, so a person can compare
-# each one with its image.
+# First half of the check: write n random descriptions to a spreadsheet, so a person can compare each one with its
+# image.
 def write_review(n: int = 50) -> Path:
-    # Only images with a description can be checked.
+    # We can only check images that have a description.
     rows = [r for r in load_rows() if r.description]
-    # Shuffled so the sample is random and fair; the fixed seed (42) gives the same sample if it is rerun.
+    # We shuffle them so the sample is random and fair; the fixed seed (42) gives the same sample if we run it again.
     random.Random(42).shuffle(rows)
+    # Make sure the folder exists, then write the spreadsheet with its header.
     REVIEW_FILE.parent.mkdir(parents=True, exist_ok=True)
     with REVIEW_FILE.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=REVIEW_FIELDS)
         writer.writeheader()
         # The first n rows after shuffling are the n random images.
         for r in rows[:n]:
-            # The last 3 columns are left empty for the reviewer.
+            # The last 3 columns stay empty for the reviewer.
             writer.writerow({"image_id": r.image_id, "image_class": r.image_class, "image_path": r.image_path,
                              "ocr_text": r.ocr_text, "description": r.description,
                              "correct": "", "fixed_description": "", "error_type": ""})
@@ -275,25 +283,28 @@ def write_review(n: int = 50) -> Path:
 
 
 # Second half of the check: save the corrections into image_texts.jsonl and count the results in
-# reports/description_review.json. Those counts are the figures of the documentation
-# (39 correct, 10 partly correct, 1 wrong out of 50).
+# reports/description_review.json. Those counts are the figures of the documentation (39 correct, 10 partly correct, 1
+# wrong out of 50).
 def apply_review() -> dict:
+    # The review spreadsheet has to exist first.
     if not REVIEW_FILE.exists():
         raise SystemExit("No review file: run with --review 50 first")
-    # Only the rows the reviewer filled in (the "correct" column is not empty).
+    # We only read the rows the reviewer filled in (the "correct" column isn't empty).
     with REVIEW_FILE.open(encoding="utf-8", newline="") as f:
         review = {r["image_id"]: r for r in csv.DictReader(f) if r["correct"].strip()}
+    # Go through every image row and apply the correction of the ones in the sample.
     rows = load_rows()
     for row in rows:
         r = review.get(row.image_id)
-        # Images outside the sample are left as they are.
+        # Images outside the sample stay as they are.
         if r is None:
             continue
         # A corrected description replaces the model's one.
         if r["fixed_description"].strip():
             row.description = r["fixed_description"].strip()
-        # Marked as checked, so needs_work() never sends it to the model again.
+        # We mark it as checked, so needs_work() never sends it to the model again.
         row.human_checked = True
+    # Save the rows with the corrections.
     write_jsonl(PATHS["image_texts"], rows)
 
     # Count the verdicts (yes / partly / no) and how many times each type of error appeared.
@@ -302,6 +313,7 @@ def apply_review() -> dict:
     for r in review.values():
         if r["error_type"].strip():
             errors[r["error_type"].strip()] = errors.get(r["error_type"].strip(), 0) + 1
+    # The summary: how many were checked, how many were correct, partly correct and wrong, and the error types.
     summary = {"checked": len(verdicts), "correct": verdicts.count("yes"), "partly": verdicts.count("partly"),
                "wrong": verdicts.count("no"), "error_types": errors}
     # Save the counts in reports/ and print them.
@@ -315,10 +327,10 @@ def apply_review() -> dict:
 # ----------------------------------------------------------------------
 # Command line
 
-# Read the options written after the command and run the matching part:
-# --review N writes the spreadsheet, --apply-review saves the corrections, and with no option
-# the pending images are classified and described.
+# Read the options written after the command and run the matching part: --review N writes the spreadsheet,
+# --apply-review saves the corrections, and with no option we classify and describe the pending images.
 def main(argv: list[str] | None = None) -> int:
+    # The options the command accepts.
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     # The config holds the vision model (generation.vision_model in base.yaml).
     parser.add_argument("--config", default="configs/base.yaml")
@@ -327,6 +339,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force", action="store_true", help="process again images that were already done (except the ones corrected by hand)")
     parser.add_argument("--review", type=int, metavar="N", help="write N random descriptions to check by hand")
     parser.add_argument("--apply-review", action="store_true", help="apply the corrections from the review file")
+    # Read them and run the matching part.
     args = parser.parse_args(argv)
     if args.review:
         write_review(args.review)

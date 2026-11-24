@@ -1,30 +1,30 @@
-# Builders for every id used in the project, one function per id type.
-# Each id is built only from fixed data (course, sessions, page or section number),
-# never from the reading order or the date, so it is the same on every rebuild.
-# All files link their records through these ids, and the evaluation questions use
-# them to name their correct source.
-#
+# The builders of every id used in the project, one function per type of id. Each id is built only from fixed data
+# (course, sessions, page or section number), never from the reading order or the date, so it's the same after every
+# rebuild. All the files link their records through these ids, and the evaluation questions use them to name their
+# correct source.
 #   source_id   c01_syl  |  c01_s04  |  c01_s05-06
 #   section_id  c01_syl_sec04
 #   slide_id    c01_s04_p025
 #   image_id    c01_s04_p025_img01   |  c01_s04_p025_full
 #   chunk_id    slide__c01_s04_p025__00
 #   run_id      final__test__20261115-1030
-#
-# Numbers are zero-padded (04, 025) so every id of the same type has the same length
-# and ids sort in page and session order.
+# Numbers are padded with zeros (04, 025), so every id of the same type has the same length and the ids sort in page
+# and session order.
 from __future__ import annotations
 
+# datetime gives the date and time used in the id of an evaluation run.
 from datetime import datetime
 
 
 # Id of a document: the course code plus "_syl" for a syllabus, or "_s" plus its
 # sessions for a slide deck (several sessions are joined with "-").
 def source_id(course_code: str, doc_type: str, sessions: list[int] | None = None) -> str:
+    # A syllabus: the course code plus "_syl".
     if doc_type == "syllabus":
         return f"{course_code}_syl"
     if not sessions:  # a slide id without sessions would not be unique
         raise ValueError("slides need at least one session number")
+    # A slide deck: the course code, "_s" and its sessions with two digits each.
     return f"{course_code}_s" + "-".join(f"{s:02d}" for s in sessions)
 
 
@@ -53,5 +53,6 @@ def chunk_id(strategy: str, first_covered_id: str, n: int) -> str:
 # Id of an evaluation run: config name, question split and the date and time
 # (the current time if none is given).
 def run_id(config_name: str, split: str, when: datetime | None = None) -> str:
+    # The current date and time if none was given.
     when = when or datetime.now()
     return f"{config_name}__{split}__{when:%Y%m%d-%H%M}"
