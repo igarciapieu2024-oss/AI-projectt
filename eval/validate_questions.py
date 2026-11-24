@@ -1,17 +1,20 @@
-# Check the evaluation question bank (eval/questions.csv) before using it, so a typo in a question cannot
-# silently change the results. It checks the columns, the required fields, that every gold id exists in the
-# parsed slides and syllabus sections, repeated or almost repeated questions, the question types, the number
-# of questions of each type per author, and the dev/test split (40 dev and 60 test out of 100).
+# Check the evaluation question bank (eval/questions.csv) before using it, so a typo in a question can't silently
+# change the results. It checks the columns, the required fields, that every gold id exists in the parsed slides and
+# syllabus sections, repeated or almost repeated questions, the question types, the number of questions of each type
+# per author, and the dev/test split (40 dev and 60 test out of 100).
 #   python -m eval.validate_questions            (add --strict to also fail on warnings)
 # It only reads the files and prints the errors and warnings; it returns 1 if there are errors.
 
 from __future__ import annotations
 
+# argparse reads the options, csv reads the question file, json reads the parsed files and re cleans the questions.
 import argparse
 import csv
 import json
 import re
 
+# Counter and defaultdict count the questions per author and type, and SequenceMatcher measures how similar two
+# questions are.
 from collections import Counter, defaultdict
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -43,6 +46,8 @@ TYPES = {
     "unanswerable",
 }
 
+# How many questions of each type every author writes (20 each). It keeps the bank balanced, so a system can't look
+# strong only because one easy type of question dominates.
 QUOTA = {
     "admin": 4,
     "cross": 3,
@@ -52,22 +57,23 @@ QUOTA = {
     "unanswerable": 4,
 }
 
-# How many questions of each type every author writes (20 each). It keeps the bank balanced, so a system
-# cannot look strong only because one easy type of question dominates.
 
 
-# Read the ids (slide_id or section_id) of every record of a parsed file, to check the gold ids against them.
+# Read the ids (slide_id or section_id) of every record of a parsed file, so we can check the gold ids against them.
 def load_ids(path: Path, key: str) -> set[str]:
 
+    # The ids found in the file.
     ids = set()
 
     with path.open(encoding="utf-8") as file:
 
         for number, line in enumerate(file, start=1):
 
+            # Empty lines are skipped.
             if not line.strip():
                 continue
 
+            # Every line has to be valid JSON; the error says which file and line failed.
             try:
                 record = json.loads(line)
 
@@ -76,6 +82,7 @@ def load_ids(path: Path, key: str) -> set[str]:
                     f"Invalid JSON in {path}:{number}: {exc}"
                 ) from exc
 
+            # Every record needs its id.
             identifier = record.get(key)
 
             if not isinstance(identifier, str) or not identifier:
@@ -88,10 +95,11 @@ def load_ids(path: Path, key: str) -> set[str]:
     return ids
 
 
-# Lowercase the question and keep only letters and numbers, so two questions that differ only in punctuation
+# Put the question in lower case and keep only letters and numbers, so two questions that differ only in punctuation
 # or spaces are compared as the same text.
 def normalized(value: str) -> str:
 
+    # Lower case, everything that isn't a letter or a digit becomes a space, and repeated spaces are collapsed.
     value = value.lower()
 
     value = re.sub(r"[^a-z0-9]+", " ", value)
@@ -99,8 +107,8 @@ def normalized(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
-# Run every check and print the result. Errors make the file unusable; warnings are things to look at (an
-# unfinished bank, similar questions). Returns 1 if there are errors (or warnings with strict), else 0.
+# Run every check and print the result. Errors make the file unusable; warnings are things to look at (an unfinished
+# bank, similar questions). It returns 1 if there are errors (or warnings with strict), and 0 otherwise.
 def validate(
     questions: Path,
     slides: Path,
@@ -108,9 +116,11 @@ def validate(
     strict: bool = False,
 ) -> int:
 
+    # The problems we find: errors and warnings.
     errors = []
     warnings = []
 
+    # Open the question file (utf-8-sig also accepts files saved by Excel) and read its rows.
     with questions.open(
         encoding="utf-8-sig",
         newline=""
@@ -118,29 +128,33 @@ def validate(
 
         reader = csv.DictReader(file)
 
+        # The header has to be exactly the columns above, in the same order.
         if reader.fieldnames != COLUMNS:
             errors.append("Incorrect CSV columns")
 
         rows = list(reader)
 
+    # An empty file is an error.
     if not rows:
         errors.append("No questions found")
 
-    # The gold ids are checked against the ids that really exist in the parsed files, so an id that looks right
-    # but does not exist is caught.
+    # We check the gold ids against the ids that really exist in the parsed files, so an id that looks right but
+    # doesn't exist is caught.
     source_ids = (
         load_ids(slides, "slide_id")
         | load_ids(syllabus, "section_id")
     )
 
+    # The question ids seen so far, to find repeated ones.
     seen = set()
 
-    # Number of questions of each type per author, for the quota check below.
+    # The number of questions of each type per author, for the quota check below.
     by_author = defaultdict(Counter)
 
-    # Check each row; the row number starts at 2 because row 1 of the file is the header.
+    # Check each row; the row number starts at 2, because row 1 of the file is the header.
     for index, row in enumerate(rows, start=2):
 
+        # The label of this row in the messages, and each of its fields without spaces at the ends.
         label = f"Row {index}: {row.get('question_id', '?')}"
 
         qid = (row.get("question_id") or "").strip()
@@ -219,6 +233,7 @@ def validate(
                 f"{label}: answerable question missing gold IDs"
             )
 
+        # Every gold id has to exist in the parsed files.
         for source_id in gold:
 
             if source_id not in source_ids:
@@ -233,7 +248,7 @@ def validate(
                 f"{label}: missing reference answer"
             )
 
-    # Near-duplicate questions: every pair is compared, and a similarity of 0.91 or more is reported.
+    # Near-duplicate questions: we compare every pair, and report a similarity of 0.91 or more.
 
     for i, left in enumerate(rows):
 
@@ -260,6 +275,7 @@ def validate(
 
     for author, counts in sorted(by_author.items()):
 
+        # How many questions this author wrote in total.
         total = sum(counts.values())
 
         if total != 20:
@@ -267,6 +283,7 @@ def validate(
                 f"{author}: {total} questions, expected 20"
             )
 
+        # And how many of each type.
         for qtype, expected in QUOTA.items():
 
             if counts[qtype] != expected:
@@ -275,9 +292,10 @@ def validate(
                     f"expected={expected}"
                 )
 
-    # Dev/test split: until the 100 questions have a split it is only a warning; after that it must be 40 dev
-    # and 60 test.
+    # The dev/test split: until the 100 questions have a split it's only a warning; after that it has to be 40 dev and
+    # 60 test.
 
+    # How many questions are in each split; a question without a split counts as "unassigned".
     splits = Counter(
         (row.get("split") or "").strip().lower()
         or "unassigned"
@@ -313,6 +331,7 @@ def validate(
 
     print(f"Warnings: {len(warnings)}")
 
+    # Every error and every warning on its own line.
     for error in errors:
         print("ERROR:", error)
 
@@ -321,6 +340,7 @@ def validate(
 
     print("===========================================\n")
 
+    # The result: 1 if there are errors (or warnings with --strict), 0 if everything is fine.
     if errors:
         return 1
 
@@ -333,6 +353,7 @@ def validate(
 # Command line: the paths of the question file and of the parsed slides and syllabus sections.
 def main() -> None:
 
+    # The options: the three files and --strict.
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -360,7 +381,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # A missing or broken file stops with a short message instead of a traceback.
+    # A missing or broken file stops with a short message instead of a long error trace.
     try:
         result = validate(
             args.questions,
@@ -372,6 +393,7 @@ def main() -> None:
     except (OSError, ValueError) as exc:
         parser.exit(2, f"ERROR: {exc}\n")
 
+    # Leave with the result as the exit code.
     raise SystemExit(result)
 
 

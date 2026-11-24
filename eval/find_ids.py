@@ -1,19 +1,22 @@
-# Find the ids of the syllabus sections, slides and slide images that contain some words. Used when writing
-# the evaluation questions, to fill in gold_ids (the correct source of each question).
+# Find the ids of the syllabus sections, slides and slide images that contain some words. We use it when writing the
+# evaluation questions, to fill in gold_ids (the correct source of each question).
 #   python -m eval.find_ids "final exam"
 from __future__ import annotations
 
+# argparse reads the words to search, and json reads the records.
 import argparse
 import json
 from pathlib import Path
 
+# Where the parsed files are.
 from src.config import PATHS
 
 
-# Return every section, slide and image record that contains all the words of the query. It is a plain word
-# search to help write the questions, not the search of the system. An image match gives the id of its slide,
-# because the slide is the source the knowledge base cites.
+# Return every section, slide and image record that contains all the words of the query. It's a plain word search to
+# help us write the questions, not the search of the system. An image match gives the id of its slide, because the
+# slide is the source the knowledge base cites.
 def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
+    # The words of the query, in lower case.
     words = query.casefold().split()
     if not words:
         return []
@@ -33,14 +36,17 @@ def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
             (data_dir / "image_texts.jsonl", "image"),
         ]
 
+    # The records that match.
     matches = []
 
     for path, record_type in files:
+        # A file that doesn't exist yet is skipped with a message.
         if not path.exists():
             print(f"File not found: {path}")
             continue
 
-        # Read the file line by line (one JSON record per line) and take the id, course, title and text of each record.
+        # Read the file line by line (one JSON record per line) and take the id, the course, the title and the text of
+        # each record.
         with path.open(encoding="utf-8") as file:
             for line in file:
                 if not line.strip():
@@ -48,16 +54,19 @@ def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
 
                 record = json.loads(line)
 
+                # A syllabus section: its id, course, name and text.
                 if record_type == "section":
                     source_id = record.get("section_id", "")
                     course = record.get("course_code", "")
                     title = record.get("section_name", "")
                     text = record.get("text", "")
+                # A slide: its id, course, title and text.
                 elif record_type == "slide":
                     source_id = record.get("slide_id", "")
                     course = record.get("course_code", "")
                     title = record.get("title", "")
                     text = record.get("text", "")
+                # An image: the id of its slide, and its OCR text and description as the text.
                 else:
                     source_id = record.get("slide_id", "")
                     course = record.get("course_code", "")
@@ -68,7 +77,7 @@ def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
                         + record.get("description", "")
                     )
 
-                # A record matches when every word of the query appears in its title or text (any case).
+                # A record matches when every word of the query appears in its title or its text (in any case).
                 searchable = f"{title} {text}".casefold()
 
                 if all(word in searchable for word in words):
@@ -85,12 +94,14 @@ def find_ids(query: str, data_dir: Path | None = None) -> list[dict]:
 
 # Command line: search the words and print each match with a short piece of its text.
 def main() -> None:
+    # The only argument is the words to search.
     parser = argparse.ArgumentParser(
         description="Find syllabus section and slide IDs."
     )
     parser.add_argument("query", help="Words to search for")
     args = parser.parse_args()
 
+    # Search, and print a message if nothing was found.
     results = find_ids(args.query)
 
     if not results:

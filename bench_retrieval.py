@@ -1,18 +1,21 @@
-# Quick retrieval check: does the search find the right source? It is not the official evaluation
-# (eval/run_eval.py); it only compares changes to the search quickly, without calling the LLM to answer.
+# A quick check of the retrieval: does the search find the right source? It isn't the official evaluation
+# (eval/run_eval.py); we only use it to compare changes to the search quickly, without calling the LLM to answer.
 #   python bench_retrieval.py --config configs/final_system.yaml
 #   python bench_retrieval.py --config configs/experiments/bge_small_embeddings.yaml
 # 44 questions are asked without a course filter (the hardest case), in 3 groups:
-#   main (28): admin and content questions over the 7 courses, the set used for all the earlier comparisons;
+#   main (28): admin and content questions over the 7 courses, the set we used for all the earlier comparisons;
 #   images (8): the answer is only inside a slide image (diagram, chart, table), not in the slide text;
 #   spanish (8): main questions asked in Spanish, to check the translation.
-# The right sources are syllabus sections found by their heading, slides found by a keyword, or fixed slide
-# ids. It prints hit@1, hit@5 and MRR after the fusion and after the reranker. It does not change any file.
+# The right sources are syllabus sections found by their heading, slides found by a keyword, or fixed slide ids. It
+# prints hit@1, hit@5 and MRR after the fusion and after the reranker. It doesn't change any file.
+# argparse reads the options, json prints the final line, re matches the slide patterns and time measures the run.
 import argparse
 import json
 import re
 import time
 
+# The folders and the config reader, the real search of the answer phase, the translation of questions, the reranker
+# and the JSONL reader.
 from src.config import PATHS, load_config
 from src.generation.answer import _build_hits
 from src.generation.rewrite import translate_to_english_query
@@ -51,7 +54,7 @@ CASES = [
     ("What is a Nash equilibrium?", "strategies", r"slide:nash equilibrium"),
     ("What is vertical integration?", "strategies", r"slide:vertical integration"),
 ]
-# Questions answered only by the text of a slide image, so they check the image step.
+# Questions that are only answered by the text of a slide image, so they check the image step.
 IMAGE_CASES = [
     ("What is the Dupont formula for ROE?", "strategies", "ids:strategies_s02_p040"),
     ("What are the steps of the expectancy theory of motivation?", "ob", "ids:ob_s05_p036"),
@@ -73,16 +76,21 @@ SPANISH_CASES = [
     ("¿Qué es un fallo de página en un sistema operativo?", "os", r"slide:page fault"),
     ("¿Qué es el equilibrio de Nash?", "strategies", r"slide:nash equilibrium"),
 ]
+# The three groups of cases, each with its name.
 GROUPS = [("main", CASES), ("images", IMAGE_CASES), ("spanish", SPANISH_CASES)]
 
 
 # The ids of the right sources of one case, found in the parsed sections and slides of its course.
 def gold_ids(course: str, target: str, sections: list, slides: list) -> set[str]:
+    # The kind of target and its value, separated by the first ":".
     kind, value = target.split(":", 1)
+    # Fixed ids: the list written in the case.
     if kind == "ids":
         return set(value.split(","))
+    # A syllabus section: the sections of that course with that label.
     if kind == "section":
         return {s["section_id"] for s in sections if s["course_code"] == course and s["section_name"] == value}
+    # A slide: the slides of that course whose title or text matches the pattern.
     pattern = re.compile(value, re.IGNORECASE)
     return {s["slide_id"] for s in slides
             if s["course_code"] == course and pattern.search(f"{s.get('title', '')} {s.get('text', '')}")}
@@ -90,6 +98,7 @@ def gold_ids(course: str, target: str, sections: list, slides: list) -> set[str]
 
 # The position (from 1) of the first result that covers a right source, or None if none of them does.
 def rank_of_first_hit(hits, gold: set[str]) -> int | None:
+    # Go through the results in order, counting from 1.
     for i, hit in enumerate(hits, 1):
         if gold & set(hit.chunk.covers):
             return i
@@ -98,40 +107,50 @@ def rank_of_first_hit(hits, gold: set[str]) -> int | None:
 
 # Run the cases, print the position of the right source for each one and the summary of each group.
 def main() -> None:
+    # The options: the config, which group to run, and optionally how many candidates each search returns.
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/final_system.yaml")
     parser.add_argument("--group", choices=["all", *(name for name, _ in GROUPS)], default="all")
-    # --k-dense and --k-bm25 change how many candidates each search returns, to compare without editing a config.
+    # --k-dense and --k-bm25 change how many candidates each search returns, so we can compare without editing a
+    # config.
     parser.add_argument("--k-dense", type=int)
     parser.add_argument("--k-bm25", type=int)
     args = parser.parse_args()
+    # Load the config and apply the two options, if they were given.
     cfg = load_config(args.config)
     if args.k_dense is not None:
         cfg.retrieval["k_dense"] = args.k_dense
     if args.k_bm25 is not None:
         cfg.retrieval["k_bm25"] = args.k_bm25
+    # Both numbers have to be whole numbers of at least 1.
     for key in ("k_dense", "k_bm25"):
         value = cfg.retrieval.get(key)
         if not isinstance(value, int) or isinstance(value, bool) or value < 1:
             parser.error(f"{key.replace('_', '-')} must be a positive integer")
+    # The parsed sections and slides, to find the right sources of each case.
     sections = read_jsonl(PATHS["syllabus_sections"])
     slides = read_jsonl(PATHS["slides"])
     # The cross-encoder is loaded once; it scores the fused candidates of every case below.
     model = rerank._model(cfg.retrieval["reranker_model"])
+    # Print the settings of this run.
     print(
         f"config={cfg.name}  kb_sig={cfg.kb_sig}  embed_model={cfg.kb['embed_model']}  "
         f"k_dense={cfg.retrieval['k_dense']}  k_bm25={cfg.retrieval['k_bm25']}  "
         f"translate_query={cfg.generation.get('translate_query', False)}\n"
     )
 
+    # The positions of every group, and the start time.
     results = {}
     started = time.perf_counter()
     for group, cases in GROUPS:
+        # Skip the groups that weren't asked for.
         if args.group != "all" and group != args.group:
             continue
+        # The position of the right source in each case, after the fusion and after the reranker.
         fused_ranks, reranked_ranks = [], []
         print(f"--- {group}")
         for question, course, target in cases:
+            # The right sources of this case.
             gold = gold_ids(course, target, sections, slides)
             query = question
             # The same translation as the answer phase, so the Spanish questions are searched in English.
@@ -139,43 +158,50 @@ def main() -> None:
                 query = translate_to_english_query(question, cfg)
             # The same search as the answer phase (dense + BM25 + RRF), without a course filter on purpose.
             fused = _build_hits(query, cfg, None)
+            # The reranker score of every candidate.
             scores = model.predict(
                 [(query, hit.chunk.embed_text) for hit in fused],
                 show_progress_bar=False,
             )
-            # All the candidates sorted by the reranker, to see where the right source ends up.
+            # All the candidates sorted by the reranker, so we can see where the right source ends up.
             reranked = [hit for _, hit in sorted(zip(scores, fused), key=lambda item: -item[0])]
+            # Where the right source is in each list.
             fused_rank = rank_of_first_hit(fused, gold)
             reranked_rank = rank_of_first_hit(reranked, gold)
             fused_ranks.append(fused_rank)
             reranked_ranks.append(reranked_rank)
+            # Print both positions ("-" when it wasn't found), the number of right sources and the question.
             print(
                 f"fusion #{fused_rank if fused_rank else '-':>2}  "
                 f"rerank #{reranked_rank if reranked_rank else '-':>2}  "
                 f"({len(gold):2} gold)  {question}"
             )
+            # If the question was translated, show the query that was really searched.
             if query != question:
                 print(f"  search query: {query}")
         results[group] = (fused_ranks, reranked_ranks)
 
-    # hit@1: share of questions with a right source first; hit@5: within the first 5 (the sources the LLM
-    # receives); MRR: average of 1/position, 0 when it is not found.
+    # hit@1: the share of questions with a right source in first place; hit@5: within the first 5 (the sources the LLM
+    # receives); MRR: the average of 1/position, with 0 when it isn't found.
     def summary(name, ranks):
+        # The number of cases, and the three metrics.
         n = len(ranks)
         hit1 = sum(1 for r in ranks if r == 1) / n
         hit5 = sum(1 for r in ranks if r and r <= 5) / n
         mrr = sum(1 / r for r in ranks if r) / n
         print(f"{name:15} hit@1 {hit1:.2f}   hit@5 {hit5:.2f}   MRR {mrr:.2f}")
 
+    # How many questions were run and how long it took, and then the summary of each group.
     count = sum(len(cases) for group, cases in GROUPS if args.group in {"all", group})
     print(f"\n{count} questions, {time.perf_counter() - started:.0f} s")
     for group, (fused_ranks, reranked_ranks) in results.items():
         print(f"[{group}]")
         summary("after fusion", fused_ranks)
         summary("after reranker", reranked_ranks)
-    # One JSON line with every position after the reranker, to compare two runs.
+    # One JSON line with every position after the reranker, so two runs can be compared.
     print(json.dumps({"config": cfg.name, **{g: r for g, (_, r) in results.items()}}))
 
 
+# Runs only when the file is executed directly.
 if __name__ == "__main__":
     main()

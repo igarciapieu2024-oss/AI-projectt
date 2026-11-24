@@ -1,14 +1,16 @@
-# Draw four bar charts that compare three systems on the test questions: B0 (the LLM alone, no RAG), B1 (the
-# baseline RAG) and "Final v1.2" (the version of the final system on 16 November, before the changes of
-# 18 November). The values are read from the saved summary files of three fixed runs; nothing is run again.
+# Draw four bar charts that compare three systems on the test questions: B0 (the LLM alone, no RAG), B1 (the baseline
+# RAG) and "Final v1.2" (the version of the final system on 16 November, before the changes of 18 November). The
+# values are read from the saved summary files of three fixed runs; we don't run anything again.
 #   python -m eval.figures
 # The charts are saved in reports/figures/test/.
 
 from __future__ import annotations
 
+# json reads the summary files of each run.
 import json
 from pathlib import Path
 
+# matplotlib draws the charts, and numpy gives the positions of the bars.
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -18,6 +20,7 @@ B0_RUN = Path("eval/runs/20261116T193556Z_b0_no_rag_test")
 B1_RUN = Path("eval/runs/20261116T193243Z_b1_v1_test")
 FINAL_RUN = Path("eval/runs/20261116T192633Z_final_test")
 
+# The folder where the charts are saved.
 OUTPUT = Path("reports/figures/test")
 
 
@@ -27,9 +30,9 @@ def load_json(path: Path) -> dict:
         return json.load(f)
 
 
-# Draw one chart: a group of bars per metric, one bar per system, with its value written on top, and save it.
-# B0 is optional because the retrieval chart only compares the two RAG systems. Shares are shown as
-# percentages; the latency chart shows seconds.
+# Draw one chart: a group of bars per metric, one bar per system, with its value written on top, and save it. B0 is
+# optional, because the retrieval chart only compares the two RAG systems. Shares are shown as percentages; the
+# latency chart shows seconds.
 def grouped_chart(
     title: str,
     labels: list[str],
@@ -42,12 +45,13 @@ def grouped_chart(
     higher_is_better: bool = True,
 ) -> None:
 
+    # One position on the horizontal axis per metric, and an empty chart of 9 by 5 inches.
     x = np.arange(len(labels))
     fig, ax = plt.subplots(figsize=(9, 5))
 
     if b0_values is None:
-        # Two bars per group. The LLM alone has no search step, so it has no recall or MRR; plotting 0 would
-        # suggest it searched and failed.
+        # Two bars per group. The LLM alone has no search step, so it has no recall or MRR; drawing a 0 would suggest
+        # that it searched and failed.
         width = 0.33
         positions = [
             (x - width / 2, b1_values, "B1 Baseline", "#A9B8CC"),
@@ -62,6 +66,7 @@ def grouped_chart(
             (x + width, final_values, "Final v1.2", "#3977AD"),
         ]
 
+    # Draw the bars of each system and keep them, to write their values afterwards.
     bar_groups = []
 
     for position, values, name, color in positions:
@@ -78,17 +83,20 @@ def grouped_chart(
     all_values = (b0_values or []) + b1_values + final_values
     maximum = max(all_values)
 
+    # Shares: an axis from 0% to a bit above 100%, with its marks written as percentages.
     if percentage:
         ax.set_ylim(0, 1.12)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda y, _: f"{y:.0%}")
         )
+    # Seconds: an axis from 0 to a bit above the highest value.
     else:
         ax.set_ylim(0, maximum * 1.2 if maximum else 1)
 
     # Write each value on top of its bar.
     for bars in bar_groups:
         for bar in bars:
+            # The height of the bar is its value, written as a percentage or with two decimals.
             value = bar.get_height()
 
             label = (
@@ -97,6 +105,7 @@ def grouped_chart(
                 else f"{value:.2f}"
             )
 
+            # Write it 5 points above the centre of the bar.
             ax.annotate(
                 label,
                 (
@@ -109,12 +118,14 @@ def grouped_chart(
                 fontsize=10,
             )
 
+    # Remove the top and right borders, and add a soft horizontal grid behind the bars.
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
     ax.grid(axis="y", alpha=0.15)
     ax.set_axisbelow(True)
 
+    # Tidy the margins, make sure the folder exists, save the image and close the figure.
     fig.tight_layout()
 
     OUTPUT.mkdir(parents=True, exist_ok=True)
@@ -130,8 +141,9 @@ def grouped_chart(
     print("Saved:", OUTPUT / filename)
 
 
-# Read the summaries of the three runs and draw the retrieval, correctness, refusal and latency charts.
+# Read the summaries of the three runs and draw the four charts: retrieval, correctness, refusals and latency.
 def main() -> None:
+    # The summary files of the three runs: the automatic metrics and the judge's grades.
     b0_metrics = load_json(B0_RUN / "metrics_summary.json")
     b0_judge = load_json(B0_RUN / "judge_summary.json")
     b1_metrics = load_json(B1_RUN / "metrics_summary.json")
@@ -156,7 +168,8 @@ def main() -> None:
         filename="retrieval_performance.png",
     )
 
-    # Figure 2: answer correctness from the judge (fully correct share and average score).
+    # Figure 2: the correctness of the answers according to the judge (the share of fully correct answers and the
+    # average score).
 
     grouped_chart(
         title="Answer Correctness",
@@ -218,6 +231,7 @@ def main() -> None:
         ],
     )
 
+    # The final message.
     print("\n========== FIGURES COMPLETE ==========")
     print("Output directory:", OUTPUT)
     print("Total figures: 4")

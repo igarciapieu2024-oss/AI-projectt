@@ -1,18 +1,21 @@
-# Compute the automatic metrics of one evaluation run from its saved answers (results.jsonl, written by
-# eval/run_eval.py). No model is called: everything is counted from what the system returned.
+# Calculate the automatic metrics of one evaluation run from its saved answers (results.jsonl, written by
+# eval/run_eval.py). No model is called: we count everything from what the system returned.
 #   python -m eval.metrics --run-dir eval/runs/RUN_ID
-# Metrics: recall@5 and MRR (did the search find the right source, and how high), refusal accuracy, false
-# refusal rate, citation validity and presence, and latency. Whether an answer is correct is graded
-# separately by eval/judge.py.
-# Writes metrics_questions.csv (one row per question) and metrics_summary.json (the averages) in the run
-# folder; eval/error_analysis.py, eval/figures.py and the results of the report read them.
+# The metrics: recall@5 and MRR (did the search find the right source, and how high), refusal accuracy, false refusal
+# rate, citation validity and presence, and latency. Whether an answer is correct is graded separately by
+# eval/judge.py.
+# It writes metrics_questions.csv (one row per question) and metrics_summary.json (the averages) in the folder of the
+# run; eval/error_analysis.py, eval/figures.py and the results of the report read them.
 
 from __future__ import annotations
 
+# argparse reads the options, csv writes the metrics of each question and json reads the answers and writes the
+# averages.
 import argparse
 import csv
 import json
 
+# mean averages the values.
 from pathlib import Path
 from statistics import mean
 
@@ -20,11 +23,13 @@ from statistics import mean
 # Read results.jsonl: one JSON record per question, with the question and the answer of the system.
 def load_run(path: Path) -> list[dict]:
 
+    # The file has to exist: eval/run_eval.py writes it.
     if not path.is_file():
         raise FileNotFoundError(
             f"Results file not found: {path}"
         )
 
+    # One record per line; empty lines are skipped.
     with path.open(encoding="utf-8") as file:
 
         return [
@@ -38,10 +43,13 @@ def load_run(path: Path) -> list[dict]:
 # all of them: a chunk of a merged slide can cover several slides.
 def source_ids(hit: dict) -> set[str]:
 
+    # The chunk of this search result.
     chunk = hit.get("chunk") or {}
 
+    # The slides or sections the chunk covers.
     ids = set(chunk.get("covers") or [])
 
+    # Older saved answers stored these ids in separate fields, so we add them too when they are there.
     if chunk.get("source_id"):
         ids.add(str(chunk["source_id"]))
 
@@ -54,17 +62,20 @@ def source_ids(hit: dict) -> set[str]:
     return ids
 
 
-# The metrics of one question. The search counts as a hit if any of the first k chunks (the 5 the LLM
-# reads) covers at least one gold id; it does not say whether the answer used that source correctly.
-# Retrieval metrics are left empty ("") for unanswerable questions, which have no right source.
+# The metrics of one question. The search counts as a hit if any of the first k chunks (the 5 the LLM reads) covers at
+# least one gold id; it doesn't say whether the answer used that source correctly. The retrieval metrics are left
+# empty ("") for unanswerable questions, which have no right source.
 def score_question(row: dict, k: int) -> dict:
 
+    # The answer of the system for this question.
     result = row["result"]
 
+    # The sources given to the model, and the ones the answer cites.
     hits = result.get("context_hits") or []
 
     citations = result.get("citations") or []
 
+    # The gold ids of the question: the slides or sections that contain its answer, separated by ";".
     gold = {
         item.strip()
         for item in str(
@@ -73,12 +84,13 @@ def score_question(row: dict, k: int) -> dict:
         if item.strip()
     }
 
+    # 1 if the material can answer the question, 0 if the system should refuse it.
     answerable = (
         str(row.get("answerable", "")).strip() == "1"
     )
 
-    # Refused is the flag the answer phase sets when it returns the refusal sentence (src/generation/answer.py),
-    # not a reading of the answer text.
+    # refused is the flag the answer phase sets when it returns the refusal sentence (src/generation/answer.py); we
+    # don't read it from the text of the answer.
     refused = bool(
         result.get("refused")
     )
@@ -89,11 +101,13 @@ def score_question(row: dict, k: int) -> dict:
 
     if answerable:
 
+        # Go through the first k sources in order, counting from 1.
         for rank, hit in enumerate(
             hits[:k],
             start=1
         ):
 
+            # The first source that shares an id with the gold ids is the one that counts.
             retrieved_ids = source_ids(hit)
 
             if gold.intersection(retrieved_ids):
@@ -102,9 +116,10 @@ def score_question(row: dict, k: int) -> dict:
 
                 break
 
-    # A citation is valid when its label ([S1], [S2]...) points to the same chunk the system gave the LLM under
-    # that label, so the answer cannot cite a source it did not receive.
+    # A citation is valid when its label ([S1], [S2]...) points to the same chunk the system gave the LLM under that
+    # label, so the answer can't cite a source it didn't receive.
 
+    # Each label with the chunk the system gave the model under that label.
     labels = {
         hit.get("label"): (
             hit.get("chunk") or {}
@@ -112,6 +127,7 @@ def score_question(row: dict, k: int) -> dict:
         for hit in hits
     }
 
+    # A citation is valid when its label exists and points to that same chunk.
     valid_citations = sum(
         citation.get("label") in labels
         and labels[citation.get("label")]
@@ -122,7 +138,7 @@ def score_question(row: dict, k: int) -> dict:
     total_citations = len(citations)
 
     # One row of metrics_questions.csv. The refusal decision is correct when the system refused exactly the
-    # unanswerable questions; the reciprocal rank is 1/position, or 0 if the right source was not found.
+    # unanswerable questions; the reciprocal rank is 1/position, or 0 if the right source wasn't found.
 
     return {
         "question_id": row.get("question_id", ""),
@@ -130,10 +146,12 @@ def score_question(row: dict, k: int) -> dict:
         "answerable": int(answerable),
         "refused": int(refused),
 
+        # 1 when the system refused an unanswerable question or answered an answerable one.
         "correct_refusal_decision": int(
             refused != answerable
         ),
 
+        # 1 if the right source was among the first k, 0 if it wasn't.
         "recall_at_k": (
             int(first_rank is not None)
             if answerable
@@ -152,10 +170,12 @@ def score_question(row: dict, k: int) -> dict:
 
         "valid_citation_count": valid_citations,
 
+        # 1 if the answer has at least one citation.
         "citation_present": int(
             total_citations > 0
         ),
 
+        # The share of its citations that are valid (empty when it has none).
         "citation_precision": (
             round(
                 valid_citations / total_citations,
@@ -165,6 +185,7 @@ def score_question(row: dict, k: int) -> dict:
             else ""
         ),
 
+        # The total time of the answer, in milliseconds.
         "latency_ms": (
             result.get("timings_ms") or {}
         ).get("total", "")
@@ -192,9 +213,10 @@ def _source_sets(retrieved):
     ]
 
 
-# Share of the gold ids found in the first k results. Unlike score_question (found or not), it gives
-# partial credit when only some of the gold ids are found.
+# The share of the gold ids found in the first k results. Unlike score_question (found or not), it gives partial
+# credit when only some of the gold ids are found.
 def recall_at_k(retrieved, gold, k=5):
+    # With k below 1, or without gold ids, there is nothing to find.
     if k < 1:
         return 0.0
 
@@ -203,11 +225,13 @@ def recall_at_k(retrieved, gold, k=5):
     if not gold_set:
         return 0.0
 
+    # All the ids of the first k results together.
     retrieved_ids = set()
 
     for source in _source_sets(retrieved)[:k]:
         retrieved_ids.update(source)
 
+    # The share of the gold ids that are among them.
     return len(retrieved_ids & gold_set) / len(gold_set)
 
 
@@ -218,6 +242,7 @@ def reciprocal_rank(retrieved, gold):
     if not gold_set:
         return 0.0
 
+    # Go through the results in order and stop at the first one that covers a gold id.
     for rank, source in enumerate(_source_sets(retrieved), start=1):
         if source & gold_set:
             return 1.0 / rank
@@ -228,6 +253,7 @@ def reciprocal_rank(retrieved, gold):
 # nDCG@k: every right result found adds more the higher it is ranked (1/log2(position + 1)), divided by the
 # best score possible, so 1 means all the right sources are at the top.
 def ndcg_at_k(retrieved, gold, k=5):
+    # log2 is only needed here.
     from math import log2
 
     if k < 1:
@@ -238,14 +264,17 @@ def ndcg_at_k(retrieved, gold, k=5):
     if not gold_set:
         return 0.0
 
+    # The first k results.
     sources = _source_sets(retrieved)[:k]
 
+    # DCG: the sum of 1/log2(position + 1) over the right results.
     dcg = sum(
         1.0 / log2(rank + 1)
         for rank, source in enumerate(sources, start=1)
         if source & gold_set
     )
 
+    # The ideal DCG: the same sum if all the right sources were at the top.
     ideal_count = min(len(gold_set), k)
 
     idcg = sum(
@@ -256,9 +285,10 @@ def ndcg_at_k(retrieved, gold, k=5):
     return dcg / idcg if idcg else 0.0
 
 
-# Compare the refusals expected with the refusals made: precision (refusals that were right), recall
-# (questions to refuse that were refused) and accuracy. Each ratio is 0 when its denominator is 0.
+# Compare the refusals we expected with the refusals the system made: precision (the refusals that were right), recall
+# (the questions to refuse that were refused) and accuracy. Each ratio is 0 when its denominator is 0.
 def refusal_metrics(expected, predicted):
+    # Both lists have to be the same length, and an empty list gives zeros.
     if len(expected) != len(predicted):
         raise ValueError("Expected and predicted lengths must match")
 
@@ -269,6 +299,8 @@ def refusal_metrics(expected, predicted):
             "refusal_accuracy": 0.0,
         }
 
+    # tp: refusals that were expected. fp: refusals that weren't expected. fn: expected refusals that didn't happen.
+    # correct: the cases where both agree.
     tp = sum(
         bool(e) and bool(p)
         for e, p in zip(expected, predicted)
@@ -303,6 +335,7 @@ def average_latency(latencies):
 # Score every question of a run, average the metrics and save both files in the run folder.
 def main():
 
+    # The options: the folder of the run and k, the number of sources that count (5 by default).
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -319,6 +352,7 @@ def main():
 
     args = parser.parse_args()
 
+    # k has to be at least 1.
     if args.k < 1:
         parser.error("--k must be at least 1")
 
@@ -342,12 +376,13 @@ def main():
         if row.get("status") != "ok"
     ]
 
+    # Without any successful answer there is nothing to score.
     if not successful:
         parser.error(
             "No successful question results to score"
         )
 
-    # Score each question, then split them into answerable and unanswerable for the averages.
+    # Score each question, and then split them into answerable and unanswerable for the averages.
 
     scores = [
         score_question(row, args.k)
@@ -366,6 +401,7 @@ def main():
         if row["answerable"] == 0
     ]
 
+    # The citations of the whole run, and how many of them are valid.
     all_citations = sum(
         row["citation_count"]
         for row in scores
@@ -376,9 +412,9 @@ def main():
         for row in scores
     )
 
-    # The averages. Recall and MRR use only the answerable questions; the false refusal rate is the share of
-    # answerable questions refused, and correct_unanswerable_refusal_rate the share of unanswerable ones
-    # refused. Citation validity is valid citations over all citations of the run.
+    # The averages. Recall and MRR only use the answerable questions; the false refusal rate is the share of
+    # answerable questions that were refused, and correct_unanswerable_refusal_rate is the share of unanswerable ones
+    # that were refused. Citation validity is the valid citations over all the citations of the run.
 
     summary = {
         "run_dir": str(args.run_dir),
@@ -450,6 +486,7 @@ def main():
         args.run_dir / "metrics_questions.csv"
     )
 
+    # The columns are the keys of the first row.
     with csv_path.open(
         "w",
         encoding="utf-8",
