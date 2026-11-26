@@ -1,0 +1,46 @@
+{
+  "run_dir": "eval\\saved_runs\\20261118T203420Z_final_tables_test",
+  "judge_model": "qwen2.5:7b",
+  "judge_results": "saved by an earlier run",
+  "embed_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "evaluated": 30,
+  "judge_errors": 0,
+  "retrieval": {
+    "recall_at_k": 0.8333,
+    "recall_ceiling": 0.875,
+    "answerable_not_searched": 2,
+    "gold_source_not_in_index": 1,
+    "context_precision": 0.3409,
+    "gold_precision": 0.2955,
+    "precision_ceiling": 0.3591,
+    "questions": 22
+  },
+  "generation": {
+    "faithfulness": 0.9656,
+    "fully_supported_rate": 0.8696,
+    "answers": 23,
+    "reference_fully_supported_rate": 0.8696,
+    "judge_agreement_with_reference": 0.913,
+    "correct_rate_with_gold_source": 0.8,
+    "questions_with_gold_source": 20,
+    "correct_rate_without_gold_source": 0.0,
+    "questions_without_gold_source": 4
+  },
+  "end_to_end": {
+    "answerable_correct_rate": 0.6667,
+    "answer_semantic_similarity": 0.6278,
+    "questions": 24,
+    "similarity_of_correct_answers": 0.6705,
+    "similarity_of_other_answers": 0.5425
+  },
+  "notes": [
+    "Context precision: relevant sources / sources given to the LLM, graded by the judge on answerable questions.",
+    "Gold precision: sources that cover a gold id / sources given to the LLM. Precision ceiling: its best possible value with the same number of sources.",
+    "Recall ceiling: answerable questions that were searched and whose gold source is in the indexes.",
+    "Faithfulness: supported claims / claims of the answer, graded by the judge on the answers that weren't refused.",
+    "Reference fully supported rate: answers whose claims are all supported, checked against the sources by a second model.",
+    "Correct rate with gold source: fully correct answers among the answerable questions with recall@k = 1.",
+    "Answerable correct rate = recall@k x correct rate with gold source, when no answer is correct without it.",
+    "Answer semantic similarity: cosine between the answer and the reference answer, on answerable questions. The similarity of the correct answers is its practical ceiling."
+  ]
+}

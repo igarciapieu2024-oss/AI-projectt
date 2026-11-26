@@ -1,0 +1,24 @@
+run_id,question_id,fully_supported,unsupported_claim
+20261118T203420Z_final_tables_test,NZ01,1,
+20261118T203420Z_final_tables_test,NZ03,1,
+20261118T203420Z_final_tables_test,NZ04,1,
+20261118T203420Z_final_tables_test,NZ05,1,
+20261118T203420Z_final_tables_test,NZ06,1,
+20261118T203420Z_final_tables_test,NZ07,0,Says each firm produces 200 pounds; the source gives 200 pounds as the output of all the firms.
+20261118T203420Z_final_tables_test,NZ08,1,
+20261118T203420Z_final_tables_test,NZ10,1,
+20261118T203420Z_final_tables_test,NZ11,1,
+20261118T203420Z_final_tables_test,NZ12,0,"Says a final exam grade below 3.5 sends the student to the retake exam; the source says less than 4 goes to the retake, and below 3.5 fails the course."
+20261118T203420Z_final_tables_test,NZ13,1,
+20261118T203420Z_final_tables_test,NZ14,1,
+20261118T203420Z_final_tables_test,NZ15,1,
+20261118T203420Z_final_tables_test,NZ21,1,
+20261118T203420Z_final_tables_test,NZ22,1,
+20261118T203420Z_final_tables_test,NZ23,1,
+20261118T203420Z_final_tables_test,NZ24,1,
+20261118T203420Z_final_tables_test,NZ25,1,
+20261118T203420Z_final_tables_test,NZ26,1,
+20261118T203420Z_final_tables_test,NZ27,0,Says the six listed functions report to the CFO; the source lists them as the functions of the controller.
+20261118T203420Z_final_tables_test,NZ28,1,
+20261118T203420Z_final_tables_test,NZ29,1,
+20261118T203420Z_final_tables_test,NZ30,1,

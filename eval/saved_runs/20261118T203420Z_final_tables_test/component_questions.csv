@@ -1,0 +1,31 @@
+question_id,type,answerable,refused,recall_at_k,correctness,semantic_similarity,context_total,gold_in_index,gold_sources,gold_precision,precision_ceiling,context_relevant,context_precision,relevant_labels,claims,supported_claims,faithfulness,unsupported_claims,reference_fully_supported,judge_status
+NZ01,content,1,0,1,1.0,0.7622,5,1,1,0.2,0.2,1,0.2,S1,3,3,1.0,,1,ok
+NZ02,content,1,1,0,0.0,0.1299,,1,,,,,,,,,,,,not_needed
+NZ03,content,1,0,1,1.0,0.6832,5,1,1,0.2,0.2,2,0.4,S1;S2,2,2,1.0,,1,ok
+NZ04,content,1,0,1,1.0,0.449,5,1,1,0.2,0.2,2,0.4,S1;S2,3,3,1.0,,1,ok
+NZ05,content,1,0,1,1.0,0.9272,5,1,1,0.2,0.2,2,0.4,S1;S4,2,2,1.0,,1,ok
+NZ06,content,1,0,1,1.0,0.9993,5,1,1,0.2,0.2,2,0.4,S1;S2,2,2,1.0,,1,ok
+NZ07,content,1,0,0,0.0,0.6686,5,0,0,0.0,0.0,1,0.2,S1,3,2,0.6667,"Under perfect competition, each firm produces 200 pounds",0,ok
+NZ08,content,1,0,1,1.0,0.594,5,1,1,0.2,0.2,1,0.2,S1,4,4,1.0,,1,ok
+NZ09,admin,1,1,0,0.0,0.3369,,2,,,,,,,,,,,,not_needed
+NZ10,admin,1,0,1,0.5,0.6564,5,3,2,0.4,0.6,2,0.4,S1;S2,2,2,1.0,,1,ok
+NZ11,admin,1,0,1,1.0,0.7877,5,4,4,0.8,0.8,2,0.4,S1;S2,2,2,1.0,,1,ok
+NZ12,admin,1,0,1,0.5,0.8844,5,2,2,0.4,0.4,1,0.2,S1,2,2,1.0,,0,ok
+NZ13,admin,1,0,1,1.0,0.5433,5,4,3,0.6,0.8,1,0.2,S1,3,3,1.0,,1,ok
+NZ14,admin,1,0,1,1.0,0.4103,5,2,2,0.4,0.4,2,0.4,S1;S2,4,4,1.0,,1,ok
+NZ15,unanswerable,0,0,,1.0,,,,,,,,,,3,2,0.6667,The course has a number of teaching assistants,1,ok
+NZ16,unanswerable,0,1,,1.0,,,,,,,,,,,,,,,not_needed
+NZ17,unanswerable,0,1,,1.0,,,,,,,,,,,,,,,not_needed
+NZ18,unanswerable,0,1,,1.0,,,,,,,,,,,,,,,not_needed
+NZ19,unanswerable,0,1,,1.0,,,,,,,,,,,,,,,not_needed
+NZ20,unanswerable,0,1,,1.0,,,,,,,,,,,,,,,not_needed
+NZ21,cross,1,0,1,1.0,0.5496,10,4,3,0.3,0.4,2,0.2,S1;S6,2,2,1.0,,1,ok
+NZ22,cross,1,0,1,0.5,0.7142,10,4,4,0.4,0.4,4,0.4,S1;S2;S6;S7,3,3,1.0,,1,ok
+NZ23,cross,1,0,1,1.0,0.4969,10,4,3,0.3,0.4,2,0.2,S5;S8,2,2,1.0,,1,ok
+NZ24,cross,1,0,1,1.0,0.7468,10,7,3,0.3,0.7,3,0.3,S1;S6;S8,4,4,1.0,,1,ok
+NZ25,image,1,0,0,0.5,0.4774,5,2,0,0.0,0.4,1,0.2,S1,3,3,1.0,,1,ok
+NZ26,image,1,0,1,1.0,0.9235,5,1,1,0.2,0.2,2,0.4,S1;S5,3,3,1.0,,1,ok
+NZ27,image,1,0,1,0.0,0.472,5,3,3,0.6,0.6,2,0.4,S1;S5,8,7,0.875,Prepare and analyze performance reports and interpret them for the general managers report to the CFO,0,ok
+NZ28,followup,1,0,1,1.0,0.5255,5,1,1,0.2,0.2,2,0.4,S1;S4,2,2,1.0,,1,ok
+NZ29,followup,1,0,1,1.0,0.7245,5,1,1,0.2,0.2,2,0.4,S1;S4,2,2,1.0,,1,ok
+NZ30,followup,1,0,1,1.0,0.6048,5,1,1,0.2,0.2,4,0.8,S1;S2;S3;S5,3,3,1.0,,1,ok

@@ -1,0 +1,46 @@
+{
+  "run_dir": "eval\\saved_runs\\20261118T210200Z_b0_no_rag_test",
+  "judge_model": null,
+  "judge_results": "none",
+  "embed_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "evaluated": 30,
+  "judge_errors": 0,
+  "retrieval": {
+    "recall_at_k": 0,
+    "recall_ceiling": 0.0,
+    "answerable_not_searched": 24,
+    "gold_source_not_in_index": 0,
+    "context_precision": null,
+    "gold_precision": null,
+    "precision_ceiling": null,
+    "questions": 0
+  },
+  "generation": {
+    "faithfulness": null,
+    "fully_supported_rate": null,
+    "answers": 0,
+    "reference_fully_supported_rate": null,
+    "judge_agreement_with_reference": null,
+    "correct_rate_with_gold_source": null,
+    "questions_with_gold_source": 0,
+    "correct_rate_without_gold_source": 0.0417,
+    "questions_without_gold_source": 24
+  },
+  "end_to_end": {
+    "answerable_correct_rate": 0.0417,
+    "answer_semantic_similarity": 0.4546,
+    "questions": 24,
+    "similarity_of_correct_answers": 0.3264,
+    "similarity_of_other_answers": 0.4602
+  },
+  "notes": [
+    "Context precision: relevant sources / sources given to the LLM, graded by the judge on answerable questions.",
+    "Gold precision: sources that cover a gold id / sources given to the LLM. Precision ceiling: its best possible value with the same number of sources.",
+    "Recall ceiling: answerable questions that were searched and whose gold source is in the indexes.",
+    "Faithfulness: supported claims / claims of the answer, graded by the judge on the answers that weren't refused.",
+    "Reference fully supported rate: answers whose claims are all supported, checked against the sources by a second model.",
+    "Correct rate with gold source: fully correct answers among the answerable questions with recall@k = 1.",
+    "Answerable correct rate = recall@k x correct rate with gold source, when no answer is correct without it.",
+    "Answer semantic similarity: cosine between the answer and the reference answer, on answerable questions. The similarity of the correct answers is its practical ceiling."
+  ]
+}
