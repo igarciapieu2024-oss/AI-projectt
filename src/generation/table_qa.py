@@ -300,8 +300,3 @@ def course_rows() -> list[dict[str, str]]:
 # ranking word and asks for nothing else. answer.py uses it to send such questions to the table.
 def asks_for_ranking(question: str) -> bool:
     return bool(_compared_field(question) and _RANKING.search(question) and not _OTHER_ASK.search(question))
-
-
-# Empty the cached rows, so the table is read again after it is rebuilt.
-def clear_table_cache() -> None:
-    _load_rows.cache_clear()

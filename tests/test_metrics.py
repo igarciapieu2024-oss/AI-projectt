@@ -93,32 +93,6 @@ def test_multiple_ids_source_position():
     assert recall_at_k(retrieved, gold, k=1) == 0.0
     assert recall_at_k(retrieved, gold, k=2) == 1.0
 
-def test_multiple_ids_per_source():
-    """One retrieved source may cover multiple gold IDs."""
-    retrieved = [
-        ["A", "B"],
-        ["C"],
-        ["D", "E"],
-    ]
-    gold = ["B", "E"]
-
-    assert recall_at_k(retrieved, gold, k=1) == 0.5
-    assert recall_at_k(retrieved, gold, k=3) == 1.0
-    assert reciprocal_rank(retrieved, gold) == 1.0
-
-
-def test_multiple_ids_source_position():
-    """Ranking is based on sources, not individual IDs."""
-    retrieved = [
-        ["A", "B"],
-        ["C", "D"],
-    ]
-    gold = ["D"]
-
-    assert reciprocal_rank(retrieved, gold) == 0.5
-    assert recall_at_k(retrieved, gold, k=1) == 0.0
-    assert recall_at_k(retrieved, gold, k=2) == 1.0
-
 def test_refusal_metrics():
     """Calculate precision, recall and accuracy of refusals."""
     expected = [True, True, False, False]

@@ -31,16 +31,16 @@ import csv
 import json
 import re
 
-# mean averages the values.
+# Path holds the paths of the run folder and of the reference files.
 from pathlib import Path
-from statistics import mean
 
 # load_scores reads the grades the automatic judge saved for a run (question_id -> grade).
 from eval.judge_agreement import load_scores
 
-# load_run reads results.jsonl, score_question gives recall@5 for one question and source_ids gives the slides or
-# sections a retrieved chunk covers, so "the right source" means here exactly what it means in eval/metrics.py.
-from eval.metrics import load_run, score_question, source_ids
+# average gives the mean rounded to 4 decimals (None if there are no values), load_run reads results.jsonl,
+# score_question gives recall@5 for one question and source_ids gives the slides or sections a retrieved chunk
+# covers, so the averages and "the right source" mean here exactly what they mean in eval/metrics.py.
+from eval.metrics import average, load_run, score_question, source_ids
 
 # load_config gives the names of the judge model and of the embedding model, and chunks_path the file with the chunks
 # of a knowledge base, so they are the same as in the rest of the project.
@@ -310,13 +310,6 @@ def answer_similarities(rows: list[dict], model_name: str, embed_fn=None) -> dic
         row["question_id"]: round(float((answer * reference).sum()), 4)
         for row, answer, reference in zip(rows, answer_vectors, reference_vectors)
     }
-
-
-# The mean rounded to 4 decimals, or None if there are no values.
-def average(values: list[float]):
-    if not values:
-        return None
-    return round(mean(values), 4)
 
 
 # The share of fully correct answers (grade 1) in a group of questions, or None if the group is empty.
